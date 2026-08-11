@@ -22,7 +22,9 @@ npm run login          # devvit login
 npm run playtest       # builds and installs into your dev subreddit
 ```
 
-Set your dev subreddit in `devvit.json` under `dev.subreddit` (currently `outlier_dev`).
+The app installs into **r/PlayOutlier**, set in `devvit.json` under `dev.subreddit`.
+Nothing else hardcodes a subreddit — every post and comment resolves the install's own
+subreddit from the request context, so the app works wherever it is installed.
 
 | Command | What it does |
 |---|---|
