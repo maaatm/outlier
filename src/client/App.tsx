@@ -227,44 +227,48 @@ function PlayView({
         />
       </div>
 
-      <p className="guess__prompt">
-        You said <strong>{label}</strong>. How many out of {CROWD_SIZE} agree?
-      </p>
+      {/* One group, so the controls arrive together and after the crowd has
+          made room for them. */}
+      <div className="guess__controls">
+        <p className="guess__prompt">
+          You said <strong>{label}</strong>. How many out of {CROWD_SIZE} agree?
+        </p>
 
-      <div className="guess__readout">
-        <span className="bignum">{guess}</span>
-        <span className="guess__unit">out of {CROWD_SIZE}</span>
+        <div className="guess__readout">
+          <span className="bignum">{guess}</span>
+          <span className="guess__unit">out of {CROWD_SIZE}</span>
+        </div>
+
+        <input
+          className="slider"
+          type="range"
+          min={0}
+          max={100}
+          step={1}
+          value={guess}
+          aria-label={`Percentage of people who also said ${label}`}
+          onChange={(event) => setGuess(Number(event.target.value))}
+        />
+        <div className="slider__ticks">
+          <span>0</span>
+          <span>100</span>
+        </div>
+
+        <button
+          type="button"
+          className="button button--primary"
+          onClick={lockIn}
+          disabled={submitting}
+        >
+          {submitting ? 'Locking in...' : 'Lock it in'}
+        </button>
+
+        <button type="button" className="button button--quiet" onClick={() => setChoice(null)}>
+          Change answer
+        </button>
+
+        {error && <p className="notice notice--quiet">{error}</p>}
       </div>
-
-      <input
-        className="slider"
-        type="range"
-        min={0}
-        max={100}
-        step={1}
-        value={guess}
-        aria-label={`Percentage of people who also said ${label}`}
-        onChange={(event) => setGuess(Number(event.target.value))}
-      />
-      <div className="slider__ticks">
-        <span>0</span>
-        <span>100</span>
-      </div>
-
-      <button
-        type="button"
-        className="button button--primary"
-        onClick={lockIn}
-        disabled={submitting}
-      >
-        {submitting ? 'Locking in...' : 'Lock it in'}
-      </button>
-
-      <button type="button" className="button button--quiet" onClick={() => setChoice(null)}>
-        Change answer
-      </button>
-
-      {error && <p className="notice notice--quiet">{error}</p>}
     </div>
   );
 }

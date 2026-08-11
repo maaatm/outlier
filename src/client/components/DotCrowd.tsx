@@ -7,7 +7,10 @@
  *
  * The crowd sizes itself to whatever box it is given — it measures its parent
  * and derives the cell from that, so the dots grow to fill the slide rather
- * than sitting at a fixed size in the middle of it.
+ * than sitting at a fixed size in the middle of it. When the box changes, and it
+ * does the moment an answer is picked, the crowd travels to its new size instead
+ * of snapping: every dot moves and resizes on one clock, so a hundred of them
+ * read as a single group being scaled.
  *
  * While the player drags the slider the crowd previews their guess: the first
  * `split` dots take one colour and the rest take the other, so the two groups
@@ -220,16 +223,22 @@ export function DotCrowd({
   const dot = cell * DOT_RATIO;
   const jitterScale = cell / REFERENCE_CELL;
   const inset = cell * layout.margin;
-  // The field is the size of the crowd inside it, and the field is centered in
-  // the stage — so the crowd is centered too, whichever arrangement it is in.
-  const fieldWidth = cell * layout.width;
-  const fieldHeight = cell * layout.height;
+  /*
+   * The field is the whole box, and the crowd is centered inside it by this
+   * offset. Sizing the field to the crowd instead and letting flex center it
+   * would be simpler to read, but the box changes size — the guess screen gives
+   * the crowd less room than the question screen does — and a field that resizes
+   * teleports its own origin, taking every dot with it in a single frame. With
+   * the centering carried in the transform there is nothing to teleport: every
+   * dot's target moves, and every dot's transition takes it there.
+   */
+  const originX = (box.width - cell * layout.width) / 2;
+  const originY = (box.height - cell * layout.height) / 2;
 
   return (
     <div className="crowd" ref={boxRef}>
       <div
         className="crowd__field"
-        style={{ width: fieldWidth, height: fieldHeight }}
         role="img"
         aria-label={
           revealed
@@ -279,8 +288,8 @@ export function DotCrowd({
                   width: dot,
                   height: dot,
                   transform:
-                    `translate(${(inset + target.x * cell + jitter.dx * jitterScale + proud).toFixed(2)}px, ` +
-                    `${(inset + target.y * cell + jitter.dy * jitterScale + proud).toFixed(2)}px)`,
+                    `translate(${(originX + inset + target.x * cell + jitter.dx * jitterScale + proud).toFixed(2)}px, ` +
+                    `${(originY + inset + target.y * cell + jitter.dy * jitterScale + proud).toFixed(2)}px)`,
                   transitionDelay:
                     revealed && animate
                       ? `${index * STAGGER_MS + (mine ? MINE_DELAY_MS : 0)}ms`
