@@ -12,6 +12,7 @@ import { getBadge } from '../shared/badges.js';
 import { CROWD_SIZE } from '../shared/config.js';
 import type { Choice, Question, Reveal, StateResponse, Streaks } from '../shared/types.js';
 import { ApiFailure, castVote, fetchState } from './api.js';
+import { randomGroupColors } from './colors.js';
 import { BadgeStamp } from './components/BadgeStamp.js';
 import { Compose } from './components/Compose.js';
 import { DotCrowd } from './components/DotCrowd.js';
@@ -153,6 +154,9 @@ function PlayView({
   const [guess, setGuess] = useState(DEFAULT_GUESS);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Drawn once per question, not per frame: the pair has to hold still while
+  // the slider moves, or the crowd strobes.
+  const [groupColors] = useState(randomGroupColors);
 
   if (locked) {
     return <p className="notice">Voting closed on this one. The result is in the thread.</p>;
@@ -202,11 +206,25 @@ function PlayView({
   }
 
   const label = choice === 'a' ? question.labelA : question.labelB;
+  const otherLabel = choice === 'a' ? question.labelB : question.labelA;
+  // The slider is a percentage; the crowd is dots. Same number today, but the
+  // conversion is what is meant.
+  const dotsGuessed = (guess / 100) * CROWD_SIZE;
 
+  // Now that there is a side, the crowd answers the slider: the guess splits it
+  // into two coloured groups in place. Nothing has moved yet — the travel into
+  // camps is the reveal's, and spending it here would spend it twice.
   return (
     <div className="guess">
       <div className="stage">
-        <DotCrowd withYou={null} accent="signal" />
+        <DotCrowd
+          withYou={null}
+          accent="signal"
+          split={dotsGuessed}
+          groupColors={groupColors}
+          yourLabel={label}
+          otherLabel={otherLabel}
+        />
       </div>
 
       <p className="guess__prompt">
