@@ -1,9 +1,10 @@
 /**
  * One tap posts the comment.
  *
- * The comment is pre-written and that is load-bearing — nothing here requires
- * the player to type. The note field is optional, is appended to the generated
- * text, and never blocks posting.
+ * The comment is pre-written and that is load-bearing — the primary button
+ * posts it directly, no typing anywhere. "See it first" opens an overlay panel
+ * with the exact text and the optional note; the panel floats over the reveal
+ * instead of extending it, so the screen never grows past the viewport.
  */
 
 import { useState } from 'react';
@@ -21,7 +22,7 @@ type Props = {
 
 export function Compose({ postId, question, reveal }: Props): React.JSX.Element {
   const [note, setNote] = useState('');
-  const [showNote, setShowNote] = useState(false);
+  const [panel, setPanel] = useState(false);
   const [posting, setPosting] = useState(false);
   const [posted, setPosted] = useState(reveal.commented);
   const [error, setError] = useState<string | null>(null);
@@ -35,9 +36,14 @@ export function Compose({ postId, question, reveal }: Props): React.JSX.Element 
     try {
       await postComment(postId, note.trim() || undefined);
       setPosted(true);
+      setPanel(false);
     } catch (failure) {
-      if (failure instanceof ApiFailure && failure.status === 409) setPosted(true);
-      else setError(failure instanceof Error ? failure.message : 'Could not post that.');
+      if (failure instanceof ApiFailure && failure.status === 409) {
+        setPosted(true);
+        setPanel(false);
+      } else {
+        setError(failure instanceof Error ? failure.message : 'Could not post that.');
+      }
     } finally {
       setPosting(false);
     }
@@ -49,11 +55,27 @@ export function Compose({ postId, question, reveal }: Props): React.JSX.Element 
 
   return (
     <div className="compose">
-      <p className="section__title">your comment, already written</p>
-      <pre className="compose__preview">{preview}</pre>
+      <div className="compose__actions">
+        <button
+          type="button"
+          className="button button--primary"
+          onClick={submit}
+          disabled={posting}
+        >
+          {posting ? 'Posting...' : 'Post this to the thread'}
+        </button>
+        <button type="button" className="button button--quiet" onClick={() => setPanel(true)}>
+          See it · add a line
+        </button>
+      </div>
 
-      {showNote ? (
-        <>
+      {error && !panel && <p className="notice notice--quiet">{error}</p>}
+
+      {panel && (
+        <div className="compose__panel" role="dialog" aria-label="Your comment">
+          <p className="section__title">your comment, already written</p>
+          <pre className="compose__preview">{preview}</pre>
+
           <label className="visually-hidden" htmlFor="note">
             Optional note
           </label>
@@ -66,21 +88,25 @@ export function Compose({ postId, question, reveal }: Props): React.JSX.Element 
             placeholder="Add a line, or do not."
             onChange={(event) => setNote(event.target.value)}
           />
-          <p className="compose__hint">
-            {NOTE_MAX_LENGTH - note.length} left. Skippable.
-          </p>
-        </>
-      ) : (
-        <button type="button" className="button button--quiet" onClick={() => setShowNote(true)}>
-          Add a line (optional)
-        </button>
+          <p className="compose__hint">{NOTE_MAX_LENGTH - note.length} left. Skippable.</p>
+
+          <div className="compose__actions">
+            <button
+              type="button"
+              className="button button--primary"
+              onClick={submit}
+              disabled={posting}
+            >
+              {posting ? 'Posting...' : 'Post it'}
+            </button>
+            <button type="button" className="button button--quiet" onClick={() => setPanel(false)}>
+              Back
+            </button>
+          </div>
+
+          {error && <p className="notice notice--quiet">{error}</p>}
+        </div>
       )}
-
-      <button type="button" className="button" onClick={submit} disabled={posting}>
-        {posting ? 'Posting...' : 'Post this to the thread'}
-      </button>
-
-      {error && <p className="notice notice--quiet">{error}</p>}
     </div>
   );
 }

@@ -231,7 +231,7 @@ button {
   display: block;
   width: 100%;
   height: 8px;
-  margin: var(--s3) 0;
+  margin: var(--s2) 0;
   color: var(--ink);
   overflow: visible;
 }
@@ -485,32 +485,49 @@ button {
 
 /* ── Reveal ─────────────────────────────────────────────────────────────── */
 
+/*
+ * The reveal fits one viewport, always. Crowd and figures share a row, the
+ * badge sits under them, one strip holds histogram or leaderboard, one row
+ * holds the actions. The comment preview floats in an overlay panel rather
+ * than extending the column.
+ */
 .reveal {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: var(--s3);
+  gap: var(--s2);
+}
+
+/* The crowd's home on both the guess screen and the reveal. */
+.stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s4);
+}
+
+.reveal__rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  min-width: 96px;
 }
 
 .verdict {
   margin: 0;
   font-size: 18px;
   line-height: 1.35;
+  text-align: center;
 }
 
 .verdict strong {
   font-weight: 600;
 }
 
-.figures {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--s2);
-}
-
 .figure {
   border: var(--stroke) solid var(--ink);
   border-radius: var(--radius-button);
-  padding: var(--s2);
+  padding: var(--s1) var(--s2);
   background: var(--card);
 }
 
@@ -525,9 +542,42 @@ button {
   display: block;
   font-family: var(--font-display);
   font-weight: 500;
-  font-size: 32px;
+  font-size: 26px;
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
+}
+
+/* ── Detail strip: histogram or leaderboard, same slot ───────────────────── */
+
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+}
+
+.detail__tabs {
+  display: flex;
+  gap: var(--s2);
+}
+
+.detail__tab {
+  border: var(--stroke) solid var(--ink);
+  border-radius: var(--radius-button);
+  background: var(--card);
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 2px var(--s2);
+}
+
+.detail__tab.is-active {
+  background: var(--ink);
+  color: var(--card);
+}
+
+.detail__tab:focus-visible {
+  outline: var(--stroke) solid var(--signal);
+  outline-offset: 2px;
 }
 
 .badge {
@@ -592,7 +642,7 @@ button {
   display: flex;
   align-items: flex-end;
   gap: var(--s1);
-  height: 72px;
+  height: 44px;
 }
 
 .histogram__bar {
@@ -632,6 +682,42 @@ button {
   gap: var(--s2);
 }
 
+.compose__actions {
+  display: flex;
+  gap: var(--s2);
+  align-items: stretch;
+}
+
+.compose__actions .button--primary {
+  flex: 1;
+}
+
+.compose__actions .button--quiet {
+  white-space: nowrap;
+}
+
+/*
+ * The preview panel floats over the reveal instead of extending it — opening
+ * it must not make the page taller. Solid card, hard shadow, no translucency.
+ */
+.compose__panel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  background: var(--card);
+  border: var(--stroke) solid var(--ink);
+  border-radius: var(--radius-card);
+  box-shadow: var(--drop);
+  padding: var(--s3);
+  max-height: 100%;
+  overflow-y: auto;
+}
+
 .compose__preview {
   font-family: var(--font-mono);
   font-size: 12px;
@@ -642,8 +728,6 @@ button {
   padding: var(--s2);
   background: var(--paper);
   margin: 0;
-  max-height: 168px;
-  overflow-y: auto;
 }
 
 .compose__note {
@@ -689,7 +773,10 @@ button {
 }
 
 .board__text {
-  font-size: 14px;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .board__error {
@@ -742,6 +829,79 @@ button {
   clip: rect(0 0 0 0);
   white-space: nowrap;
   border: 0;
+}
+
+/* ── Short viewports ────────────────────────────────────────────────────── */
+
+/*
+ * The reveal must fit without scrolling even in Devvit's inline post view,
+ * which can be as short as 512px. Two tiers: tighten first, then drop the
+ * detail strip. `zoom` is used rather than `transform: scale` because it
+ * participates in layout, so the shrunken crowd gives its space back.
+ */
+@media (max-height: 700px) {
+  .app {
+    padding: var(--s2);
+    gap: var(--s2);
+  }
+
+  .card {
+    padding: var(--s2);
+  }
+
+  .stage {
+    zoom: 0.85;
+  }
+
+  .question {
+    font-size: 18px;
+  }
+
+  .bignum {
+    font-size: 40px;
+  }
+
+  .slider__ticks {
+    display: none;
+  }
+
+  .badge {
+    padding: var(--s1) var(--s2);
+  }
+
+  .badge__title {
+    font-size: 18px;
+  }
+
+  .badge__line {
+    font-size: 13px;
+  }
+}
+
+@media (max-height: 560px) {
+  .stage {
+    zoom: 0.72;
+  }
+
+  .detail {
+    display: none;
+  }
+
+  .verdict {
+    font-size: 16px;
+  }
+
+  .guess {
+    gap: var(--s2);
+  }
+
+  .bignum {
+    font-size: 32px;
+  }
+
+  .button {
+    padding: var(--s2) var(--s3);
+  }
 }
 
 /* ── Reduced motion ─────────────────────────────────────────────────────── */

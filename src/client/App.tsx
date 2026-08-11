@@ -131,8 +131,6 @@ function Game({
           />
         )}
       </section>
-
-      {reveal && <Leaderboard />}
     </main>
   );
 }
@@ -188,7 +186,9 @@ function PlayView({
   if (choice === null) {
     return (
       <div className="guess">
-        <DotCrowd withYou={null} accent="signal" />
+        <div className="stage">
+          <DotCrowd withYou={null} accent="signal" />
+        </div>
         <div className="choices">
           <button type="button" className="button" onClick={() => setChoice('a')}>
             <span className="choice__label">{question.labelA}</span>
@@ -205,7 +205,9 @@ function PlayView({
 
   return (
     <div className="guess">
-      <DotCrowd withYou={null} accent="signal" />
+      <div className="stage">
+        <DotCrowd withYou={null} accent="signal" />
+      </div>
 
       <p className="guess__prompt">
         You said <strong>{label}</strong>. How many out of {CROWD_SIZE} agree?
@@ -249,7 +251,12 @@ function PlayView({
   );
 }
 
-/** The verdict. Dots first, numbers second, badge last. */
+/**
+ * The verdict, on one screen. Dots and numbers side by side, badge under them,
+ * one detail strip, one action row. Nothing here should ever ask for a scroll —
+ * the comment preview lives in an overlay, and the leaderboard shares the
+ * detail strip with the histogram instead of stacking below it.
+ */
 function RevealView({
   postId,
   question,
@@ -265,20 +272,39 @@ function RevealView({
   const mine = reveal.choice === 'a' ? question.labelA : question.labelB;
   const theirs = reveal.choice === 'a' ? question.labelB : question.labelA;
   const rest = CROWD_SIZE - reveal.dotsWithYou;
+  const [detail, setDetail] = useState<'guesses' | 'misjudged'>('guesses');
+
+  const captionBits = [`${reveal.dotsWithYou} ${mine} · ${rest} ${theirs}`];
+  if (reveal.provisional) {
+    captionBits.push(`${reveal.tally.total} ${reveal.tally.total === 1 ? 'vote' : 'votes'} so far`);
+  }
+  if (!question.isDaily) captionBits.push('no streak');
 
   return (
     <div className="reveal">
-      <DotCrowd
-        withYou={reveal.dotsWithYou}
-        accent={accent}
-        yourLabel={mine}
-        otherLabel={theirs}
-        animate={animate}
-      />
-
-      <p className="crowd__caption">
-        {reveal.dotsWithYou} said {mine} · {rest} said {theirs}
-      </p>
+      <div className="stage reveal__stage">
+        <DotCrowd
+          withYou={reveal.dotsWithYou}
+          accent={accent}
+          yourLabel={mine}
+          otherLabel={theirs}
+          animate={animate}
+        />
+        <div className="reveal__rail">
+          <div className="figure">
+            <span className="figure__label">you said</span>
+            <span className="figure__value">{reveal.guess}</span>
+          </div>
+          <div className="figure">
+            <span className="figure__label">it was</span>
+            <span className="figure__value">{reveal.actual}</span>
+          </div>
+          <div className="figure">
+            <span className="figure__label">off by</span>
+            <span className="figure__value">{reveal.error}</span>
+          </div>
+        </div>
+      </div>
 
       <p className="verdict">
         {reveal.minority ? 'Only ' : ''}
@@ -287,36 +313,33 @@ function RevealView({
         </strong>{' '}
         are with you.
       </p>
-
-      <div className="figures">
-        <div className="figure">
-          <span className="figure__label">you said</span>
-          <span className="figure__value">{reveal.guess}</span>
-        </div>
-        <div className="figure">
-          <span className="figure__label">it was</span>
-          <span className="figure__value">{reveal.actual}</span>
-        </div>
-        <div className="figure">
-          <span className="figure__label">off by</span>
-          <span className="figure__value">{reveal.error}</span>
-        </div>
-      </div>
+      <p className="crowd__caption">{captionBits.join(' · ')}</p>
 
       <BadgeStamp id={reveal.badge} animate={animate} />
 
-      {reveal.provisional && (
-        <p className="notice notice--quiet">
-          {reveal.tally.total} {reveal.tally.total === 1 ? 'vote' : 'votes'} so far. This split
-          will move.
-        </p>
-      )}
-
-      {!question.isDaily && (
-        <p className="notice notice--quiet">Open question. It does not touch your streak.</p>
-      )}
-
-      <Histogram buckets={reveal.histogram} yourGuess={reveal.guess} accent={accent} />
+      <div className="detail">
+        <div className="detail__tabs">
+          <button
+            type="button"
+            className={`detail__tab${detail === 'guesses' ? ' is-active' : ''}`}
+            onClick={() => setDetail('guesses')}
+          >
+            where everyone guessed
+          </button>
+          <button
+            type="button"
+            className={`detail__tab${detail === 'misjudged' ? ' is-active' : ''}`}
+            onClick={() => setDetail('misjudged')}
+          >
+            hardest to read
+          </button>
+        </div>
+        {detail === 'guesses' ? (
+          <Histogram buckets={reveal.histogram} yourGuess={reveal.guess} accent={accent} />
+        ) : (
+          <Leaderboard />
+        )}
+      </div>
 
       <Compose postId={postId} question={question} reveal={reveal} />
     </div>

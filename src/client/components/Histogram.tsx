@@ -26,7 +26,6 @@ export function Histogram({
 
   return (
     <div>
-      <p className="section__title">where everyone guessed</p>
       <div className="histogram">
         {buckets.map((count, index) => {
           const yours = index === yourBucket;

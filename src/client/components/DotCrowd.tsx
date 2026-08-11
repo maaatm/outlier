@@ -16,10 +16,10 @@ import type { BadgeAccent } from '../../shared/badges.js';
 import { CROWD_SIZE } from '../../shared/config.js';
 import { facedDots, jitterFor, scatterFor } from '../jitter.js';
 
-const CELL = 20;
+const CELL = 18;
 const PER_ROW = 10;
 /** Separation between your camp and theirs. */
-const CAMP_GAP = 14;
+const CAMP_GAP = 12;
 const FACES = 8;
 const STAGGER_MS = 6;
 /** Your dot lands this far behind the pack. */
