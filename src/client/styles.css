@@ -1,0 +1,768 @@
+/*
+ * Flat sticker-book.
+ *
+ * The rules, in one place so they are hard to drift from:
+ *   - 2px solid ink on every card, button and dot. Never thinner.
+ *   - Hard offset shadows only. No blur, ever.
+ *   - No gradients, no translucency, no backdrop blur.
+ *   - Radius 14 on cards, 10 on buttons. Never a pill.
+ *   - Spacing comes from the scale below and nowhere else.
+ *   - Two accents on screen at most.
+ */
+
+/* ── Fonts ──────────────────────────────────────────────────────────────── */
+
+@font-face {
+  font-family: 'Gabarito';
+  src: url('./fonts/gabarito-latin.woff2') format('woff2');
+  font-weight: 400 500;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+2000-206F, U+2122, U+2212;
+}
+
+@font-face {
+  font-family: 'Instrument Sans';
+  src: url('./fonts/instrumentsans-latin.woff2') format('woff2');
+  font-weight: 400 600;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+2000-206F, U+2122, U+2212;
+}
+
+@font-face {
+  font-family: 'Instrument Sans';
+  src: url('./fonts/instrumentsans-latin-ext.woff2') format('woff2');
+  font-weight: 400 600;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0100-02BA, U+1E00-1E9F, U+2020, U+20A0-20AB, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: 'DM Mono';
+  src: url('./fonts/dmmono-400-latin.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'DM Mono';
+  src: url('./fonts/dmmono-500-latin.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ── Tokens ─────────────────────────────────────────────────────────────── */
+
+:root {
+  --ink: #15181d;
+  --paper: #e7e9f5;
+  --card: #ffffff;
+
+  --signal: #2b6be4; /* you / your answer */
+  --rare: #ff4d6d; /* minority position */
+  --hit: #00a676; /* accurate guess */
+  --sun: #ffc53d; /* streak only, never anything else */
+
+  /* The opposing camp: ink, held back. */
+  --ink-quiet: rgba(21, 24, 29, 0.15);
+  --ink-soft: rgba(21, 24, 29, 0.55);
+
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 16px;
+  --s4: 24px;
+  --s5: 40px;
+
+  --stroke: 2px;
+  --radius-card: 14px;
+  --radius-button: 10px;
+  --drop: 3px 3px 0 var(--ink);
+  --drop-pressed: 1px 1px 0 var(--ink);
+
+  --font-display: 'Gabarito', ui-sans-serif, system-ui, sans-serif;
+  --font-body: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'DM Mono', ui-monospace, 'SFMono-Regular', monospace;
+}
+
+/* Accents are saturated enough to hold in both modes, so only the neutrals move. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --ink: #f0efea;
+    --paper: #14161b;
+    --card: #1e2129;
+    --ink-quiet: rgba(240, 239, 234, 0.15);
+    --ink-soft: rgba(240, 239, 234, 0.55);
+  }
+}
+
+:root[data-theme='dark'] {
+  --ink: #f0efea;
+  --paper: #14161b;
+  --card: #1e2129;
+  --ink-quiet: rgba(240, 239, 234, 0.15);
+  --ink-soft: rgba(240, 239, 234, 0.55);
+}
+
+/* ── Reset ──────────────────────────────────────────────────────────────── */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+/* ── Shell ──────────────────────────────────────────────────────────────── */
+
+.app {
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: var(--s3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.card {
+  background: var(--card);
+  border: var(--stroke) solid var(--ink);
+  border-radius: var(--radius-card);
+  box-shadow: var(--drop);
+  padding: var(--s3);
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.header__mark {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.header__day {
+  color: var(--ink-soft);
+}
+
+.streaks {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+}
+
+.streak {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s1);
+  border: var(--stroke) solid var(--ink);
+  border-radius: var(--radius-button);
+  padding: 2px var(--s2);
+  background: var(--card);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.streak--live {
+  background: var(--sun);
+  color: #15181d;
+}
+
+.streak__count {
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Question ───────────────────────────────────────────────────────────── */
+
+.question {
+  font-family: var(--font-body);
+  font-size: 22px;
+  line-height: 1.3;
+  font-weight: 600;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.question__meta {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin: 0 0 var(--s2);
+}
+
+.rule {
+  display: block;
+  width: 100%;
+  height: 8px;
+  margin: var(--s3) 0;
+  color: var(--ink);
+  overflow: visible;
+}
+
+/* ── Buttons ────────────────────────────────────────────────────────────── */
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s2);
+  width: 100%;
+  padding: var(--s3);
+  background: var(--card);
+  border: var(--stroke) solid var(--ink);
+  border-radius: var(--radius-button);
+  box-shadow: var(--drop);
+  font-family: var(--font-body);
+  font-size: 16px;
+  font-weight: 600;
+  text-align: center;
+  transition: box-shadow 80ms linear, transform 80ms linear;
+}
+
+.button:active:not(:disabled) {
+  box-shadow: var(--drop-pressed);
+  transform: translate(2px, 2px);
+}
+
+.button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.button:focus-visible {
+  outline: var(--stroke) solid var(--signal);
+  outline-offset: 3px;
+}
+
+.button--primary {
+  background: var(--signal);
+  color: #ffffff;
+}
+
+.button--quiet {
+  box-shadow: none;
+  border-style: solid;
+  font-weight: 400;
+  padding: var(--s2) var(--s3);
+  width: auto;
+}
+
+.choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s2);
+}
+
+.choice__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Guess step ─────────────────────────────────────────────────────────── */
+
+.guess {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+}
+
+.guess__prompt {
+  margin: 0;
+  font-size: 16px;
+}
+
+.guess__prompt strong {
+  font-weight: 600;
+}
+
+.guess__readout {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s2);
+}
+
+.bignum {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 56px;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.bignum--small {
+  font-size: 32px;
+}
+
+.guess__unit {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 28px;
+  background: transparent;
+  margin: 0;
+}
+
+.slider:focus-visible {
+  outline: var(--stroke) solid var(--signal);
+  outline-offset: 4px;
+  border-radius: var(--radius-button);
+}
+
+.slider::-webkit-slider-runnable-track {
+  height: 14px;
+  background: var(--card);
+  border: var(--stroke) solid var(--ink);
+  border-radius: var(--radius-button);
+}
+
+.slider::-moz-range-track {
+  height: 14px;
+  background: var(--card);
+  border: var(--stroke) solid var(--ink);
+  border-radius: var(--radius-button);
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 28px;
+  height: 28px;
+  margin-top: -9px;
+  background: var(--signal);
+  border: var(--stroke) solid var(--ink);
+  border-radius: var(--radius-button);
+  box-shadow: var(--drop);
+}
+
+.slider::-moz-range-thumb {
+  width: 28px;
+  height: 28px;
+  background: var(--signal);
+  border: var(--stroke) solid var(--ink);
+  border-radius: var(--radius-button);
+  box-shadow: var(--drop);
+}
+
+.slider__ticks {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin-top: calc(var(--s1) * -1);
+}
+
+/* ── The crowd ──────────────────────────────────────────────────────────── */
+
+.crowd {
+  position: relative;
+  margin: 0 auto;
+  touch-action: none;
+}
+
+.dot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: var(--stroke) solid var(--ink);
+  background: var(--ink-quiet);
+  transition: transform 600ms cubic-bezier(0.22, 1.18, 0.36, 1), background-color 300ms linear;
+  will-change: transform;
+}
+
+/*
+ * Your dot. Three-pixel ring, and a knockout in the card colour so it reads as
+ * standing slightly out of the pack rather than as one more dot in it. The
+ * knockout is a zero-blur ring, not a soft shadow.
+ */
+.dot--mine {
+  border-width: 3px;
+  box-shadow: 0 0 0 2px var(--card);
+  z-index: 2;
+}
+
+.dot--signal {
+  background: var(--signal);
+}
+
+.dot--rare {
+  background: var(--rare);
+}
+
+.dot--hit {
+  background: var(--hit);
+}
+
+.dot__eye {
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: var(--ink);
+  top: 3px;
+}
+
+.dot__eye--left {
+  left: 2px;
+}
+
+.dot__eye--right {
+  right: 2px;
+}
+
+/* Your dot lands last and pops. */
+.dot--mine.is-landed {
+  animation: pop 260ms cubic-bezier(0.22, 1.4, 0.36, 1) 750ms both;
+}
+
+@keyframes pop {
+  0% {
+    scale: 1;
+  }
+  45% {
+    scale: 1.28;
+  }
+  100% {
+    scale: 1;
+  }
+}
+
+.crowd__caption {
+  margin: var(--s2) 0 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-soft);
+  text-align: center;
+}
+
+/* ── Reveal ─────────────────────────────────────────────────────────────── */
+
+.reveal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+}
+
+.verdict {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.35;
+}
+
+.verdict strong {
+  font-weight: 600;
+}
+
+.figures {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--s2);
+}
+
+.figure {
+  border: var(--stroke) solid var(--ink);
+  border-radius: var(--radius-button);
+  padding: var(--s2);
+  background: var(--card);
+}
+
+.figure__label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.figure__value {
+  display: block;
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 32px;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.badge {
+  align-self: center;
+  border: var(--stroke) solid var(--ink);
+  border-radius: var(--radius-card);
+  box-shadow: var(--drop);
+  padding: var(--s2) var(--s3);
+  background: var(--card);
+  text-align: center;
+  rotate: -2deg; /* a stamp applied by hand */
+}
+
+.badge--signal {
+  background: var(--signal);
+  color: #ffffff;
+}
+
+.badge--rare {
+  background: var(--rare);
+  color: #15181d;
+}
+
+.badge--hit {
+  background: var(--hit);
+  color: #ffffff;
+}
+
+.badge__title {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 22px;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.badge__line {
+  margin: var(--s1) 0 0;
+  font-size: 14px;
+}
+
+.badge.is-stamping {
+  animation: stamp 240ms cubic-bezier(0.3, 1.3, 0.4, 1) 900ms both;
+}
+
+@keyframes stamp {
+  0% {
+    scale: 1.35;
+    opacity: 0;
+    rotate: -8deg;
+  }
+  100% {
+    scale: 1;
+    opacity: 1;
+    rotate: -2deg;
+  }
+}
+
+/* ── Histogram ──────────────────────────────────────────────────────────── */
+
+.histogram {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--s1);
+  height: 72px;
+}
+
+.histogram__bar {
+  flex: 1;
+  border: var(--stroke) solid var(--ink);
+  border-radius: 4px 4px 0 0;
+  background: var(--ink-quiet);
+  min-height: 4px;
+}
+
+.histogram__bar--yours {
+  background: var(--signal);
+}
+
+.histogram__bar--yours.is-accent-rare {
+  background: var(--rare);
+}
+
+.histogram__bar--yours.is-accent-hit {
+  background: var(--hit);
+}
+
+.histogram__axis {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin-top: var(--s1);
+}
+
+/* ── Comment ────────────────────────────────────────────────────────────── */
+
+.compose {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+}
+
+.compose__preview {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  border: var(--stroke) solid var(--ink);
+  border-radius: var(--radius-button);
+  padding: var(--s2);
+  background: var(--paper);
+  margin: 0;
+  max-height: 168px;
+  overflow-y: auto;
+}
+
+.compose__note {
+  width: 100%;
+  font: inherit;
+  font-size: 16px;
+  color: inherit;
+  background: var(--card);
+  border: var(--stroke) solid var(--ink);
+  border-radius: var(--radius-button);
+  padding: var(--s2);
+  resize: none;
+}
+
+.compose__note:focus-visible {
+  outline: var(--stroke) solid var(--signal);
+  outline-offset: 2px;
+}
+
+.compose__hint {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin: 0;
+}
+
+/* ── Leaderboard ────────────────────────────────────────────────────────── */
+
+.board {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+}
+
+.board__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s2);
+}
+
+.board__text {
+  font-size: 14px;
+}
+
+.board__error {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.section__title {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin: 0 0 var(--s2);
+}
+
+/* ── States ─────────────────────────────────────────────────────────────── */
+
+.notice {
+  font-size: 16px;
+  margin: 0;
+}
+
+.notice--quiet {
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.fade-in {
+  animation: fade 200ms linear both;
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── Reduced motion ─────────────────────────────────────────────────────── */
+
+/*
+ * The reveal is the one orchestrated moment in the app. With motion reduced it
+ * becomes a straight cross-fade to the same final state — no travel, no stagger,
+ * no pop, no stamp.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+  }
+
+  .reveal {
+    animation: fade 220ms linear both;
+  }
+}

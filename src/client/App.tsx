@@ -1,0 +1,328 @@
+/**
+ * See question → tap an answer → drag the slider → lock in → reveal.
+ *
+ * Two taps, no typing, under fifteen seconds. Everything on the way to the
+ * reveal is instant; the reveal is the one orchestrated moment.
+ */
+
+import { context } from '@devvit/web/client';
+import { useCallback, useEffect, useState } from 'react';
+
+import { getBadge } from '../shared/badges.js';
+import { CROWD_SIZE } from '../shared/config.js';
+import type { Choice, Question, Reveal, StateResponse, Streaks } from '../shared/types.js';
+import { ApiFailure, castVote, fetchState } from './api.js';
+import { BadgeStamp } from './components/BadgeStamp.js';
+import { Compose } from './components/Compose.js';
+import { DotCrowd } from './components/DotCrowd.js';
+import { Histogram } from './components/Histogram.js';
+import { Leaderboard } from './components/Leaderboard.js';
+import { StreakBar } from './components/StreakBar.js';
+import { WobbleRule } from './components/WobbleRule.js';
+
+const DEFAULT_GUESS = 50;
+
+type Phase =
+  | { name: 'loading' }
+  | { name: 'error'; message: string }
+  | { name: 'ready'; state: StateResponse };
+
+export function App(): React.JSX.Element {
+  const postId = context.postId;
+  const [phase, setPhase] = useState<Phase>({ name: 'loading' });
+  // The reveal is orchestrated only for the vote that produced it. A player
+  // reopening a post they already answered lands on the finished state.
+  const [justVoted, setJustVoted] = useState(false);
+
+  const load = useCallback(async (): Promise<void> => {
+    if (!postId) {
+      setPhase({ name: 'error', message: 'This post has no question attached.' });
+      return;
+    }
+    try {
+      setPhase({ name: 'ready', state: await fetchState(postId) });
+    } catch (failure) {
+      setPhase({
+        name: 'error',
+        message: failure instanceof Error ? failure.message : 'Could not load the question.',
+      });
+    }
+  }, [postId]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  if (phase.name === 'loading') {
+    return (
+      <main className="app">
+        <p className="notice notice--quiet">Loading.</p>
+      </main>
+    );
+  }
+
+  if (phase.name === 'error') {
+    return (
+      <main className="app">
+        <div className="card">
+          <p className="notice">{phase.message}</p>
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <Game
+      postId={postId!}
+      state={phase.state}
+      justVoted={justVoted}
+      onReveal={(reveal, streaks) => {
+        setJustVoted(true);
+        setPhase({ name: 'ready', state: { ...phase.state, reveal, streaks } });
+      }}
+    />
+  );
+}
+
+function Game({
+  postId,
+  state,
+  justVoted,
+  onReveal,
+}: {
+  postId: string;
+  state: StateResponse;
+  justVoted: boolean;
+  onReveal: (reveal: Reveal, streaks: Streaks) => void;
+}): React.JSX.Element {
+  const { question, reveal, streaks, canVote } = state;
+
+  return (
+    <main className="app">
+      <header className="header">
+        <span className="header__mark">Outlier</span>
+        <span className="header__day">
+          {question.isDaily ? question.dailyDate : 'open question'}
+        </span>
+        <StreakBar streaks={streaks} />
+      </header>
+
+      <section className="card">
+        {question.source === 'community' && question.authorName && (
+          <p className="question__meta">asked by u/{question.authorName}</p>
+        )}
+        <h1 className="question">{question.text}</h1>
+        <WobbleRule />
+
+        {reveal ? (
+          <RevealView
+            postId={postId}
+            question={question}
+            reveal={reveal}
+            animate={justVoted}
+          />
+        ) : (
+          <PlayView
+            postId={postId}
+            question={question}
+            canVote={canVote}
+            locked={question.locked}
+            onReveal={onReveal}
+          />
+        )}
+      </section>
+
+      {reveal && <Leaderboard />}
+    </main>
+  );
+}
+
+/** Tap an answer, drag the slider, lock in. */
+function PlayView({
+  postId,
+  question,
+  canVote,
+  locked,
+  onReveal,
+}: {
+  postId: string;
+  question: Question;
+  canVote: boolean;
+  locked: boolean;
+  onReveal: (reveal: Reveal, streaks: Streaks) => void;
+}): React.JSX.Element {
+  const [choice, setChoice] = useState<Choice | null>(null);
+  const [guess, setGuess] = useState(DEFAULT_GUESS);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (locked) {
+    return <p className="notice">Voting closed on this one. The result is in the thread.</p>;
+  }
+  if (!canVote) {
+    return <p className="notice">Sign in to play.</p>;
+  }
+
+  async function lockIn(): Promise<void> {
+    if (choice === null) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const result = await castVote(postId, choice, guess);
+      onReveal(result, result.streaks ?? emptyStreaks());
+    } catch (failure) {
+      // A 409 carries the reveal this player already earned — show it rather
+      // than an error.
+      if (failure instanceof ApiFailure && failure.reveal) {
+        onReveal(failure.reveal, failure.reveal.streaks ?? emptyStreaks());
+        return;
+      }
+      setError(failure instanceof Error ? failure.message : 'Could not record that.');
+      setSubmitting(false);
+    }
+  }
+
+  // The crowd is on screen from the first frame, undifferentiated: a hundred
+  // people, not a split. The reveal then reorganises these same dots, which is
+  // the whole point of the moment.
+  if (choice === null) {
+    return (
+      <div className="guess">
+        <DotCrowd withYou={null} accent="signal" />
+        <div className="choices">
+          <button type="button" className="button" onClick={() => setChoice('a')}>
+            <span className="choice__label">{question.labelA}</span>
+          </button>
+          <button type="button" className="button" onClick={() => setChoice('b')}>
+            <span className="choice__label">{question.labelB}</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const label = choice === 'a' ? question.labelA : question.labelB;
+
+  return (
+    <div className="guess">
+      <DotCrowd withYou={null} accent="signal" />
+
+      <p className="guess__prompt">
+        You said <strong>{label}</strong>. How many out of {CROWD_SIZE} agree?
+      </p>
+
+      <div className="guess__readout">
+        <span className="bignum">{guess}</span>
+        <span className="guess__unit">out of {CROWD_SIZE}</span>
+      </div>
+
+      <input
+        className="slider"
+        type="range"
+        min={0}
+        max={100}
+        step={1}
+        value={guess}
+        aria-label={`Percentage of people who also said ${label}`}
+        onChange={(event) => setGuess(Number(event.target.value))}
+      />
+      <div className="slider__ticks">
+        <span>0</span>
+        <span>100</span>
+      </div>
+
+      <button
+        type="button"
+        className="button button--primary"
+        onClick={lockIn}
+        disabled={submitting}
+      >
+        {submitting ? 'Locking in...' : 'Lock it in'}
+      </button>
+
+      <button type="button" className="button button--quiet" onClick={() => setChoice(null)}>
+        Change answer
+      </button>
+
+      {error && <p className="notice notice--quiet">{error}</p>}
+    </div>
+  );
+}
+
+/** The verdict. Dots first, numbers second, badge last. */
+function RevealView({
+  postId,
+  question,
+  reveal,
+  animate,
+}: {
+  postId: string;
+  question: Question;
+  reveal: Reveal;
+  animate: boolean;
+}): React.JSX.Element {
+  const accent = getBadge(reveal.badge).accent;
+  const mine = reveal.choice === 'a' ? question.labelA : question.labelB;
+  const theirs = reveal.choice === 'a' ? question.labelB : question.labelA;
+  const rest = CROWD_SIZE - reveal.dotsWithYou;
+
+  return (
+    <div className="reveal">
+      <DotCrowd
+        withYou={reveal.dotsWithYou}
+        accent={accent}
+        yourLabel={mine}
+        otherLabel={theirs}
+        animate={animate}
+      />
+
+      <p className="crowd__caption">
+        {reveal.dotsWithYou} said {mine} · {rest} said {theirs}
+      </p>
+
+      <p className="verdict">
+        {reveal.minority ? 'Only ' : ''}
+        <strong>
+          {reveal.dotsWithYou} out of {CROWD_SIZE}
+        </strong>{' '}
+        are with you.
+      </p>
+
+      <div className="figures">
+        <div className="figure">
+          <span className="figure__label">you said</span>
+          <span className="figure__value">{reveal.guess}</span>
+        </div>
+        <div className="figure">
+          <span className="figure__label">it was</span>
+          <span className="figure__value">{reveal.actual}</span>
+        </div>
+        <div className="figure">
+          <span className="figure__label">off by</span>
+          <span className="figure__value">{reveal.error}</span>
+        </div>
+      </div>
+
+      <BadgeStamp id={reveal.badge} animate={animate} />
+
+      {reveal.provisional && (
+        <p className="notice notice--quiet">
+          {reveal.tally.total} {reveal.tally.total === 1 ? 'vote' : 'votes'} so far. This split
+          will move.
+        </p>
+      )}
+
+      {!question.isDaily && (
+        <p className="notice notice--quiet">Open question. It does not touch your streak.</p>
+      )}
+
+      <Histogram buckets={reveal.histogram} yourGuess={reveal.guess} accent={accent} />
+
+      <Compose postId={postId} question={question} reveal={reveal} />
+    </div>
+  );
+}
+
+function emptyStreaks(): Streaks {
+  return { playStreak: 0, readStreak: 0, totalPlayed: 0, totalHits: 0, extendedToday: false };
+}

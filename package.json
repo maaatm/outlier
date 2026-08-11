@@ -1,0 +1,40 @@
+{
+  "name": "outlier",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "BSD-3-Clause",
+  "description": "A daily social-calibration game for Reddit, built on Devvit.",
+  "scripts": {
+    "build": "npm run build:client && npm run build:server",
+    "build:client": "vite build -c vite.client.config.ts",
+    "build:server": "vite build -c vite.server.config.ts",
+    "dev:build": "concurrently -k -n client,server -c cyan,magenta \"vite build -c vite.client.config.ts --watch\" \"vite build -c vite.server.config.ts --watch\"",
+    "check": "tsc -p src/client/tsconfig.json --noEmit && tsc -p src/server/tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "verify": "npm run check && npm run test && npm run build",
+    "login": "devvit login",
+    "playtest": "devvit playtest",
+    "upload": "devvit upload",
+    "publish": "devvit publish"
+  },
+  "dependencies": {
+    "@devvit/web": "0.14.0",
+    "@hono/node-server": "^2.1.0",
+    "hono": "^4.13.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "concurrently": "^9.1.2",
+    "devvit": "0.14.0",
+    "typescript": "~5.8.3",
+    "vite": "^7.0.0",
+    "vitest": "^4.1.0"
+  }
+}

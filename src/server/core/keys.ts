@@ -1,0 +1,77 @@
+/**
+ * Every Redis key the app touches, in one place.
+ *
+ * The shape follows the data model in the spec. Three keys are additions, all
+ * of them derived indexes kept so a hot read does not have to scan a set:
+ *
+ *   hist:{questionId}   ten-bucket guess histogram, so the reveal does not read
+ *                       the whole `guesses` zset on every open
+ *   stats:misjudged     questionId -> avgError, so the leaderboard is one range
+ *                       read instead of a scan over every question
+ *   commented:{id}      userId -> commentId, so one tap cannot post twice
+ *
+ * `guesses:{questionId}` is still the record of truth for the distribution; the
+ * histogram is a cache of it.
+ */
+
+export const keys = {
+  /** hash: text, labelA, labelB, authorId, authorName, source, createdAt, postId, lockedAt, dailyDate */
+  question: (questionId: string) => `q:${questionId}`,
+
+  /** string: questionId of the Daily for a `YYYY-MM-DD` day. */
+  daily: (day: string) => `daily:${day}`,
+
+  /**
+   * hash: day -> "1". The double-fire guard for `post-daily`.
+   *
+   * A separate key from `daily:{day}` because the claim has to happen *before*
+   * the question is resolved — otherwise two overlapping runs both draw from the
+   * house pool and one of the draws is thrown away.
+   */
+  dailyClaims: 'daily:claims',
+
+  /** string: questionId behind a post. */
+  post: (postId: string) => `post:${postId}`,
+
+  /** hash: a, b, guessSum, guessCount, errSum */
+  votes: (questionId: string) => `votes:${questionId}`,
+
+  /** zset: userId -> guess. The distribution record. */
+  guesses: (questionId: string) => `guesses:${questionId}`,
+
+  /** hash: userId -> "a:45". Dedupe guard and the record of what to re-render. */
+  voted: (questionId: string) => `voted:${questionId}`,
+
+  /** hash: bucket index "0".."9" -> count. Derived from `guesses`. */
+  histogram: (questionId: string) => `hist:${questionId}`,
+
+  /** hash: userId -> commentId. */
+  commented: (questionId: string) => `commented:${questionId}`,
+
+  /** hash: playStreak, readStreak, lastPlayedDay, totalPlayed, totalHits */
+  user: (userId: string) => `user:${userId}`,
+
+  /** string with a 24h TTL. Presence means "already submitted today". */
+  submissionCooldown: (userId: string) => `sub:cooldown:${userId}`,
+
+  /** zset: questionId -> upvotes on the open post. */
+  queuePending: 'queue:pending',
+
+  /** zset: questionId -> upvotes. Only these may reach the Daily slot. */
+  queueApproved: 'queue:approved',
+
+  /** zset: questionId -> avgError. */
+  misjudged: 'stats:misjudged',
+
+  /** string: index into the shuffled house pool. */
+  poolCursor: 'pool:cursor',
+} as const;
+
+/** Field names on the `votes:` hash, kept in one place to avoid typos. */
+export const voteFields = {
+  a: 'a',
+  b: 'b',
+  guessSum: 'guessSum',
+  guessCount: 'guessCount',
+  errSum: 'errSum',
+} as const;

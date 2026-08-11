@@ -1,0 +1,9 @@
+{
+  /*
+   * The client and the server resolve `@devvit/web/*` through different export
+   * conditions, so each side owns its own config. This root file exists so an
+   * editor opening the repo finds both.
+   */
+  "files": [],
+  "references": [{ "path": "./src/client" }, { "path": "./src/server" }]
+}
