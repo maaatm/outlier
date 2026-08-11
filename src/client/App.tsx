@@ -12,6 +12,7 @@ import { getBadge } from '../shared/badges.js';
 import { CROWD_SIZE } from '../shared/config.js';
 import type { Choice, Question, Reveal, StateResponse, Streaks } from '../shared/types.js';
 import { ApiFailure, castVote, fetchState } from './api.js';
+import { randomGroupColors } from './colors.js';
 import { BadgeStamp } from './components/BadgeStamp.js';
 import { Compose } from './components/Compose.js';
 import { DotCrowd } from './components/DotCrowd.js';
@@ -153,6 +154,9 @@ function PlayView({
   const [guess, setGuess] = useState(DEFAULT_GUESS);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Drawn once per question, not per frame: the pair has to hold still while
+  // the slider moves, or the crowd strobes.
+  const [groupColors] = useState(randomGroupColors);
 
   if (locked) {
     return <p className="notice">Voting closed on this one. The result is in the thread.</p>;
@@ -202,51 +206,69 @@ function PlayView({
   }
 
   const label = choice === 'a' ? question.labelA : question.labelB;
+  const otherLabel = choice === 'a' ? question.labelB : question.labelA;
+  // The slider is a percentage; the crowd is dots. Same number today, but the
+  // conversion is what is meant.
+  const dotsGuessed = (guess / 100) * CROWD_SIZE;
 
+  // Now that there is a side, the crowd answers the slider: the guess splits it
+  // into two coloured groups in place. Nothing has moved yet — the travel into
+  // camps is the reveal's, and spending it here would spend it twice.
   return (
     <div className="guess">
       <div className="stage">
-        <DotCrowd withYou={null} accent="signal" />
+        <DotCrowd
+          withYou={null}
+          accent="signal"
+          split={dotsGuessed}
+          groupColors={groupColors}
+          yourLabel={label}
+          otherLabel={otherLabel}
+        />
       </div>
 
-      <p className="guess__prompt">
-        You said <strong>{label}</strong>. How many out of {CROWD_SIZE} agree?
-      </p>
+      {/* One group, so the controls arrive together and after the crowd has
+          made room for them. */}
+      <div className="guess__controls">
+        <p className="guess__prompt">
+          You said <strong>{label}</strong>. How many out of {CROWD_SIZE} agree?
+        </p>
 
-      <div className="guess__readout">
-        <span className="bignum">{guess}</span>
-        <span className="guess__unit">out of {CROWD_SIZE}</span>
+        <div className="guess__readout">
+          <span className="bignum">{guess}</span>
+          <span className="guess__unit">out of {CROWD_SIZE}</span>
+        </div>
+
+        <input
+          className="slider"
+          type="range"
+          min={0}
+          max={100}
+          step={1}
+          value={guess}
+          aria-label={`Percentage of people who also said ${label}`}
+          onChange={(event) => setGuess(Number(event.target.value))}
+        />
+        <div className="slider__ticks">
+          <span>0</span>
+          <span>100</span>
+        </div>
+
+        <button
+          type="button"
+          className="button button--primary"
+          onClick={lockIn}
+          disabled={submitting}
+        >
+          {submitting ? 'Locking in...' : 'Lock it in'}
+        </button>
+
+        <button type="button" className="button button--quiet" onClick={() => setChoice(null)}>
+          Change answer
+        </button>
+
+        {error && <p className="notice notice--quiet">{error}</p>}
       </div>
-
-      <input
-        className="slider"
-        type="range"
-        min={0}
-        max={100}
-        step={1}
-        value={guess}
-        aria-label={`Percentage of people who also said ${label}`}
-        onChange={(event) => setGuess(Number(event.target.value))}
-      />
-      <div className="slider__ticks">
-        <span>0</span>
-        <span>100</span>
-      </div>
-
-      <button
-        type="button"
-        className="button button--primary"
-        onClick={lockIn}
-        disabled={submitting}
-      >
-        {submitting ? 'Locking in...' : 'Lock it in'}
-      </button>
-
-      <button type="button" className="button button--quiet" onClick={() => setChoice(null)}>
-        Change answer
-      </button>
-
-      {error && <p className="notice notice--quiet">{error}</p>}
     </div>
   );
 }

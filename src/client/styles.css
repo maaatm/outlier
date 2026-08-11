@@ -363,6 +363,19 @@ button {
   min-height: 0;
 }
 
+/*
+ * Everything under the crowd on the guess screen. Picking an answer shrinks the
+ * crowd to make room, and that contraction takes 600ms — so the controls hold
+ * back a beat and fade in behind it rather than appearing under a crowd that is
+ * still standing where they are about to be.
+ */
+.guess__controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+  animation: fade 260ms linear 160ms both;
+}
+
 .guess__prompt {
   margin: 0;
   font-size: 16px;
@@ -470,20 +483,30 @@ button {
   touch-action: none;
 }
 
+/* The field is the whole box; the crowd is centered inside it by the component,
+   so that resizing the box moves the dots rather than teleporting them. */
 .crowd__field {
-  position: relative;
+  position: absolute;
+  inset: 0;
 }
 
 /*
  * Two layers per dot on purpose. The slot carries the journey from scatter to
  * camp (transform), the dot inside carries the idle bob (also transform) — one
  * element cannot animate transform two ways at once.
+ *
+ * Size travels with position, on the same clock and the same curve. The crowd
+ * resizes whenever the box does — picking an answer trades the tall question
+ * screen for the shorter guess screen — and a dot that slides to its new place
+ * but snaps to its new size breaks the illusion that the crowd is one thing.
+ * Moved together, the hundred dots read as a single group being scaled.
  */
 .dot-slot {
+  --travel: 600ms cubic-bezier(0.22, 1.18, 0.36, 1);
   position: absolute;
   top: 0;
   left: 0;
-  transition: transform 600ms cubic-bezier(0.22, 1.18, 0.36, 1);
+  transition: transform var(--travel), width var(--travel), height var(--travel);
   will-change: transform;
 }
 
@@ -1086,7 +1109,8 @@ button {
     font-size: 16px;
   }
 
-  .guess {
+  .guess,
+  .guess__controls {
     gap: var(--s2);
   }
 

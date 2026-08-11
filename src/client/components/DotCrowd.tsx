@@ -7,7 +7,15 @@
  *
  * The crowd sizes itself to whatever box it is given — it measures its parent
  * and derives the cell from that, so the dots grow to fill the slide rather
- * than sitting at a fixed size in the middle of it.
+ * than sitting at a fixed size in the middle of it. When the box changes, and it
+ * does the moment an answer is picked, the crowd travels to its new size instead
+ * of snapping: every dot moves and resizes on one clock, so a hundred of them
+ * read as a single group being scaled.
+ *
+ * While the player drags the slider the crowd previews their guess: the first
+ * `split` dots take one colour and the rest take the other, so the two groups
+ * appear without anything moving. The grid is the same grid — colour is the only
+ * thing that travels, which leaves the reveal's journey still to come.
  *
  * On reveal the dots travel from a neutral scatter into two camps over ~600ms
  * with a 6ms stagger and a light spring overshoot. Your dot lands last, ~150ms
@@ -19,6 +27,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import type { BadgeAccent } from '../../shared/badges.js';
 import { CROWD_SIZE } from '../../shared/config.js';
+import type { GroupColors } from '../colors.js';
 import { facedDots, hashUnit, jitterFor, scatterFor } from '../jitter.js';
 
 const PER_ROW = 10;
@@ -50,6 +59,15 @@ type Props = {
   /** How many of the hundred stand with you. Null before the reveal. */
   withYou: number | null;
   accent: BadgeAccent;
+  /**
+   * The guess being previewed: this many dots take one colour, the rest the
+   * other. The crowd stays in its scatter — only the colours move. Null when
+   * there is nothing to preview, and ignored once `withYou` arrives, because the
+   * reveal has its own arrangement and its own accent.
+   */
+  split?: number | null;
+  /** The pair the preview is drawn in. Without it there is no preview. */
+  groupColors?: GroupColors | null;
   /** The label of the side the player picked, for the accessible summary. */
   yourLabel?: string;
   otherLabel?: string;
@@ -137,11 +155,19 @@ function cellFor(box: { width: number; height: number }, layout: Layout): number
 export function DotCrowd({
   withYou,
   accent,
+  split = null,
+  groupColors = null,
   yourLabel,
   otherLabel,
   animate = true,
 }: Props): React.JSX.Element {
   const revealed = withYou !== null;
+  // The preview exists only before the reveal, and only once there is a pair of
+  // colours to draw it in.
+  const preview =
+    !revealed && groupColors !== null && split !== null
+      ? { colors: groupColors, count: Math.min(CROWD_SIZE, Math.max(0, Math.round(split))) }
+      : null;
   const boxRef = useRef<HTMLDivElement>(null);
   const [box, setBox] = useState({ width: 0, height: 0 });
 
@@ -197,22 +223,32 @@ export function DotCrowd({
   const dot = cell * DOT_RATIO;
   const jitterScale = cell / REFERENCE_CELL;
   const inset = cell * layout.margin;
-  // The field is the size of the crowd inside it, and the field is centered in
-  // the stage — so the crowd is centered too, whichever arrangement it is in.
-  const fieldWidth = cell * layout.width;
-  const fieldHeight = cell * layout.height;
+  /*
+   * The field is the whole box, and the crowd is centered inside it by this
+   * offset. Sizing the field to the crowd instead and letting flex center it
+   * would be simpler to read, but the box changes size — the guess screen gives
+   * the crowd less room than the question screen does — and a field that resizes
+   * teleports its own origin, taking every dot with it in a single frame. With
+   * the centering carried in the transform there is nothing to teleport: every
+   * dot's target moves, and every dot's transition takes it there.
+   */
+  const originX = (box.width - cell * layout.width) / 2;
+  const originY = (box.height - cell * layout.height) / 2;
 
   return (
     <div className="crowd" ref={boxRef}>
       <div
         className="crowd__field"
-        style={{ width: fieldWidth, height: fieldHeight }}
         role="img"
         aria-label={
           revealed
             ? `${withYou} of ${CROWD_SIZE} people answered ${yourLabel ?? 'the same as you'}, ` +
               `${CROWD_SIZE - (withYou ?? 0)} answered ${otherLabel ?? 'the other way'}.`
-            : 'A hundred people, undecided.'
+            : preview
+              ? `Your guess: ${preview.count} of ${CROWD_SIZE} answered ` +
+                `${yourLabel ?? 'the same as you'}, ${CROWD_SIZE - preview.count} ` +
+                `answered ${otherLabel ?? 'the other way'}.`
+              : 'A hundred people, undecided.'
         }
       >
         {cell > 0 &&
@@ -233,6 +269,15 @@ export function DotCrowd({
             if (mine && revealed) dotClasses.push('dot--mine', `dot--${accent}`);
             else if (onYourSide) dotClasses.push(`dot--${accent}`);
 
+            // Which group this dot is in while the slider moves. The dots fill
+            // in index order, so a group is always a contiguous run of the grid
+            // rather than a colour sprayed across it.
+            const groupColor = preview
+              ? index < preview.count
+                ? preview.colors.yours
+                : preview.colors.theirs
+              : undefined;
+
             const bob = BOB_MIN + hashUnit(index, 21) * (BOB_MAX - BOB_MIN);
 
             return (
@@ -243,8 +288,8 @@ export function DotCrowd({
                   width: dot,
                   height: dot,
                   transform:
-                    `translate(${(inset + target.x * cell + jitter.dx * jitterScale + proud).toFixed(2)}px, ` +
-                    `${(inset + target.y * cell + jitter.dy * jitterScale + proud).toFixed(2)}px)`,
+                    `translate(${(originX + inset + target.x * cell + jitter.dx * jitterScale + proud).toFixed(2)}px, ` +
+                    `${(originY + inset + target.y * cell + jitter.dy * jitterScale + proud).toFixed(2)}px)`,
                   transitionDelay:
                     revealed && animate
                       ? `${index * STAGGER_MS + (mine ? MINE_DELAY_MS : 0)}ms`
@@ -254,6 +299,9 @@ export function DotCrowd({
                 <span
                   className={dotClasses.join(' ')}
                   style={{
+                    // The dot's own transition carries this, so a dot crossing
+                    // the boundary fades rather than flicks.
+                    backgroundColor: groupColor,
                     rotate: `${jitter.rotation.toFixed(2)}deg`,
                     // Out of step on purpose: a crowd bobbing in unison reads
                     // as a machine, not as people.
