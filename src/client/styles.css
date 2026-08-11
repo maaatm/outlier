@@ -265,7 +265,8 @@ button {
   font-size: 16px;
   font-weight: 600;
   text-align: center;
-  transition: box-shadow 100ms ease-out, transform 100ms ease-out;
+  transition: box-shadow 100ms ease-out, transform 100ms ease-out,
+    background-color 100ms ease-out, color 100ms ease-out;
 }
 
 /*
@@ -332,6 +333,18 @@ button {
   padding: var(--s4) var(--s3);
   font-size: 18px;
   min-height: 88px;
+}
+
+/*
+ * The answer under the cursor fills with `--signal` — the colour that means
+ * "you" everywhere else in the app — so the side you are about to take reads as
+ * already yours. Only one can be hovered, so the two-accent rule still holds.
+ */
+@media (hover: hover) and (pointer: fine) {
+  .choices .button:hover:not(:disabled) {
+    background: var(--signal);
+    color: #ffffff;
+  }
 }
 
 .choice__label {
@@ -601,6 +614,15 @@ button {
   min-height: 0;
   /* Safety valve. Normally nothing here needs it. */
   overflow-y: auto;
+  /*
+   * A scroll container clips on both axes, and a button that lifts on hover
+   * puts its raised shadow outside its resting box — which is how the tabs and
+   * the compose buttons came to lose an edge against this boundary. The padding
+   * gives that shadow somewhere to be, and the equal negative margin hands the
+   * space straight back, so every slide's contents sit exactly where they did.
+   */
+  padding: var(--s1);
+  margin: calc(var(--s1) * -1);
 }
 
 /*
@@ -656,6 +678,13 @@ button {
   font-size: 32px;
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
+}
+
+/* The unit rides along with the number without competing with it. */
+.figure__unit {
+  font-size: 0.6em;
+  color: var(--ink-soft);
+  margin-left: 1px;
 }
 
 /* ── Slide navigation ───────────────────────────────────────────────────── */

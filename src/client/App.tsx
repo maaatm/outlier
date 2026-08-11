@@ -317,15 +317,24 @@ function RevealView({
           <div className="figures">
             <div className="figure">
               <span className="figure__label">you said</span>
-              <span className="figure__value">{reveal.guess}</span>
+              <span className="figure__value">
+                {reveal.guess}
+                <span className="figure__unit">%</span>
+              </span>
             </div>
             <div className="figure">
               <span className="figure__label">it was</span>
-              <span className="figure__value">{reveal.actual}</span>
+              <span className="figure__value">
+                {reveal.actual}
+                <span className="figure__unit">%</span>
+              </span>
             </div>
             <div className="figure">
               <span className="figure__label">off by</span>
-              <span className="figure__value">{reveal.error}</span>
+              <span className="figure__value">
+                {reveal.error}
+                <span className="figure__unit">%</span>
+              </span>
             </div>
           </div>
 
