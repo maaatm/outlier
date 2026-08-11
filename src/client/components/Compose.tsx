@@ -33,7 +33,10 @@ export function Compose({ postId, question, reveal }: Props): React.JSX.Element 
     setPosting(true);
     setError(null);
     try {
-      await postComment(postId, note.trim() || undefined);
+      await postComment(postId, note.trim() || undefined, {
+        choice: reveal.choice,
+        guess: reveal.guess,
+      });
       setPosted(true);
     } catch (failure) {
       if (failure instanceof ApiFailure && failure.status === 409) setPosted(true);

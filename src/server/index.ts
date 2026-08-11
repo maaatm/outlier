@@ -10,6 +10,7 @@ import { createServer, getServerPort } from '@devvit/web/server';
 import { getRequestListener } from '@hono/node-server';
 import { Hono } from 'hono';
 
+import { REPLAY_MODE } from '../shared/config.js';
 import { api } from './routes/api.js';
 import { formRoutes } from './routes/forms.js';
 import { menuRoutes } from './routes/menu.js';
@@ -34,6 +35,15 @@ app.onError((error, c) => {
 });
 
 app.notFound((c) => c.json({ error: 'No such endpoint.' }, 404));
+
+if (REPLAY_MODE) {
+  // Loud on purpose. This is the vote dedupe switched off, and it is the one
+  // setting in the app that must never reach a real subreddit unnoticed.
+  console.warn(
+    'REPLAY_MODE is on: votes are not remembered and one account can vote ' +
+      'repeatedly. Set REPLAY_MODE to false in src/shared/config.ts before release.'
+  );
+}
 
 const server = createServer(getRequestListener(app.fetch));
 server.listen(getServerPort());

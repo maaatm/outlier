@@ -21,6 +21,7 @@ import type {
   VoteRequest,
 } from '../../shared/types.js';
 import { toDayKey } from '../../shared/day.js';
+import { REPLAY_MODE } from '../../shared/config.js';
 import { getQuestion, getQuestionIdForPost, toPublicQuestion } from '../core/questions.js';
 import { misjudgedLeaderboard } from '../core/stats.js';
 import { getUser, projectStreaks, recordDailyPlay } from '../core/users.js';
@@ -122,7 +123,15 @@ api.post('/api/comment', async (c) => {
   if (!question) return c.json<ApiError>({ error: 'That question is gone.' }, 404);
 
   // Recomputed from stored state — the client does not get to say what it scored.
-  const vote = await getStoredVote(questionId, userId);
+  let vote = await getStoredVote(questionId, userId);
+
+  // Under REPLAY_MODE no vote was stored, so the answer comes back with the
+  // request. Only the answer: the split, the error and the badge are still
+  // derived from the live tally on this side of the wire.
+  if (!vote && REPLAY_MODE && isValidChoice(body.choice) && isValidGuess(body.guess)) {
+    vote = { choice: body.choice, guess: body.guess };
+  }
+
   if (!vote) return c.json<ApiError>({ error: 'Answer first, then post.' }, 403);
 
   const streaks = projectStreaks(await getUser(userId));

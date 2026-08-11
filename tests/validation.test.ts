@@ -113,11 +113,22 @@ describe('the generated comment', () => {
 
   it('needs nothing typed and still says something', () => {
     const text = buildComment(question, reveal);
-    expect(text).toContain('Do you eat the pizza crust?');
-    expect(text).toContain('19 out of 100 are with me');
-    expect(text).toContain('Guessed 40%, actual 19%. Off by 21.');
+    expect(text).toContain('Yes');
+    expect(text).toContain('19 of 100 are with me');
+    expect(text).toContain('I guessed 40%, off by 21.');
     expect(text).toContain('Living in a bubble');
-    expect(text).toContain('Play streak 12');
+    expect(text).toContain('play 12');
+  });
+
+  it('stays short enough to read without scrolling', () => {
+    const text = buildComment(question, reveal);
+    // One claim, one footer. Anything longer and the preview needs a scrollbar.
+    expect(text.split('\n').filter((line) => line.trim() !== '')).toHaveLength(2);
+    expect(text.length).toBeLessThan(200);
+  });
+
+  it('does not repeat the question the post already asks', () => {
+    expect(buildComment(question, reveal)).not.toContain(question.text);
   });
 
   it('appends an optional note without disturbing the rest', () => {
