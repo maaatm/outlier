@@ -230,7 +230,8 @@ each dot a person, one of them you. There is no percentage bar: on reveal the do
 from a neutral scatter into two camps and the count *is* the visual. Nineteen dots
 against eighty-one lands harder than "19%".
 
-- 14px circles, flat fill, 2px ink outline
+- Flat circles, 2px ink outline, sized to fill the box the slide hands them — the crowd
+  measures its own space and centers in it, so the dots grow with the screen
 - Your dot carries a 3px ring and a knockout so it sits proud of the pack
 - Your side takes the accent for your outcome; the opposing side is ink at 15%
 - Eight dots carry faces, chosen by a fixed seed — a crowd where every face is drawn
@@ -249,6 +250,11 @@ font CDN.
 deterministic ±2px and ±3° from each dot's index; the divider under the question is an
 inline SVG path with a hand-drawn waver; the badge sits at −2° like a stamp applied by
 hand.
+
+**Pointer feedback** is the sticker metaphor kept honest: anything clickable lifts two
+pixels towards the cursor on hover with its shadow lengthening to match, and presses two
+pixels into the page on click. Hover is behind `(hover: hover) and (pointer: fine)`, so a
+tap on a phone never leaves a button stuck in the raised state.
 
 **Motion** is one orchestrated moment. On lock-in the dots travel to their camps over
 600ms with a 6ms stagger and a light spring overshoot; your dot lands ~150ms behind the

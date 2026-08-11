@@ -82,6 +82,7 @@
   --radius-button: 10px;
   --drop: 3px 3px 0 var(--ink);
   --drop-pressed: 1px 1px 0 var(--ink);
+  --drop-raised: 5px 5px 0 var(--ink);
 
   --font-display: 'Gabarito', ui-sans-serif, system-ui, sans-serif;
   --font-body: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
@@ -264,12 +265,37 @@ button {
   font-size: 16px;
   font-weight: 600;
   text-align: center;
-  transition: box-shadow 80ms linear, transform 80ms linear;
+  transition: box-shadow 100ms ease-out, transform 100ms ease-out;
 }
 
-.button:active:not(:disabled) {
+/*
+ * Everything clickable lifts towards the cursor: up and left by two, with the
+ * shadow lengthening by the same amount so the sticker looks peeled off the
+ * page rather than moved across it. Guarded on a real pointer — a phone would
+ * otherwise leave the last-tapped button stuck in the raised state.
+ */
+@media (hover: hover) and (pointer: fine) {
+  .button:hover:not(:disabled),
+  .detail__tab:hover {
+    box-shadow: var(--drop-raised);
+    transform: translate(-2px, -2px);
+  }
+
+  /* Quiet buttons carry no shadow at rest, so theirs arrives on the lift. */
+  .button--quiet:hover:not(:disabled) {
+    box-shadow: var(--drop);
+  }
+}
+
+/* After the hover rules: pressing always wins over pointing. */
+.button:active:not(:disabled),
+.detail__tab:active {
   box-shadow: var(--drop-pressed);
   transform: translate(2px, 2px);
+}
+
+.button--quiet:active:not(:disabled) {
+  box-shadow: none;
 }
 
 .button:disabled {
@@ -299,6 +325,13 @@ button {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--s2);
+}
+
+/* The two answers are the whole game, so they are the biggest targets in it. */
+.choices .button {
+  padding: var(--s4) var(--s3);
+  font-size: 18px;
+  min-height: 88px;
 }
 
 .choice__label {
@@ -690,6 +723,7 @@ button {
   font-family: var(--font-mono);
   font-size: 12px;
   padding: 2px var(--s2);
+  transition: box-shadow 100ms ease-out, transform 100ms ease-out;
 }
 
 .detail__tab.is-active {
@@ -815,10 +849,15 @@ button {
   min-height: 0;
 }
 
+/*
+ * Takes the slack, so that when the note field grows the preview above it gives
+ * up the room rather than the actions below it being pushed off the card.
+ */
 .compose__body {
   display: flex;
   flex-direction: column;
   gap: var(--s2);
+  flex: 1;
   min-height: 0;
 }
 
@@ -832,27 +871,42 @@ button {
   font-family: var(--font-mono);
   font-size: 12px;
   line-height: 1.6;
+  /* Keeps the comment's own line breaks, wraps everything else — including a
+     link or a run-on word long enough to push the card sideways. */
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
   border: var(--stroke) solid var(--ink);
   border-radius: var(--radius-button);
   padding: var(--s2);
   background: var(--paper);
   margin: 0;
   min-height: 0;
+  /* Shrinks to make room for the note field, and never grows past its text. */
+  flex: 0 1 auto;
   /* Only the preview scrolls, and only when the comment genuinely outgrows it. */
   overflow-y: auto;
 }
 
+/*
+ * The note field grows with what is typed into it — Compose sets its height
+ * from the content on every keystroke — so the text never scrolls out of sight
+ * inside a two-line box. It starts at two lines and stretches from there.
+ */
 .compose__note {
   width: 100%;
   font: inherit;
   font-size: 16px;
+  line-height: 1.5;
   color: inherit;
   background: var(--card);
   border: var(--stroke) solid var(--ink);
   border-radius: var(--radius-button);
   padding: var(--s2);
   resize: none;
+  overflow-wrap: anywhere;
+  overflow-y: hidden;
+  min-height: calc(3em + var(--s2) * 2 + var(--stroke) * 2);
+  flex: none;
 }
 
 .compose__note:focus-visible {
@@ -1013,6 +1067,12 @@ button {
 
   .button {
     padding: var(--s2) var(--s3);
+  }
+
+  .choices .button {
+    padding: var(--s3);
+    font-size: 16px;
+    min-height: 64px;
   }
 
   .slide {
