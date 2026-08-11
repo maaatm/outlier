@@ -6,7 +6,7 @@
  * text, and never blocks posting.
  */
 
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 
 import { buildComment, normalizeNote } from '../../shared/comment.js';
 import { NOTE_MAX_LENGTH } from '../../shared/config.js';
@@ -25,9 +25,22 @@ export function Compose({ postId, question, reveal }: Props): React.JSX.Element 
   const [posting, setPosting] = useState(false);
   const [posted, setPosted] = useState(reveal.commented);
   const [error, setError] = useState<string | null>(null);
+  const noteRef = useRef<HTMLTextAreaElement>(null);
 
   // The same function the server uses, so the preview is the comment.
   const preview = buildComment(question, reveal, normalizeNote(note));
+
+  // The note field takes the height of its own text, so a line that wraps
+  // stretches the box down instead of scrolling inside it. Done before paint so
+  // the field is never briefly the wrong height under the cursor.
+  useLayoutEffect(() => {
+    const field = noteRef.current;
+    if (!field) return;
+    field.style.height = 'auto';
+    // scrollHeight leaves out the border, and the box is border-box.
+    const border = field.offsetHeight - field.clientHeight;
+    field.style.height = `${field.scrollHeight + border}px`;
+  }, [note, showNote]);
 
   async function submit(): Promise<void> {
     setPosting(true);
@@ -63,6 +76,7 @@ export function Compose({ postId, question, reveal }: Props): React.JSX.Element 
             </label>
             <textarea
               id="note"
+              ref={noteRef}
               className="compose__note"
               rows={2}
               maxLength={NOTE_MAX_LENGTH}

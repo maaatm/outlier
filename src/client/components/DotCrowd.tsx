@@ -22,15 +22,20 @@ import { CROWD_SIZE } from '../../shared/config.js';
 import { facedDots, hashUnit, jitterFor, scatterFor } from '../jitter.js';
 
 const PER_ROW = 10;
-/** Rows of ten, plus the gap between camps, expressed in cells. */
-const ROWS = 11;
+/** Blank space between the two camps, in cells. */
 const CAMP_GAP_CELLS = 0.7;
-const BOX_CELLS_TALL = ROWS + CAMP_GAP_CELLS;
 
 /** A dot fills most of its cell; the remainder is the breathing room. */
-const DOT_RATIO = 0.82;
+const DOT_RATIO = 0.9;
 /** The size everything was tuned against, so jitter scales with the cell. */
 const REFERENCE_CELL = 20;
+
+/** Jitter is ±2px at the reference cell, which is a constant in cells. */
+const JITTER_CELLS = 2 / REFERENCE_CELL;
+/** How far your dot sits proud of the pack, up and to the left. */
+const PROUD_CELLS = 0.16;
+/** How far a dot strays from its cell in the pre-reveal scatter. */
+const SCATTER_SPREAD = 0.45;
 
 const FACES = 8;
 const STAGGER_MS = 6;
@@ -58,12 +63,37 @@ type Props = {
 type Placement = { x: number; y: number };
 
 /**
- * Two blocks, ten to a row: your camp on top, theirs below, with a gap between.
- * The row counts carry the proportion on their own. Positions are in cells;
- * the caller multiplies by the measured cell size.
+ * Where the dots rest, and the box that exactly holds them.
+ *
+ * The box is measured from the arrangement actually on screen rather than from
+ * a worst case, so the crowd fills the space it is given and sits centered in
+ * it — a fifty-fifty split needs ten rows, a fifty-five split needs eleven, and
+ * the scatter before the reveal needs ten. Everything is in cells; the caller
+ * multiplies by the measured cell size.
  */
-function campLayout(withYou: number): Placement[] {
+type Layout = {
+  places: Placement[];
+  width: number;
+  height: number;
+  /** Slack on every side, for what strays outside its cell. Kept symmetric so
+      the crowd stays centered in the box. */
+  margin: number;
+};
+
+/** How much room a run of `count` cells needs: the span, the dot, the slack. */
+function extent(count: number, margin: number): number {
+  return count - 1 + DOT_RATIO + margin * 2;
+}
+
+/**
+ * Two blocks, ten to a row: your camp on top, theirs below, with a gap between.
+ * The row counts carry the proportion on their own.
+ */
+function campLayout(withYou: number): Layout {
   const yourRows = Math.ceil(withYou / PER_ROW);
+  const otherRows = Math.ceil((CROWD_SIZE - withYou) / PER_ROW);
+  // Nothing to separate when one camp took every dot.
+  const gap = yourRows > 0 && otherRows > 0 ? CAMP_GAP_CELLS : 0;
   const places: Placement[] = [];
 
   for (let i = 0; i < CROWD_SIZE; i++) {
@@ -73,26 +103,35 @@ function campLayout(withYou: number): Placement[] {
     const column = indexInCamp % PER_ROW;
     places.push({
       x: column,
-      y: row + (mine ? 0 : yourRows + CAMP_GAP_CELLS),
+      y: row + (mine ? 0 : yourRows + gap),
     });
   }
-  return places;
+
+  // Your dot is the top-left one, so its proud offset is what decides the slack.
+  const margin = JITTER_CELLS + PROUD_CELLS;
+  return {
+    places,
+    width: extent(PER_ROW, margin),
+    height: extent(yourRows + otherRows, margin) + gap,
+    margin,
+  };
 }
 
-/**
- * Slack around the grid, in cells. Jitter and your dot's proud offset both push
- * outside the nominal bounds, and without this the top-left dot — which is
- * always yours — gets clipped by the card edge.
- */
-const MARGIN_CELLS = 0.5;
+/** The loose neutral scatter, which strays a good part of a cell either way. */
+function scatterLayout(places: Placement[]): Layout {
+  const margin = SCATTER_SPREAD + JITTER_CELLS;
+  return {
+    places,
+    width: extent(PER_ROW, margin),
+    height: extent(Math.ceil(CROWD_SIZE / PER_ROW), margin),
+    margin,
+  };
+}
 
-/** Largest cell that fits the crowd, with its margin, into the measured box. */
-function cellFor(width: number, height: number): number {
-  if (width <= 0 || height <= 0) return 0;
-  return Math.min(
-    width / (PER_ROW + MARGIN_CELLS),
-    height / (BOX_CELLS_TALL + MARGIN_CELLS)
-  );
+/** Largest cell that fits the whole layout into the measured box. */
+function cellFor(box: { width: number; height: number }, layout: Layout): number {
+  if (box.width <= 0 || box.height <= 0) return 0;
+  return Math.min(box.width / layout.width, box.height / layout.height);
 }
 
 export function DotCrowd({
@@ -104,21 +143,23 @@ export function DotCrowd({
 }: Props): React.JSX.Element {
   const revealed = withYou !== null;
   const boxRef = useRef<HTMLDivElement>(null);
-  const [cell, setCell] = useState(0);
+  const [box, setBox] = useState({ width: 0, height: 0 });
 
   // Measured before paint so the dots never flash at the wrong size, then kept
   // in step with the box as the slide or the viewport changes.
   useLayoutEffect(() => {
-    const box = boxRef.current;
-    if (!box) return;
+    const element = boxRef.current;
+    if (!element) return;
 
     const measure = (): void => {
-      setCell(cellFor(box.clientWidth, box.clientHeight));
+      const width = element.clientWidth;
+      const height = element.clientHeight;
+      setBox((last) => (last.width === width && last.height === height ? last : { width, height }));
     };
     measure();
 
     const observer = new ResizeObserver(measure);
-    observer.observe(box);
+    observer.observe(element);
     return () => observer.disconnect();
   }, []);
 
@@ -140,20 +181,32 @@ export function DotCrowd({
   }, [revealed, animate]);
 
   const faces = useMemo(() => facedDots(FACES, CROWD_SIZE), []);
-  const places = useMemo(() => campLayout(withYou ?? 0), [withYou]);
+  const scatter = useMemo(
+    () =>
+      Array.from({ length: CROWD_SIZE }, (_, index) =>
+        scatterFor(index, PER_ROW, 1, SCATTER_SPREAD)
+      ),
+    []
+  );
+  const layout = useMemo(
+    () => (withYou === null ? scatterLayout(scatter) : campLayout(withYou)),
+    [withYou, scatter]
+  );
 
+  const cell = cellFor(box, layout);
   const dot = cell * DOT_RATIO;
   const jitterScale = cell / REFERENCE_CELL;
-  const inset = (cell * MARGIN_CELLS) / 2;
-  // The crowd sits centered in whatever box it was handed.
-  const crowdWidth = cell * (PER_ROW + MARGIN_CELLS);
-  const crowdHeight = cell * (BOX_CELLS_TALL + MARGIN_CELLS);
+  const inset = cell * layout.margin;
+  // The field is the size of the crowd inside it, and the field is centered in
+  // the stage — so the crowd is centered too, whichever arrangement it is in.
+  const fieldWidth = cell * layout.width;
+  const fieldHeight = cell * layout.height;
 
   return (
     <div className="crowd" ref={boxRef}>
       <div
         className="crowd__field"
-        style={{ width: crowdWidth, height: crowdHeight }}
+        style={{ width: fieldWidth, height: fieldHeight }}
         role="img"
         aria-label={
           revealed
@@ -168,12 +221,10 @@ export function DotCrowd({
             const mine = index === 0;
             const onYourSide = revealed && index < (withYou ?? 0);
 
-            const resting = places[index]!;
-            const scatter = scatterFor(index, PER_ROW, 1);
-            const target = settled && revealed ? resting : scatter;
+            const target = settled && revealed ? layout.places[index]! : scatter[index]!;
 
             // Your dot sits slightly proud of the pack.
-            const proud = mine && revealed ? -cell * 0.16 : 0;
+            const proud = mine && revealed ? -cell * PROUD_CELLS : 0;
 
             const slotClasses = ['dot-slot'];
             if (mine && settled && revealed && animate) slotClasses.push('is-landed');

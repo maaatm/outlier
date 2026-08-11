@@ -1,6 +1,6 @@
 {
   "$schema": "https://developers.reddit.com/schema/config-file.v1.json",
-  "name": "outlier",
+  "name": "playoutlier",
 
   "post": {
     "dir": "dist/client",
@@ -90,7 +90,7 @@
   },
 
   "dev": {
-    "subreddit": "PlayOutlier"
+    "subreddit": "playoutlier_dev"
   },
 
   "scripts": {
