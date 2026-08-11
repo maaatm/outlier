@@ -139,15 +139,21 @@ button {
 
 /* ── Shell ──────────────────────────────────────────────────────────────── */
 
+/*
+ * The shell owns the viewport. The card takes every pixel left under the
+ * header, so its height comes from the screen rather than from whichever slide
+ * happens to be showing — navigating between slides never resizes anything.
+ */
 .app {
-  min-height: 100vh;
-  min-height: 100dvh;
+  height: 100vh;
+  height: 100dvh;
   padding: var(--s3);
   display: flex;
   flex-direction: column;
   gap: var(--s3);
   max-width: 480px;
   margin: 0 auto;
+  overflow: hidden;
 }
 
 .card {
@@ -156,6 +162,11 @@ button {
   border-radius: var(--radius-card);
   box-shadow: var(--drop);
   padding: var(--s3);
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  /* Without this a tall child refuses to shrink and the card overflows. */
+  min-height: 0;
 }
 
 /* ── Header ─────────────────────────────────────────────────────────────── */
@@ -302,6 +313,8 @@ button {
   display: flex;
   flex-direction: column;
   gap: var(--s3);
+  flex: 1;
+  min-height: 0;
 }
 
 .guess__prompt {
@@ -399,23 +412,57 @@ button {
 
 /* ── The crowd ──────────────────────────────────────────────────────────── */
 
+/* Fills whatever the slide gives it; the field inside is measured from this. */
 .crowd {
   position: relative;
-  margin: 0 auto;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   touch-action: none;
 }
 
-.dot {
+.crowd__field {
+  position: relative;
+}
+
+/*
+ * Two layers per dot on purpose. The slot carries the journey from scatter to
+ * camp (transform), the dot inside carries the idle bob (also transform) — one
+ * element cannot animate transform two ways at once.
+ */
+.dot-slot {
   position: absolute;
   top: 0;
   left: 0;
-  width: 14px;
-  height: 14px;
+  transition: transform 600ms cubic-bezier(0.22, 1.18, 0.36, 1);
+  will-change: transform;
+}
+
+.dot {
+  display: block;
+  width: 100%;
+  height: 100%;
   border-radius: 50%;
   border: var(--stroke) solid var(--ink);
   background: var(--ink-quiet);
-  transition: transform 600ms cubic-bezier(0.22, 1.18, 0.36, 1), background-color 300ms linear;
-  will-change: transform;
+  transition: background-color 300ms linear;
+  animation-name: bob;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+/* A small, unsynchronised float. Amplitude stays under a dot's radius. */
+@keyframes bob {
+  0%,
+  100% {
+    transform: translateY(-6%);
+  }
+  50% {
+    transform: translateY(6%);
+  }
 }
 
 /*
@@ -426,6 +473,9 @@ button {
 .dot--mine {
   border-width: 3px;
   box-shadow: 0 0 0 2px var(--card);
+}
+
+.dot-slot:has(.dot--mine) {
   z-index: 2;
 }
 
@@ -441,25 +491,30 @@ button {
   background: var(--hit);
 }
 
+/* Eyes scale with the dot, so they stay right at any crowd size. */
 .dot__eye {
   position: absolute;
-  width: 2px;
-  height: 2px;
+  width: 14%;
+  height: 14%;
   border-radius: 50%;
   background: var(--ink);
-  top: 3px;
+  top: 24%;
 }
 
 .dot__eye--left {
-  left: 2px;
+  left: 20%;
 }
 
 .dot__eye--right {
-  right: 2px;
+  right: 20%;
 }
 
-/* Your dot lands last and pops. */
-.dot--mine.is-landed {
+/*
+ * Your dot lands last and pops. This rides on the slot using the `scale`
+ * property, which composes with the slot's `transform` travel and with the
+ * dot's own bob instead of replacing either.
+ */
+.dot-slot.is-landed {
   animation: pop 260ms cubic-bezier(0.22, 1.4, 0.36, 1) 750ms both;
 }
 
@@ -494,19 +549,40 @@ button {
   display: flex;
   flex-direction: column;
   gap: var(--s2);
+  flex: 1;
+  min-height: 0;
 }
 
+/*
+ * Every slide is the same box: it takes the space the card gives it and
+ * distributes its own contents down that height. The nav underneath is the
+ * only thing that keeps a fixed size, so the three slides are interchangeable
+ * without a single pixel of movement.
+ */
 .slide {
   display: flex;
   flex-direction: column;
+  justify-content: space-between;
   gap: var(--s3);
+  flex: 1;
+  min-height: 0;
+  /* Safety valve. Normally nothing here needs it. */
+  overflow-y: auto;
 }
 
-/* The crowd's home on both the guess screen and the reveal. */
+/*
+ * The crowd's home on both the guess screen and the reveal.
+ *
+ * `align-items: stretch` matters: the crowd measures its own box to size the
+ * dots, so if this centred instead, the box would collapse to the height of an
+ * unmeasured field and the crowd would never resolve a size at all.
+ */
 .stage {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
+  flex: 1;
+  min-height: 0;
 }
 
 .verdict {
@@ -584,10 +660,21 @@ button {
 
 /* ── Detail strip: histogram or leaderboard, same slot ───────────────────── */
 
+/* Takes the slack on the score slide so the bars grow with the screen. */
 .detail {
   display: flex;
   flex-direction: column;
   gap: var(--s2);
+  flex: 1;
+  min-height: 0;
+}
+
+.histogram__wrap {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  flex: 1;
+  min-height: 0;
 }
 
 .detail__tabs {
@@ -681,7 +768,10 @@ button {
   display: flex;
   align-items: flex-end;
   gap: var(--s1);
-  height: 44px;
+  flex: 1;
+  min-height: 44px;
+  /* Tall bars on a big screen read as a poster, not a chart. */
+  max-height: 180px;
 }
 
 .histogram__bar {
@@ -715,7 +805,27 @@ button {
 
 /* ── Comment ────────────────────────────────────────────────────────────── */
 
+/*
+ * Comment at the top, actions pinned to the bottom. The preview keeps its
+ * natural height — stretching it to fill would just draw a big empty box.
+ */
 .compose {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--s3);
+  flex: 1;
+  min-height: 0;
+}
+
+.compose__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  min-height: 0;
+}
+
+.compose__actions {
   display: flex;
   flex-direction: column;
   gap: var(--s2);
@@ -731,8 +841,8 @@ button {
   padding: var(--s2);
   background: var(--paper);
   margin: 0;
-  /* Safety valve for a long note on a short screen; normally never scrolls. */
-  max-height: 220px;
+  min-height: 0;
+  /* Only the preview scrolls, and only when the comment genuinely outgrows it. */
   overflow-y: auto;
 }
 
@@ -768,7 +878,10 @@ button {
   padding: 0;
   display: flex;
   flex-direction: column;
+  justify-content: center;
   gap: var(--s2);
+  flex: 1;
+  min-height: 0;
 }
 
 .board__row {
@@ -909,11 +1022,6 @@ button {
     gap: var(--s2);
   }
 
-  /* The preview keeps its inner scroll; the page never grows. */
-  .compose__preview {
-    max-height: 128px;
-  }
-
   .compose__hint {
     display: none;
   }
@@ -935,6 +1043,13 @@ button {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     transition-delay: 0ms !important;
+  }
+
+  /* The idle bob is removed outright rather than run once at 0.01ms, which
+     would leave every dot frozen at a random point in its cycle. */
+  .dot {
+    animation: none !important;
+    transform: none !important;
   }
 
   .reveal {

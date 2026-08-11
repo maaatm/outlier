@@ -25,7 +25,7 @@ export function Histogram({
   const yourBucket = Math.min(HISTOGRAM_BUCKETS - 1, Math.floor(yourGuess / 10));
 
   return (
-    <div>
+    <div className="histogram__wrap">
       <div className="histogram">
         {buckets.map((count, index) => {
           const yours = index === yourBucket;

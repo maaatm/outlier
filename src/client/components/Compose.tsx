@@ -49,41 +49,47 @@ export function Compose({ postId, question, reveal }: Props): React.JSX.Element 
 
   return (
     <div className="compose">
-      <p className="section__title">your comment, already written</p>
-      <pre className="compose__preview">{preview}</pre>
+      <div className="compose__body">
+        <p className="section__title">your comment, already written</p>
+        <pre className="compose__preview">{preview}</pre>
 
-      {showNote ? (
-        <>
-          <label className="visually-hidden" htmlFor="note">
-            Optional note
-          </label>
-          <textarea
-            id="note"
-            className="compose__note"
-            rows={2}
-            maxLength={NOTE_MAX_LENGTH}
-            value={note}
-            placeholder="Add a line, or do not."
-            onChange={(event) => setNote(event.target.value)}
-          />
-          <p className="compose__hint">{NOTE_MAX_LENGTH - note.length} left. Skippable.</p>
-        </>
-      ) : (
-        <button type="button" className="button button--quiet" onClick={() => setShowNote(true)}>
-          Add a line (optional)
+        {showNote && (
+          <>
+            <label className="visually-hidden" htmlFor="note">
+              Optional note
+            </label>
+            <textarea
+              id="note"
+              className="compose__note"
+              rows={2}
+              maxLength={NOTE_MAX_LENGTH}
+              value={note}
+              placeholder="Add a line, or do not."
+              onChange={(event) => setNote(event.target.value)}
+            />
+            <p className="compose__hint">{NOTE_MAX_LENGTH - note.length} left. Skippable.</p>
+          </>
+        )}
+      </div>
+
+      <div className="compose__actions">
+        {!showNote && (
+          <button type="button" className="button button--quiet" onClick={() => setShowNote(true)}>
+            Add a line (optional)
+          </button>
+        )}
+
+        <button
+          type="button"
+          className="button button--primary"
+          onClick={submit}
+          disabled={posting}
+        >
+          {posting ? 'Posting...' : 'Post this to the thread'}
         </button>
-      )}
 
-      <button
-        type="button"
-        className="button button--primary"
-        onClick={submit}
-        disabled={posting}
-      >
-        {posting ? 'Posting...' : 'Post this to the thread'}
-      </button>
-
-      {error && <p className="notice notice--quiet">{error}</p>}
+        {error && <p className="notice notice--quiet">{error}</p>}
+      </div>
     </div>
   );
 }
