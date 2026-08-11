@@ -17,6 +17,7 @@ import { Compose } from './components/Compose.js';
 import { DotCrowd } from './components/DotCrowd.js';
 import { Histogram } from './components/Histogram.js';
 import { Leaderboard } from './components/Leaderboard.js';
+import { Menu } from './components/Menu.js';
 import { StreakBar } from './components/StreakBar.js';
 import { WobbleRule } from './components/WobbleRule.js';
 
@@ -27,12 +28,19 @@ type Phase =
   | { name: 'error'; message: string }
   | { name: 'ready'; state: StateResponse };
 
+/** The question and the menu are the two screens. Only one is ever mounted. */
+type Screen = 'game' | 'menu';
+
 export function App(): React.JSX.Element {
   const postId = context.postId;
   const [phase, setPhase] = useState<Phase>({ name: 'loading' });
   // The reveal is orchestrated only for the vote that produced it. A player
   // reopening a post they already answered lands on the finished state.
   const [justVoted, setJustVoted] = useState(false);
+  const [screen, setScreen] = useState<Screen>('game');
+  // The reveal's page index lives up here rather than inside the reveal, so a
+  // trip to the menu and back returns to the slide it was opened from.
+  const [slide, setSlide] = useState(0);
 
   const load = useCallback(async (): Promise<void> => {
     if (!postId) {
@@ -71,11 +79,18 @@ export function App(): React.JSX.Element {
     );
   }
 
+  if (screen === 'menu') {
+    return <Menu streaks={phase.state.streaks} onExit={() => setScreen('game')} />;
+  }
+
   return (
     <Game
       postId={postId!}
       state={phase.state}
       justVoted={justVoted}
+      slide={slide}
+      onSlide={setSlide}
+      onOpenMenu={() => setScreen('menu')}
       onReveal={(reveal, streaks) => {
         setJustVoted(true);
         setPhase({ name: 'ready', state: { ...phase.state, reveal, streaks } });
@@ -88,11 +103,17 @@ function Game({
   postId,
   state,
   justVoted,
+  slide,
+  onSlide,
+  onOpenMenu,
   onReveal,
 }: {
   postId: string;
   state: StateResponse;
   justVoted: boolean;
+  slide: number;
+  onSlide: (slide: number) => void;
+  onOpenMenu: () => void;
   onReveal: (reveal: Reveal, streaks: Streaks) => void;
 }): React.JSX.Element {
   const { question, reveal, streaks, canVote } = state;
@@ -120,6 +141,9 @@ function Game({
             question={question}
             reveal={reveal}
             animate={justVoted}
+            slide={slide}
+            onSlide={onSlide}
+            onOpenMenu={onOpenMenu}
           />
         ) : (
           <PlayView
@@ -261,23 +285,31 @@ function PlayView({
  *
  * The travel animation belongs to slide one and the stamp to slide two, so
  * each slide keeps its own moment instead of everything firing at once.
+ *
+ * The share slide is the end of the question, so the step that carried "next"
+ * on the way here carries "menu" instead of nothing.
  */
 function RevealView({
   postId,
   question,
   reveal,
   animate,
+  slide,
+  onSlide,
+  onOpenMenu,
 }: {
   postId: string;
   question: Question;
   reveal: Reveal;
   animate: boolean;
+  slide: number;
+  onSlide: (slide: number) => void;
+  onOpenMenu: () => void;
 }): React.JSX.Element {
   const accent = getBadge(reveal.badge).accent;
   const mine = reveal.choice === 'a' ? question.labelA : question.labelB;
   const theirs = reveal.choice === 'a' ? question.labelB : question.labelA;
   const rest = CROWD_SIZE - reveal.dotsWithYou;
-  const [slide, setSlide] = useState(0);
   const [detail, setDetail] = useState<'guesses' | 'misjudged'>('guesses');
 
   const captionBits = [`${reveal.dotsWithYou} ${mine} \u00b7 ${rest} ${theirs}`];
@@ -376,7 +408,7 @@ function RevealView({
         <button
           type="button"
           className="button button--quiet slides__step"
-          onClick={() => setSlide(slide - 1)}
+          onClick={() => onSlide(slide - 1)}
           disabled={slide === 0}
           style={{ visibility: slide === 0 ? 'hidden' : 'visible' }}
         >
@@ -396,12 +428,14 @@ function RevealView({
           <button
             type="button"
             className="button slides__step"
-            onClick={() => setSlide(slide + 1)}
+            onClick={() => onSlide(slide + 1)}
           >
             Next
           </button>
         ) : (
-          <span className="slides__step" aria-hidden="true" />
+          <button type="button" className="button slides__step" onClick={onOpenMenu}>
+            Menu
+          </button>
         )}
       </nav>
     </div>

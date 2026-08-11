@@ -264,6 +264,36 @@ state. No confetti, no shake, no celebratory burst; the copy voice matches.
 
 ---
 
+## The menu
+
+The share slide is the end of a question, so the step that carried **Next** on the way
+there carries **Menu** instead of nothing. The menu is a screen rather than a sheet laid
+over one: same shell, same header, same card, and the card's contents are the only thing
+that changes.
+
+Four rooms, one open at a time, each with its fine print pinned to the bottom.
+
+| Room | What it holds |
+|---|---|
+| How to play | the three steps, then the two axes |
+| Your record | both streaks, questions answered, read rate |
+| The four outcomes | the 2x2, asked of `badgeFor` corner by corner |
+| Hardest to read | the misjudged leaderboard, five rows |
+
+Every threshold and every line of badge copy is read from `src/shared/`, so the menu
+cannot drift from what the game actually scores. The 2x2 is deliberately unaccented:
+four badges in their own colours would put three meanings of colour on one screen, and
+the rule is two.
+
+Nothing here is a leak. The leaderboard is average error on questions that are long
+since answered, and the counters are the player's own — the menu never touches a live
+tally, and it is only reachable after a reveal in any case.
+
+The reveal's page index lives in `App` rather than inside the reveal, which is what makes
+the trip out to the menu and back land on the slide it left from.
+
+---
+
 ## Decisions taken
 
 Two things the spec left open, and how they were resolved.
