@@ -56,10 +56,19 @@ export function castVote(postId: string, choice: 'a' | 'b', guess: number): Prom
   });
 }
 
-export function postComment(postId: string, note?: string): Promise<CommentResponse> {
+/**
+ * `choice` and `guess` are a fallback the server only reads when it has no
+ * stored vote for this player, which happens under REPLAY_MODE. Normally it
+ * ignores them and uses what it recorded.
+ */
+export function postComment(
+  postId: string,
+  note: string | undefined,
+  answer: { choice: 'a' | 'b'; guess: number }
+): Promise<CommentResponse> {
   return request<CommentResponse>('/api/comment', {
     method: 'POST',
-    body: JSON.stringify({ postId, note }),
+    body: JSON.stringify({ postId, note, ...answer }),
   });
 }
 

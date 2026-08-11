@@ -83,6 +83,21 @@ questions accumulate vote data and nothing else.
 
 ---
 
+## Replay mode — turn this off before release
+
+`REPLAY_MODE` in `src/shared/config.ts` is currently **on**. It exists so the
+game can be played repeatedly while testing: your answer is never written to
+`voted:{questionId}`, so opening a post always gives you the question again
+rather than the reveal you already earned.
+
+It does this by disabling the server-side dedupe guard — the only thing stopping
+one account from voting a hundred times. Votes still count toward the tallies,
+so a test subreddit builds a real distribution and a live one would build a fake
+one. Streaks are unaffected and still work normally.
+
+The server logs a warning on boot while it is on. Set it to `false` before this
+goes anywhere real.
+
 ## The invariant
 
 `GET /api/state` must not include vote counts for a user who has not voted. Otherwise

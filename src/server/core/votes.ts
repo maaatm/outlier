@@ -11,7 +11,7 @@
 import { redis } from '@devvit/web/server';
 
 import { buildComment } from '../../shared/comment.js';
-import { HISTOGRAM_BUCKETS, PROVISIONAL_VOTE_FLOOR } from '../../shared/config.js';
+import { HISTOGRAM_BUCKETS, PROVISIONAL_VOTE_FLOOR, REPLAY_MODE } from '../../shared/config.js';
 import { scoreVote } from '../../shared/scoring.js';
 import type { Choice, Reveal, Streaks, Tally } from '../../shared/types.js';
 import { keys, voteFields } from './keys.js';
@@ -45,6 +45,8 @@ export async function getStoredVote(
   questionId: string,
   userId: string
 ): Promise<StoredVote | null> {
+  // In replay mode nothing was ever stored, so every visit is a fresh one.
+  if (REPLAY_MODE) return null;
   return decodeVote(await redis.hGet(keys.voted(questionId), userId));
 }
 
@@ -65,6 +67,8 @@ async function readHistogram(questionId: string): Promise<number[]> {
 }
 
 async function hasCommented(questionId: string, userId: string): Promise<boolean> {
+  // Replay mode forgets the comment too, so the whole slide stays playable.
+  if (REPLAY_MODE) return false;
   return Boolean(await redis.hGet(keys.commented(questionId), userId));
 }
 
@@ -131,6 +135,13 @@ export async function castVote(
   choice: Choice,
   guess: number
 ): Promise<CastResult> {
+  if (REPLAY_MODE) {
+    // Nothing is claimed and nothing is remembered, so the next open starts
+    // over. See the warning on REPLAY_MODE — this is the dedupe guard, off.
+    await tallyVote(questionId, choice, guess);
+    return finishVote(questionId, choice, guess);
+  }
+
   const claimed = await redis.hSetNX(keys.voted(questionId), userId, encodeVote(choice, guess));
 
   if (claimed === 0) {
@@ -144,14 +155,29 @@ export async function castVote(
   }
 
   await Promise.all([
+    tallyVote(questionId, choice, guess),
+    redis.zAdd(keys.guesses(questionId), { member: userId, score: guess }),
+  ]);
+
+  return finishVote(questionId, choice, guess);
+}
+
+/** The counters every vote moves, whether or not the voter is remembered. */
+async function tallyVote(questionId: string, choice: Choice, guess: number): Promise<void> {
+  await Promise.all([
     redis.hIncrBy(keys.votes(questionId), choice === 'a' ? voteFields.a : voteFields.b, 1),
     redis.hIncrBy(keys.votes(questionId), voteFields.guessSum, guess),
     redis.hIncrBy(keys.votes(questionId), voteFields.guessCount, 1),
-    redis.zAdd(keys.guesses(questionId), { member: userId, score: guess }),
     redis.hIncrBy(keys.histogram(questionId), String(bucketFor(guess)), 1),
   ]);
+}
 
-  // Scored against the tally that includes this vote — you are one of the crowd.
+/** Score against the tally that includes this vote — you are one of the crowd. */
+async function finishVote(
+  questionId: string,
+  choice: Choice,
+  guess: number
+): Promise<CastResult> {
   const tally = await readTally(questionId);
   const score = scoreVote(tally, choice, guess);
 

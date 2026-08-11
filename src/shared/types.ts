@@ -90,6 +90,15 @@ export type CommentRequest = {
   postId: string;
   /** Optional and skippable. Appended to the generated comment. */
   note?: string;
+  /**
+   * The answer being shared. Read only when no vote was stored — which happens
+   * only under `REPLAY_MODE`, where nothing is remembered. Normally the server
+   * ignores these and reads the stored vote instead, so the client cannot claim
+   * a result it did not earn. The split and the score are recomputed from the
+   * live tally either way.
+   */
+  choice?: Choice;
+  guess?: number;
 };
 
 export type CommentResponse = {

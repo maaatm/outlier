@@ -710,7 +710,6 @@ button {
   padding: var(--s2) var(--s3);
   background: var(--card);
   text-align: center;
-  rotate: -2deg; /* a stamp applied by hand */
 }
 
 .badge--signal {
@@ -753,12 +752,10 @@ button {
   0% {
     scale: 1.35;
     opacity: 0;
-    rotate: -8deg;
   }
   100% {
     scale: 1;
     opacity: 1;
-    rotate: -2deg;
   }
 }
 

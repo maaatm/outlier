@@ -49,6 +49,21 @@ export const HISTOGRAM_BUCKETS = 10;
  */
 export const POOL_SHUFFLE_SEED = 0x0dd1e5;
 
+/**
+ * TESTING ONLY — set to false before this goes anywhere real.
+ *
+ * When true the game forgets that you played: your answer is never written to
+ * `voted:{questionId}`, so every time you open a post you get the question
+ * again instead of the reveal you already earned.
+ *
+ * This deliberately disables the server-side dedupe guard, which is the only
+ * thing stopping one account from voting a hundred times. Votes still count
+ * toward the tallies, so a test subreddit builds up a real distribution to look
+ * at — and a live subreddit would build up a fake one. Streaks are untouched
+ * and still work normally.
+ */
+export const REPLAY_MODE = true;
+
 /** Post flair applied to player-submitted questions. */
 export const OPEN_QUESTION_FLAIR = 'Open question';
 export const DAILY_FLAIR = 'Daily';

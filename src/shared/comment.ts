@@ -24,33 +24,24 @@ export function normalizeNote(note: string | undefined): string {
   return (lastSpace > NOTE_MAX_LENGTH * 0.6 ? cut.slice(0, lastSpace) : cut).trimEnd();
 }
 
+/**
+ * Two lines, and short enough to read without scrolling either in the app's
+ * preview or in the thread.
+ *
+ * The question itself is not quoted — the comment sits under a post that
+ * already asks it, and repeating it was most of the old length. Everything that
+ * survives is something the reader cannot get from the post: which side the
+ * player took, how the crowd split, and how badly they read it.
+ */
 export function buildComment(question: Question, reveal: Reveal, note?: string): string {
   const badge = getBadge(reveal.badge);
   const mine = labelFor(question, reveal.choice);
-  const withMe = reveal.dotsWithYou;
+  const soFar = reveal.provisional ? ' so far' : '';
 
-  const lines: string[] = [];
-
-  lines.push(`> ${question.text}`);
-  lines.push('');
-  lines.push(
-    `**${mine}.** ${withMe} out of ${CROWD_SIZE} are with me${
-      reveal.provisional ? ' so far' : ''
-    }.`
-  );
-  lines.push('');
-  lines.push(
-    `Guessed ${reveal.guess}%, actual ${reveal.actual}%. Off by ${reveal.error}.`
-  );
-  lines.push('');
-  lines.push(`**${badge.title}** — ${badge.line}`);
-
-  if (reveal.streaks) {
-    lines.push('');
-    lines.push(
-      `Play streak ${reveal.streaks.playStreak} · Read streak ${reveal.streaks.readStreak}`
-    );
-  }
+  const lines: string[] = [
+    `**${mine}** — ${reveal.dotsWithYou} of ${CROWD_SIZE} are with me${soFar}. ` +
+      `I guessed ${reveal.guess}%, off by ${reveal.error}. **${badge.title}.**`,
+  ];
 
   const cleanNote = normalizeNote(note);
   if (cleanNote) {
@@ -58,8 +49,12 @@ export function buildComment(question: Question, reveal: Reveal, note?: string):
     lines.push(cleanNote);
   }
 
+  const streak = reveal.streaks
+    ? `play ${reveal.streaks.playStreak} · read ${reveal.streaks.readStreak} · `
+    : '';
+
   lines.push('');
-  lines.push('^(via Outlier)');
+  lines.push(`^(${streak}via Outlier)`);
 
   return lines.join('\n');
 }
