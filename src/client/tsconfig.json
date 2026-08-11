@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "types": ["vite/client"],
+    /*
+     * Resolves `@devvit/web/*` to its browser entrypoints. Without it the client
+     * gets the server build, which is a stub that exists only to shout at you.
+     */
+    "customConditions": ["browser"]
+  },
+  "include": [".", "../shared"]
+}

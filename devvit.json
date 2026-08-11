@@ -1,0 +1,99 @@
+{
+  "$schema": "https://developers.reddit.com/schema/config-file.v1.json",
+  "name": "outlier",
+
+  "post": {
+    "dir": "dist/client",
+    "entrypoints": {
+      "default": {
+        "entry": "index.html",
+        "height": "tall",
+        "styles": {
+          "backgroundColor": "#E7E9F5FF",
+          "backgroundColorDark": "#14161BFF"
+        }
+      }
+    }
+  },
+
+  "server": {
+    "dir": "dist/server",
+    "entry": "index.cjs"
+  },
+
+  "permissions": {
+    "redis": true,
+    "reddit": {
+      "enable": true,
+      "scope": "moderator"
+    }
+  },
+
+  "menu": {
+    "items": [
+      {
+        "label": "Submit a question",
+        "description": "Ask the subreddit something about ordinary behavior",
+        "location": "subreddit",
+        "forUserType": "user",
+        "endpoint": "/internal/menu/submit-question"
+      },
+      {
+        "label": "Outlier: review the question queue",
+        "description": "Approve or reject community questions",
+        "location": "subreddit",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/review-queue"
+      },
+      {
+        "label": "Outlier: post today's Daily now",
+        "description": "Resolve and post the Daily without waiting for midnight",
+        "location": "subreddit",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/post-daily-now"
+      },
+      {
+        "label": "Outlier: post the misjudged leaderboard",
+        "description": "Publish the questions the subreddit read worst",
+        "location": "subreddit",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/post-leaderboard"
+      }
+    ]
+  },
+
+  "forms": {
+    "submitQuestion": "/internal/forms/submit-question",
+    "reviewQueue": "/internal/forms/review-queue"
+  },
+
+  "scheduler": {
+    "tasks": {
+      "post-daily": {
+        "endpoint": "/internal/tasks/post-daily",
+        "cron": "0 0 * * *"
+      },
+      "lock-daily": {
+        "endpoint": "/internal/tasks/lock-daily",
+        "cron": "0 0 * * *"
+      },
+      "refresh-queue": {
+        "endpoint": "/internal/tasks/refresh-queue",
+        "cron": "0 * * * *"
+      }
+    }
+  },
+
+  "triggers": {
+    "onAppInstall": "/internal/triggers/install"
+  },
+
+  "dev": {
+    "subreddit": "outlier_dev"
+  },
+
+  "scripts": {
+    "dev": "npm run dev:build",
+    "build": "npm run build"
+  }
+}
