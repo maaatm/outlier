@@ -10,7 +10,8 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { getBadge } from '../shared/badges.js';
 import { CROWD_SIZE } from '../shared/config.js';
-import type { Choice, Question, Reveal, StateResponse, Streaks } from '../shared/types.js';
+import { getBand, type Award } from '../shared/points.js';
+import type { Choice, PlayerStats, Question, Reveal, StateResponse } from '../shared/types.js';
 import { ApiFailure, castVote, fetchState } from './api.js';
 import { randomGroupColors } from './colors.js';
 import { BadgeStamp } from './components/BadgeStamp.js';
@@ -19,8 +20,9 @@ import { DotCrowd } from './components/DotCrowd.js';
 import { Histogram } from './components/Histogram.js';
 import { Leaderboard } from './components/Leaderboard.js';
 import { Menu } from './components/Menu.js';
-import { StreakBar } from './components/StreakBar.js';
+import { StatBar } from './components/StatBar.js';
 import { WobbleRule } from './components/WobbleRule.js';
+import { useCountUp } from './countUp.js';
 
 const DEFAULT_GUESS = 50;
 
@@ -81,7 +83,7 @@ export function App(): React.JSX.Element {
   }
 
   if (screen === 'menu') {
-    return <Menu streaks={phase.state.streaks} onExit={() => setScreen('game')} />;
+    return <Menu stats={phase.state.stats} onExit={() => setScreen('game')} />;
   }
 
   return (
@@ -92,9 +94,9 @@ export function App(): React.JSX.Element {
       slide={slide}
       onSlide={setSlide}
       onOpenMenu={() => setScreen('menu')}
-      onReveal={(reveal, streaks) => {
+      onReveal={(reveal) => {
         setJustVoted(true);
-        setPhase({ name: 'ready', state: { ...phase.state, reveal, streaks } });
+        setPhase({ name: 'ready', state: { ...phase.state, reveal, stats: reveal.stats } });
       }}
     />
   );
@@ -115,9 +117,9 @@ function Game({
   slide: number;
   onSlide: (slide: number) => void;
   onOpenMenu: () => void;
-  onReveal: (reveal: Reveal, streaks: Streaks) => void;
+  onReveal: (reveal: Reveal) => void;
 }): React.JSX.Element {
-  const { question, reveal, streaks, canVote } = state;
+  const { question, reveal, stats, canVote } = state;
 
   return (
     <main className="app">
@@ -126,7 +128,7 @@ function Game({
         <span className="header__day">
           {question.isDaily ? question.dailyDate : 'open question'}
         </span>
-        <StreakBar streaks={streaks} />
+        <StatBar stats={stats} />
       </header>
 
       <section className="card">
@@ -172,7 +174,7 @@ function PlayView({
   question: Question;
   canVote: boolean;
   locked: boolean;
-  onReveal: (reveal: Reveal, streaks: Streaks) => void;
+  onReveal: (reveal: Reveal) => void;
 }): React.JSX.Element {
   const [choice, setChoice] = useState<Choice | null>(null);
   const [guess, setGuess] = useState(DEFAULT_GUESS);
@@ -194,13 +196,12 @@ function PlayView({
     setSubmitting(true);
     setError(null);
     try {
-      const result = await castVote(postId, choice, guess);
-      onReveal(result, result.streaks ?? emptyStreaks());
+      onReveal(await castVote(postId, choice, guess));
     } catch (failure) {
       // A 409 carries the reveal this player already earned — show it rather
       // than an error.
       if (failure instanceof ApiFailure && failure.reveal) {
-        onReveal(failure.reveal, failure.reveal.streaks ?? emptyStreaks());
+        onReveal(failure.reveal);
         return;
       }
       setError(failure instanceof Error ? failure.message : 'Could not record that.');
@@ -334,11 +335,10 @@ function RevealView({
   const rest = CROWD_SIZE - reveal.dotsWithYou;
   const [detail, setDetail] = useState<'guesses' | 'misjudged'>('guesses');
 
-  const captionBits = [`${reveal.dotsWithYou} ${mine} \u00b7 ${rest} ${theirs}`];
-  if (reveal.provisional) {
-    captionBits.push(`${reveal.tally.total} ${reveal.tally.total === 1 ? 'vote' : 'votes'} so far`);
-  }
-  if (!question.isDaily) captionBits.push('no streak');
+  const captionBits = [
+    `${reveal.dotsWithYou} ${mine} \u00b7 ${rest} ${theirs}`,
+    votesCaption(reveal, question),
+  ];
 
   const SLIDE_COUNT = 3;
 
@@ -391,6 +391,8 @@ function RevealView({
               </span>
             </div>
           </div>
+
+          <PointsAward award={reveal.award} animate={animate} />
 
           <BadgeStamp id={reveal.badge} animate={animate} />
 
@@ -464,6 +466,52 @@ function RevealView({
   );
 }
 
-function emptyStreaks(): Streaks {
-  return { playStreak: 0, readStreak: 0, totalPlayed: 0, totalHits: 0, extendedToday: false };
+/**
+ * What the vote paid.
+ *
+ * The band label leads and the number follows it: "Bullseye" is the thing worth
+ * saying and "+60" is the receipt. The total counts up on arrival because it is
+ * the one figure here that was earned rather than reported.
+ *
+ * Deliberately unaccented. The badge stamp and the histogram on this slide
+ * already spend both of the two accents the screen is allowed.
+ */
+function PointsAward({ award, animate }: { award: Award; animate: boolean }): React.JSX.Element {
+  const band = getBand(award.band);
+  const total = useCountUp(award.total, animate);
+
+  return (
+    <div className="award">
+      <div className="award__head">
+        <span className="award__band">{band.label}</span>
+        {/* The count-up is decoration, so it is hidden and the settled total is
+            announced instead — a screen reader should not be read a number
+            still in flight. */}
+        <span className="award__total" aria-hidden="true">
+          +{total}
+        </span>
+        <span className="visually-hidden">{award.total} points</span>
+      </div>
+      <p className="award__breakdown">
+        {award.base} for playing
+        {award.bonus > 0 ? ` · ${award.bonus} for landing within ${band.maxError}` : ''}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * How big the crowd behind the split actually is.
+ *
+ * Always shown, not just when the sample is thin: the split means one thing at
+ * twelve votes and another at twelve hundred, and the reader cannot tell which
+ * they are looking at from a percentage.
+ */
+function votesCaption(reveal: Reveal, question: Question): string {
+  const { total } = reveal.tally;
+  const votes = `${total} ${total === 1 ? 'vote' : 'votes'}`;
+  if (reveal.provisional) return `${votes} so far`;
+  // A Daily's tally is today's; an open question has been collecting since it
+  // was posted, so claiming "today" for it would be a lie.
+  return question.isDaily && !question.locked ? `${votes} today` : votes;
 }

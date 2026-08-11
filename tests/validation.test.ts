@@ -102,9 +102,11 @@ describe('the generated comment', () => {
     provisional: false,
     commentPreview: '',
     commented: false,
-    streaks: {
-      playStreak: 12,
-      readStreak: 0,
+    award: { base: 10, bonus: 0, total: 10, band: 'cold' },
+    stats: {
+      streak: 12,
+      bestStreak: 19,
+      points: 430,
       totalPlayed: 30,
       totalHits: 11,
       extendedToday: true,
@@ -117,7 +119,17 @@ describe('the generated comment', () => {
     expect(text).toContain('19 of 100 are with me');
     expect(text).toContain('I guessed 40%, off by 21.');
     expect(text).toContain('Living in a bubble');
-    expect(text).toContain('play 12');
+    expect(text).toContain('streak 12');
+  });
+
+  it('carries the band the vote earned, not just the number', () => {
+    const bullseye: Reveal = {
+      ...reveal,
+      error: 1,
+      award: { base: 10, bonus: 50, total: 60, band: 'bullseye' },
+    };
+    expect(buildComment(question, bullseye)).toContain('Bullseye +60');
+    expect(buildComment(question, reveal)).toContain('Cold +10');
   });
 
   it('stays short enough to read without scrolling', () => {

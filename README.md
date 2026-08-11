@@ -72,14 +72,35 @@ error is kept for stats; the binary is what makes a streak legible.
 Badge copy lives in `src/shared/badges.ts` so the tone can be tuned without touching
 logic. Thresholds live in `src/shared/config.ts`.
 
-### Streaks
+### Streak and points
 
-- `playStreak` — consecutive days with a Daily submission. The habit metric.
-- `readStreak` — consecutive Dailies where `error <= 10`. The brag metric.
+- `streak` — consecutive UTC days on which the player submitted at least one vote. The
+  habit metric. A missed day resets it to zero; `bestStreak` keeps the number it reached
+  and is never reduced.
+- `points` — lifetime, banked per vote rather than per day.
 
-Both reset on a missed day. **Day boundaries are UTC**, matching the post schedule; local
-time is never consulted on either side of the wire. Only the Daily moves streaks — open
-questions accumulate vote data and nothing else.
+**Every question counts** toward both: the Daily, an open question somebody submitted, or
+one played out of the archive. The day recorded is the day the vote was *cast*, not the
+day the question ran, so an archived puzzle cannot back-date a streak.
+
+**Day boundaries are UTC**, matching the post schedule; local time is never consulted on
+either side of the wire. The streak moves once a day however many questions are in it;
+points move on every vote.
+
+Each vote pays `POINTS_BASE` (10) plus one accuracy band, on `error = |guess - actual|`:
+
+| Band | Error | Bonus |
+|---|---|---|
+| Bullseye | ≤ 2 | +50 |
+| Sharp | ≤ 5 | +30 |
+| Close | ≤ 10 | +15 |
+| Warm | ≤ 20 | +5 |
+| Cold | — | 0 |
+
+The label is what the reveal and the shared comment lead with; the number is the receipt.
+`Close` shares its ceiling with `HIT_THRESHOLD` on purpose — the point at which the game
+says you read the room is the point at which it stops paying much for it. The table lives
+in `src/shared/points.ts` alongside its copy, the same way badges do.
 
 ---
 
@@ -93,7 +114,8 @@ rather than the reveal you already earned.
 It does this by disabling the server-side dedupe guard — the only thing stopping
 one account from voting a hundred times. Votes still count toward the tallies,
 so a test subreddit builds a real distribution and a live one would build a fake
-one. Streaks are unaffected and still work normally.
+one. The streak still works normally, but with the guard off the same account
+banks points on every replay, so lifetime totals inflate too.
 
 The server logs a warning on boot while it is on. Set it to `false` before this
 goes anywhere real.
@@ -133,11 +155,11 @@ post:{postId}          string questionId
 
 votes:{questionId}     hash   a, b, guessSum, guessCount, errSum
 guesses:{questionId}   zset   userId -> guess     (the distribution record)
-voted:{questionId}     hash   userId -> "a:45"    (dedupe guard + what to re-render)
+voted:{questionId}     hash   userId -> "a:45:21" (dedupe guard + what to re-render)
 hist:{questionId}      hash   bucket -> count     (derived from guesses)
 commented:{questionId} hash   userId -> commentId
 
-user:{userId}          hash   playStreak, readStreak, lastPlayedDay,
+user:{userId}          hash   streak, bestStreak, lastPlayedDay, points,
                               totalPlayed, totalHits
 sub:cooldown:{userId}  string TTL 24h
 
@@ -156,15 +178,18 @@ thrown away. `errSum` on `votes:` is what makes `avgError` computable without a 
 
 `voted:{questionId}` is both the dedupe guard and the record of what to render on
 return. A player reopening a post they have answered always lands on the completed
-reveal — never a blank form, never a second vote.
+reveal — never a blank form, never a second vote. Its third field is the error the
+points were paid on, banked at vote time; a two-field value is a vote from before points
+existed and still renders.
 
 ### What a returning player sees
 
-Everything except the streak counters is recomputed from the **live** tally, so the
-crowd is as it stands now rather than a fossil of the moment they voted. Streaks are
-banked at vote time and never recomputed: a day already counted stays counted, and a
-`readStreak` earned on the day's numbers is not retroactively taken away because the
-crowd moved afterwards.
+Everything except the counters and the award is recomputed from the **live** tally, so
+the crowd is as it stands now rather than a fossil of the moment they voted. The streak
+and the points are banked at vote time and never recomputed: a day already counted stays
+counted, and points already paid are not retroactively taken away because the crowd moved
+afterwards. That is why the vote-time error is stored — an award re-derived from a tally
+that has since moved would contradict the total it already added to.
 
 ---
 
@@ -210,8 +235,9 @@ in does not matter.
    the first.
 
 Anyone can submit an open question from the subreddit menu. It becomes its own playable
-post immediately, does not affect streaks, accumulates real vote data, and enters the
-promotion queue. One submission per user per 24h, enforced server-side with a TTL.
+post immediately, counts toward the streak and pays points like any other question,
+accumulates real vote data, and enters the promotion queue. One submission per user per
+24h, enforced server-side with a TTL.
 
 Question text is validated and filtered before a post is created — length, a single
 trailing question mark, no links or usernames, and a content filter that turns away
@@ -259,8 +285,11 @@ tap on a phone never leaves a button stuck in the raised state.
 **Motion** is one orchestrated moment. On lock-in the dots travel to their camps over
 600ms with a 6ms stagger and a light spring overshoot; your dot lands ~150ms behind the
 pack with a small pop; the badge stamps in after. Under a second total — a verdict, not
-a loading screen. `prefers-reduced-motion` gets a straight cross-fade to the same final
-state. No confetti, no shake, no celebratory burst; the copy voice matches.
+a loading screen. The point total counts up on the score slide, the only number in the
+app that arrives moving, because it is the only one that was earned rather than reported.
+`prefers-reduced-motion` gets a straight cross-fade to the same final state — and the
+count-up checks it in JavaScript, since the movement is in a value no media query can
+reach. No confetti, no shake, no celebratory burst; the copy voice matches.
 
 ---
 
@@ -276,7 +305,7 @@ Four rooms, one open at a time, each with its fine print pinned to the bottom.
 | Room | What it holds |
 |---|---|
 | How to play | the three steps, then the two axes |
-| Your record | both streaks, questions answered, read rate |
+| Your record | streak, best, points, questions answered, read rate |
 | The four outcomes | the 2x2, asked of `badgeFor` corner by corner |
 | Hardest to read | the misjudged leaderboard, five rows |
 

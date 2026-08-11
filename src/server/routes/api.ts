@@ -11,6 +11,7 @@ import type { T3 } from '@devvit/web/shared';
 import { Hono } from 'hono';
 
 import { buildComment, normalizeNote } from '../../shared/comment.js';
+import { awardFor } from '../../shared/points.js';
 import { isValidChoice, isValidGuess } from '../../shared/scoring.js';
 import type {
   ApiError,
@@ -24,7 +25,7 @@ import { toDayKey } from '../../shared/day.js';
 import { REPLAY_MODE } from '../../shared/config.js';
 import { getQuestion, getQuestionIdForPost, toPublicQuestion } from '../core/questions.js';
 import { misjudgedLeaderboard } from '../core/stats.js';
-import { getUser, projectStreaks, recordDailyPlay } from '../core/users.js';
+import { EMPTY_USER, getUser, projectStats, recordPlay } from '../core/users.js';
 import { buildReveal, castVote, getStoredVote, recordComment } from '../core/votes.js';
 
 export const api = new Hono();
@@ -46,20 +47,17 @@ api.get('/api/state/:postId', async (c) => {
   if (!question) return c.json<ApiError>({ error: 'That question is gone.' }, 404);
 
   const userId = context.userId;
-  const record = userId ? await getUser(userId) : null;
-  const streaks = projectStreaks(
-    record ?? { playStreak: 0, readStreak: 0, lastPlayedDay: '', totalPlayed: 0, totalHits: 0 }
-  );
+  const stats = projectStats(userId ? await getUser(userId) : EMPTY_USER);
 
   const vote = userId ? await getStoredVote(questionId, userId) : null;
 
   // The only path to a tally.
-  const reveal = vote && userId ? await buildReveal(question, vote, userId, streaks) : null;
+  const reveal = vote && userId ? await buildReveal(question, vote, userId, stats) : null;
 
   return c.json<StateResponse>({
     question: toPublicQuestion(question),
     reveal,
-    streaks,
+    stats,
     canVote: Boolean(userId) && question.lockedAt === 0,
   });
 });
@@ -91,18 +89,22 @@ api.post('/api/vote', async (c) => {
 
   const result = await castVote(questionId, userId, body.choice, body.guess);
 
+  // A second attempt never pays twice: the claim in `castVote` fails before
+  // anything is awarded, and this path only reads.
   if (result.status === 'duplicate') {
-    const streaks = projectStreaks(await getUser(userId));
-    const reveal = await buildReveal(question, result.vote, userId, streaks);
+    const stats = projectStats(await getUser(userId));
+    const reveal = await buildReveal(question, result.vote, userId, stats);
     return c.json<ApiError>({ error: 'You have already answered this one.', reveal }, 409);
   }
 
-  // Only the Daily moves streaks. Open questions accumulate votes and nothing else.
-  const streaks = question.dailyDate
-    ? await recordDailyPlay(userId, result.hit, question.dailyDate)
-    : projectStreaks(await getUser(userId));
+  // Every question counts: the Daily, an open question somebody submitted, or
+  // one played out of the archive. The day is the day the vote was cast rather
+  // than the day the question ran, or an archived puzzle would back-date the
+  // streak to a day the player did not play.
+  const award = awardFor(result.error);
+  const stats = await recordPlay(userId, { hit: result.hit, points: award.total });
 
-  const reveal = await buildReveal(question, result.vote, userId, streaks);
+  const reveal = await buildReveal(question, result.vote, userId, stats);
   return c.json(reveal);
 });
 
@@ -134,8 +136,8 @@ api.post('/api/comment', async (c) => {
 
   if (!vote) return c.json<ApiError>({ error: 'Answer first, then post.' }, 403);
 
-  const streaks = projectStreaks(await getUser(userId));
-  const reveal = await buildReveal(question, vote, userId, streaks);
+  const stats = projectStats(await getUser(userId));
+  const reveal = await buildReveal(question, vote, userId, stats);
   if (reveal.commented) {
     return c.json<ApiError>({ error: 'You have already posted this one.' }, 409);
   }

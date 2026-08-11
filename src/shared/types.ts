@@ -1,6 +1,7 @@
 /** Wire types shared by the client and the server. */
 
 import type { BadgeId } from './badges.js';
+import type { Award } from './points.js';
 
 /** Which side of a question a player took. Always exactly two. */
 export type Choice = 'a' | 'b';
@@ -19,7 +20,7 @@ export type Question = {
   authorName?: string;
   /** Set when this question ran as a Daily, as `YYYY-MM-DD`. */
   dailyDate?: string;
-  /** Open questions do not count toward streaks. */
+  /** Only changes what the header reads. Every question counts the same. */
   isDaily: boolean;
   /** No further votes accepted once the Daily is locked. */
   locked: boolean;
@@ -52,20 +53,35 @@ export type Reveal = {
   histogram: number[];
   /** Too few votes for the split to mean anything yet. */
   provisional: boolean;
-  /** Streak state after this vote. Absent for open questions. */
-  streaks?: Streaks;
+  /**
+   * What this vote paid.
+   *
+   * Banked at vote time from the error as it stood then, because it moved a
+   * stored total. Everything else on this screen is recomputed live, so on a
+   * busy question `error` above can drift a point or two after the fact — the
+   * points already in the bank cannot.
+   */
+  award: Award;
+  /** Player totals as of this vote. */
+  stats: PlayerStats;
   /** The comment the player can post with one tap. */
   commentPreview: string;
   /** Set once this player has posted their comment. */
   commented: boolean;
 };
 
-export type Streaks = {
-  playStreak: number;
-  readStreak: number;
+/** The two counters in the header, plus what the menu reads off them. */
+export type PlayerStats = {
+  /** Consecutive UTC days with at least one vote on them. */
+  streak: number;
+  /** The longest `streak` ever reached. A missed day never reduces it. */
+  bestStreak: number;
+  /** Lifetime points. */
+  points: number;
   totalPlayed: number;
+  /** Votes inside `HIT_THRESHOLD`, which is what the read rate is made of. */
   totalHits: number;
-  /** True only on the vote that extended the streak, for the counter animation. */
+  /** True once today's vote is in, so the streak tile can go live. */
   extendedToday: boolean;
 };
 
@@ -74,8 +90,8 @@ export type StateResponse = {
   question: Question;
   /** Present if and only if this user has already voted. */
   reveal: Reveal | null;
-  /** Streak state for the header, whether or not they have voted today. */
-  streaks: Streaks;
+  /** Header counters, whether or not they have voted today. */
+  stats: PlayerStats;
   /** Signed-out users can read the question but cannot vote. */
   canVote: boolean;
 };

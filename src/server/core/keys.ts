@@ -39,7 +39,10 @@ export const keys = {
   /** zset: userId -> guess. The distribution record. */
   guesses: (questionId: string) => `guesses:${questionId}`,
 
-  /** hash: userId -> "a:45". Dedupe guard and the record of what to re-render. */
+  /**
+   * hash: userId -> "a:45:21" — choice, guess, and the error the points were
+   * paid on. Dedupe guard and the record of what to re-render.
+   */
   voted: (questionId: string) => `voted:${questionId}`,
 
   /** hash: bucket index "0".."9" -> count. Derived from `guesses`. */
@@ -48,7 +51,7 @@ export const keys = {
   /** hash: userId -> commentId. */
   commented: (questionId: string) => `commented:${questionId}`,
 
-  /** hash: playStreak, readStreak, lastPlayedDay, totalPlayed, totalHits */
+  /** hash: streak, bestStreak, lastPlayedDay, points, totalPlayed, totalHits */
   user: (userId: string) => `user:${userId}`,
 
   /** string with a 24h TTL. Presence means "already submitted today". */

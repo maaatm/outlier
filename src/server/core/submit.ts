@@ -2,8 +2,9 @@
  * Player-submitted open questions.
  *
  * An open question becomes its own interactive post, playable immediately with
- * the same UI and reveal as the Daily. It does not touch streaks, it does
- * accumulate real vote data, and it enters the promotion queue automatically.
+ * the same UI and reveal as the Daily. It counts toward the streak and pays
+ * points like any other question, it accumulates real vote data, and it enters
+ * the promotion queue automatically.
  */
 
 import { context, redis, reddit } from '@devvit/web/server';

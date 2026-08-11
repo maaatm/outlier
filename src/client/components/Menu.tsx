@@ -20,10 +20,12 @@ import {
   HIT_THRESHOLD,
   LEADERBOARD_MIN_VOTES,
   MINORITY_THRESHOLD,
+  POINTS_BASE,
 } from '../../shared/config.js';
-import type { Streaks } from '../../shared/types.js';
+import { BANDS } from '../../shared/points.js';
+import type { PlayerStats } from '../../shared/types.js';
 import { Leaderboard } from './Leaderboard.js';
-import { StreakBar } from './StreakBar.js';
+import { StatBar } from './StatBar.js';
 import { WobbleRule } from './WobbleRule.js';
 
 type PanelId = 'play' | 'record' | 'outcomes' | 'misjudged';
@@ -37,7 +39,7 @@ type Entry = {
 
 const ENTRIES: Entry[] = [
   { id: 'play', label: 'How to play', blurb: 'two taps, under fifteen seconds' },
-  { id: 'record', label: 'Your record', blurb: 'streaks, and how often you read the room' },
+  { id: 'record', label: 'Your record', blurb: 'streak, points, and how often you read the room' },
   { id: 'outcomes', label: 'The four outcomes', blurb: 'where the badge comes from' },
   { id: 'misjudged', label: 'Hardest to read', blurb: 'what the subreddit misjudged most' },
 ];
@@ -46,10 +48,10 @@ const ENTRIES: Entry[] = [
 const BOARD_ROWS = 5;
 
 export function Menu({
-  streaks,
+  stats,
   onExit,
 }: {
-  streaks: Streaks;
+  stats: PlayerStats;
   onExit: () => void;
 }): React.JSX.Element {
   const [panel, setPanel] = useState<PanelId | null>(null);
@@ -62,7 +64,7 @@ export function Menu({
       <header className="header">
         <span className="header__mark">Outlier</span>
         <span className="header__day">menu</span>
-        <StreakBar streaks={streaks} />
+        <StatBar stats={stats} />
       </header>
 
       <section className="card">
@@ -71,7 +73,7 @@ export function Menu({
         <div className="menu__body fade-in" key={open ? open.id : 'root'}>
           {open === null && <Root onOpen={setPanel} />}
           {open?.id === 'play' && <HowToPlay title={open.label} />}
-          {open?.id === 'record' && <Record title={open.label} streaks={streaks} />}
+          {open?.id === 'record' && <Record title={open.label} stats={stats} />}
           {open?.id === 'outcomes' && <Outcomes title={open.label} />}
           {open?.id === 'misjudged' && <Misjudged title={open.label} />}
         </div>
@@ -147,9 +149,9 @@ function HowToPlay({ title }: { title: string }): React.JSX.Element {
       title={title}
       note={
         <>
-          Only the Daily moves a streak. Open questions collect votes and nothing else. To
-          ask the subreddit your own question, use &ldquo;Submit a question&rdquo; in the
-          subreddit menu &mdash; one a day.
+          Every question counts &mdash; the Daily, an open question, or one from the
+          archive. One a day is all a streak needs. To ask the subreddit your own question,
+          use &ldquo;Submit a question&rdquo; in the subreddit menu &mdash; one a day.
         </>
       }
     >
@@ -175,53 +177,64 @@ function HowToPlay({ title }: { title: string }): React.JSX.Element {
           </p>
         </div>
       </div>
+
+      {/* Read off the same table the reveal pays from, so the rates here cannot
+          drift from the ones actually awarded. */}
+      <div className="axis">
+        <p className="section__title">points</p>
+        <p className="axis__line">{POINTS_BASE} a vote, and the closer you land the more.</p>
+        <ul className="bands">
+          {BANDS.filter((band) => band.bonus > 0).map((band) => (
+            <li key={band.id} className="band">
+              {band.label}
+              <span className="band__bonus">+{band.bonus}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
     </Panel>
   );
 }
 
 /** Banked state, read off the same counters the header shows. */
-function Record({ title, streaks }: { title: string; streaks: Streaks }): React.JSX.Element {
+function Record({ title, stats }: { title: string; stats: PlayerStats }): React.JSX.Element {
   const rate =
-    streaks.totalPlayed > 0 ? Math.round((streaks.totalHits / streaks.totalPlayed) * 100) : 0;
+    stats.totalPlayed > 0 ? Math.round((stats.totalHits / stats.totalPlayed) * 100) : 0;
 
   return (
     <Panel
       title={title}
       note={
         <>
-          played counts Dailies answered on consecutive days. read counts Dailies read
-          within {HIT_THRESHOLD} points, in a row. Both reset on a missed day, and the day
-          turns over at midnight UTC.
+          streak counts days you answered something, not questions &mdash; a second one the
+          same day pays points but does not move it. Miss a day and it goes back to zero;
+          best keeps the number it reached. The day turns over at midnight UTC.
         </>
       }
     >
       <div className="figures">
         <div className="figure">
-          <span className="figure__label">played</span>
-          <span className="figure__value">{streaks.playStreak}</span>
+          <span className="figure__label">streak</span>
+          <span className="figure__value">{stats.streak}</span>
         </div>
         <div className="figure">
-          <span className="figure__label">read</span>
-          <span className="figure__value">{streaks.readStreak}</span>
+          <span className="figure__label">best</span>
+          <span className="figure__value">{stats.bestStreak}</span>
         </div>
         <div className="figure">
-          <span className="figure__label">read rate</span>
-          <span className="figure__value">
-            {rate}
-            <span className="figure__unit">%</span>
-          </span>
+          <span className="figure__label">points</span>
+          <span className="figure__value">{stats.points}</span>
         </div>
       </div>
 
-      {streaks.totalPlayed > 0 ? (
+      {stats.totalPlayed > 0 ? (
         <p className="axis__line">
-          {streaks.totalPlayed} {streaks.totalPlayed === 1 ? 'question' : 'questions'} answered.
-          You landed within {HIT_THRESHOLD} points on {streaks.totalHits} of them.
+          {stats.totalPlayed} {stats.totalPlayed === 1 ? 'question' : 'questions'} answered.
+          You landed within {HIT_THRESHOLD} points on {stats.totalHits} of them &mdash;{' '}
+          {rate}%.
         </p>
       ) : (
-        <p className="axis__line">
-          Nothing banked yet. Answer a Daily and the counters start.
-        </p>
+        <p className="axis__line">Nothing banked yet. Answer anything and the counters start.</p>
       )}
     </Panel>
   );
