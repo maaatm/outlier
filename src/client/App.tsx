@@ -252,10 +252,15 @@ function PlayView({
 }
 
 /**
- * The verdict, on one screen. Dots and numbers side by side, badge under them,
- * one detail strip, one action row. Nothing here should ever ask for a scroll —
- * the comment preview lives in an overlay, and the leaderboard shares the
- * detail strip with the histogram instead of stacking below it.
+ * The verdict, told in three slides. Each one fits its screen, and each one
+ * makes a single point:
+ *
+ *   1. The crowd — the dots split into camps, and how many stand with you.
+ *   2. The score — your guess against the number, the badge, the histogram.
+ *   3. The share — the pre-written comment, an optional line, one tap to post.
+ *
+ * The travel animation belongs to slide one and the stamp to slide two, so
+ * each slide keeps its own moment instead of everything firing at once.
  */
 function RevealView({
   postId,
@@ -272,76 +277,124 @@ function RevealView({
   const mine = reveal.choice === 'a' ? question.labelA : question.labelB;
   const theirs = reveal.choice === 'a' ? question.labelB : question.labelA;
   const rest = CROWD_SIZE - reveal.dotsWithYou;
+  const [slide, setSlide] = useState(0);
   const [detail, setDetail] = useState<'guesses' | 'misjudged'>('guesses');
 
-  const captionBits = [`${reveal.dotsWithYou} ${mine} · ${rest} ${theirs}`];
+  const captionBits = [`${reveal.dotsWithYou} ${mine} \u00b7 ${rest} ${theirs}`];
   if (reveal.provisional) {
     captionBits.push(`${reveal.tally.total} ${reveal.tally.total === 1 ? 'vote' : 'votes'} so far`);
   }
   if (!question.isDaily) captionBits.push('no streak');
 
+  const SLIDE_COUNT = 3;
+
   return (
     <div className="reveal">
-      <div className="stage reveal__stage">
-        <DotCrowd
-          withYou={reveal.dotsWithYou}
-          accent={accent}
-          yourLabel={mine}
-          otherLabel={theirs}
-          animate={animate}
-        />
-        <div className="reveal__rail">
-          <div className="figure">
-            <span className="figure__label">you said</span>
-            <span className="figure__value">{reveal.guess}</span>
+      {slide === 0 && (
+        <div className="slide" key="crowd">
+          <div className="stage">
+            <DotCrowd
+              withYou={reveal.dotsWithYou}
+              accent={accent}
+              yourLabel={mine}
+              otherLabel={theirs}
+              animate={animate}
+            />
           </div>
-          <div className="figure">
-            <span className="figure__label">it was</span>
-            <span className="figure__value">{reveal.actual}</span>
+          <p className="verdict">
+            {reveal.minority ? 'Only ' : ''}
+            <strong>
+              {reveal.dotsWithYou} out of {CROWD_SIZE}
+            </strong>{' '}
+            are with you.
+          </p>
+          <p className="crowd__caption">{captionBits.join(' \u00b7 ')}</p>
+        </div>
+      )}
+
+      {slide === 1 && (
+        <div className="slide fade-in" key="score">
+          <div className="figures">
+            <div className="figure">
+              <span className="figure__label">you said</span>
+              <span className="figure__value">{reveal.guess}</span>
+            </div>
+            <div className="figure">
+              <span className="figure__label">it was</span>
+              <span className="figure__value">{reveal.actual}</span>
+            </div>
+            <div className="figure">
+              <span className="figure__label">off by</span>
+              <span className="figure__value">{reveal.error}</span>
+            </div>
           </div>
-          <div className="figure">
-            <span className="figure__label">off by</span>
-            <span className="figure__value">{reveal.error}</span>
+
+          <BadgeStamp id={reveal.badge} animate={animate} />
+
+          <div className="detail">
+            <div className="detail__tabs">
+              <button
+                type="button"
+                className={`detail__tab${detail === 'guesses' ? ' is-active' : ''}`}
+                onClick={() => setDetail('guesses')}
+              >
+                where everyone guessed
+              </button>
+              <button
+                type="button"
+                className={`detail__tab${detail === 'misjudged' ? ' is-active' : ''}`}
+                onClick={() => setDetail('misjudged')}
+              >
+                hardest to read
+              </button>
+            </div>
+            {detail === 'guesses' ? (
+              <Histogram buckets={reveal.histogram} yourGuess={reveal.guess} accent={accent} />
+            ) : (
+              <Leaderboard />
+            )}
           </div>
         </div>
-      </div>
+      )}
 
-      <p className="verdict">
-        {reveal.minority ? 'Only ' : ''}
-        <strong>
-          {reveal.dotsWithYou} out of {CROWD_SIZE}
-        </strong>{' '}
-        are with you.
-      </p>
-      <p className="crowd__caption">{captionBits.join(' · ')}</p>
-
-      <BadgeStamp id={reveal.badge} animate={animate} />
-
-      <div className="detail">
-        <div className="detail__tabs">
-          <button
-            type="button"
-            className={`detail__tab${detail === 'guesses' ? ' is-active' : ''}`}
-            onClick={() => setDetail('guesses')}
-          >
-            where everyone guessed
-          </button>
-          <button
-            type="button"
-            className={`detail__tab${detail === 'misjudged' ? ' is-active' : ''}`}
-            onClick={() => setDetail('misjudged')}
-          >
-            hardest to read
-          </button>
+      {slide === 2 && (
+        <div className="slide fade-in" key="share">
+          <Compose postId={postId} question={question} reveal={reveal} />
         </div>
-        {detail === 'guesses' ? (
-          <Histogram buckets={reveal.histogram} yourGuess={reveal.guess} accent={accent} />
+      )}
+
+      <nav className="slides__nav" aria-label="Reveal pages">
+        <button
+          type="button"
+          className="button button--quiet slides__step"
+          onClick={() => setSlide(slide - 1)}
+          disabled={slide === 0}
+          style={{ visibility: slide === 0 ? 'hidden' : 'visible' }}
+        >
+          Back
+        </button>
+
+        <div className="slides__dots" aria-hidden="true">
+          {Array.from({ length: SLIDE_COUNT }, (_, index) => (
+            <span
+              key={index}
+              className={`slides__dot${index === slide ? ' is-active' : ''}`}
+            />
+          ))}
+        </div>
+
+        {slide < SLIDE_COUNT - 1 ? (
+          <button
+            type="button"
+            className="button slides__step"
+            onClick={() => setSlide(slide + 1)}
+          >
+            Next
+          </button>
         ) : (
-          <Leaderboard />
+          <span className="slides__step" aria-hidden="true" />
         )}
-      </div>
-
-      <Compose postId={postId} question={question} reveal={reveal} />
+      </nav>
     </div>
   );
 }
