@@ -9,9 +9,10 @@ import { useEffect, useState } from 'react';
 import type { LeaderboardEntry } from '../../shared/types.js';
 import { fetchLeaderboard } from '../api.js';
 
+/** Rows on the reveal's detail strip. The menu has room for more and asks for it. */
 const ROWS = 3;
 
-export function Leaderboard(): React.JSX.Element {
+export function Leaderboard({ rows = ROWS }: { rows?: number }): React.JSX.Element {
   const [entries, setEntries] = useState<LeaderboardEntry[] | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -34,7 +35,7 @@ export function Leaderboard(): React.JSX.Element {
 
   return (
     <ol className="board">
-      {entries.slice(0, ROWS).map((entry) => (
+      {entries.slice(0, rows).map((entry) => (
         <li key={entry.id} className="board__row">
           <span className="board__text">{entry.text}</span>
           <span className="board__error">off by {entry.avgError.toFixed(1)}</span>

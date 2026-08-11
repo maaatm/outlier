@@ -627,8 +627,11 @@ button {
  * distributes its own contents down that height. The nav underneath is the
  * only thing that keeps a fixed size, so the three slides are interchangeable
  * without a single pixel of movement.
+ *
+ * The menu's pages are the same box for the same reason, so they share it.
  */
-.slide {
+.slide,
+.menu__body {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -1015,6 +1018,166 @@ button {
   margin: 0 0 var(--s2);
 }
 
+/* ── Main menu ──────────────────────────────────────────────────────────── */
+
+/*
+ * The menu is a screen rather than a sheet over one: same shell, same header,
+ * same card, so arriving from the comment slide changes the contents of the card
+ * and nothing else. `.menu__body` shares the slide box defined above; only what
+ * goes inside it is new here.
+ *
+ * The root is one wrapper so the body's space-between has nothing to spread and
+ * the list sits directly under the wordmark. A panel hands the body three
+ * children — heading, substance, footnote — and lets them distribute.
+ */
+.menu__root,
+.menu__panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+}
+
+.menu__wordmark {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 34px;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.menu__tagline {
+  margin: var(--s2) 0 0;
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+
+.menu__heading {
+  font-size: 22px;
+  line-height: 1.3;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.menu__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+}
+
+/* A row, not a label with a target next to it: the whole width is the button. */
+.menu__item {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+  padding: var(--s2) var(--s3);
+  text-align: left;
+}
+
+.menu__item-label {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.menu__item-blurb {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--ink-soft);
+}
+
+/* Sits where the slide nav sits on the reveal, one step clear of the footnote. */
+.menu__back {
+  margin-top: var(--s3);
+}
+
+.steps {
+  list-style: none;
+  counter-reset: step;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+}
+
+.steps li {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  font-size: 15px;
+}
+
+.steps li::before {
+  counter-increment: step;
+  content: counter(step);
+  flex: none;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: var(--stroke) solid var(--ink);
+  border-radius: 50%;
+  background: var(--card);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.axes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+}
+
+.axis__line {
+  margin: 0;
+  font-size: 14px;
+}
+
+/*
+ * The 2x2, drawn flat. Filling the four corners with their badge colours would
+ * put three meanings of colour on one screen and the rule is two, so the corners
+ * are outline-only and the mono line carries the axes instead.
+ */
+.outcomes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s2);
+}
+
+.outcome {
+  border: var(--stroke) solid var(--ink);
+  border-radius: var(--radius-button);
+  padding: var(--s2);
+  background: var(--card);
+}
+
+.outcome__axes {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin: 0 0 var(--s1);
+}
+
+.outcome__title {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 16px;
+  line-height: 1.15;
+  margin: 0;
+}
+
+.outcome__line {
+  margin: var(--s1) 0 0;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
 /* ── States ─────────────────────────────────────────────────────────────── */
 
 .notice {
@@ -1098,6 +1261,10 @@ button {
   .badge__line {
     font-size: 13px;
   }
+
+  .menu__wordmark {
+    font-size: 26px;
+  }
 }
 
 @media (max-height: 560px) {
@@ -1128,8 +1295,23 @@ button {
     min-height: 64px;
   }
 
-  .slide {
+  .slide,
+  .menu__body {
     gap: var(--s2);
+  }
+
+  .menu__root,
+  .menu__panel,
+  .axes {
+    gap: var(--s2);
+  }
+
+  .menu__back {
+    margin-top: var(--s2);
+  }
+
+  .menu__tagline {
+    font-size: 13px;
   }
 
   .compose__hint {
