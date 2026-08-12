@@ -154,6 +154,7 @@ daily:{YYYY-MM-DD}     string questionId
 daily:claims           hash   day -> "1"          (double-fire guard, see below)
 daily:summaries        hash   day -> "1"          (double-post guard for the sticky)
 post:{postId}          string questionId
+menu:post              string postId of the pinned menu post (no question on it)
 
 votes:{questionId}     hash   a, b, guessSum, guessCount, errSum
 guesses:{questionId}   zset   userId -> guess     (the distribution record)
@@ -336,10 +337,29 @@ the rule is two.
 
 Nothing here is a leak. The leaderboard is average error on questions that are long
 since answered, and the counters are the player's own — the menu never touches a live
-tally, and it is only reachable after a reveal in any case.
+tally. That is what makes it safe to hand out on its own, below.
 
 The reveal's page index lives in `App` rather than inside the reveal, which is what makes
 the trip out to the menu and back land on the slide it left from.
+
+### The pinned menu post
+
+**Outlier: pin the menu post** (mod menu) creates a custom post that opens straight onto
+the menu, and stickies it. It is the subreddit's front door: somebody arriving cold gets
+the rules and the four outcomes without having to find a question first.
+
+The post carries no question, so `GET /api/state/:postId` answers it with a second shape.
+`StateResponse` is a discriminated union on `kind` rather than a question-shaped object
+with holes in it — which also means the menu post's response has no field that could
+carry a `Tally` at all.
+
+`menu:post` records which post it is. It is read *only* when `post:{postId}` misses, so a
+playable post never pays for the lookup. The action is idempotent: it confirms the
+recorded post still exists before reporting it, so a deleted one does not permanently
+block a new one, and a moderator running it twice does not get two front doors.
+
+A failed sticky is not a failed post — Reddit allows two, and a subreddit that already
+has both gets the post plus a note rather than an error and nothing.
 
 ---
 

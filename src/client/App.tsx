@@ -11,7 +11,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { getBadge } from '../shared/badges.js';
 import { CROWD_SIZE } from '../shared/config.js';
 import { getBand, type Award } from '../shared/points.js';
-import type { Choice, PlayerStats, Question, Reveal, StateResponse } from '../shared/types.js';
+import type { Choice, Question, QuestionState, Reveal, StateResponse } from '../shared/types.js';
 import { ApiFailure, castVote, fetchState } from './api.js';
 import { randomGroupColors } from './colors.js';
 import { BadgeStamp } from './components/BadgeStamp.js';
@@ -82,21 +82,32 @@ export function App(): React.JSX.Element {
     );
   }
 
+  // Bound once so the narrowing below survives into the callback: TypeScript
+  // drops a discriminant it proved on a property path as soon as it crosses into
+  // a closure, but it keeps one proved on a const.
+  const state = phase.state;
+
+  // The pinned menu post has no question behind it, so the menu is the whole
+  // screen and there is nothing to exit to.
+  if (state.kind === 'menu') {
+    return <Menu stats={state.stats} />;
+  }
+
   if (screen === 'menu') {
-    return <Menu stats={phase.state.stats} onExit={() => setScreen('game')} />;
+    return <Menu stats={state.stats} onExit={() => setScreen('game')} />;
   }
 
   return (
     <Game
       postId={postId!}
-      state={phase.state}
+      state={state}
       justVoted={justVoted}
       slide={slide}
       onSlide={setSlide}
       onOpenMenu={() => setScreen('menu')}
       onReveal={(reveal) => {
         setJustVoted(true);
-        setPhase({ name: 'ready', state: { ...phase.state, reveal, stats: reveal.stats } });
+        setPhase({ name: 'ready', state: { ...state, reveal, stats: reveal.stats } });
       }}
     />
   );
@@ -112,7 +123,7 @@ function Game({
   onReveal,
 }: {
   postId: string;
-  state: StateResponse;
+  state: QuestionState;
   justVoted: boolean;
   slide: number;
   onSlide: (slide: number) => void;

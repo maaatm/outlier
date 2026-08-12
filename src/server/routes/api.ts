@@ -23,6 +23,7 @@ import type {
 } from '../../shared/types.js';
 import { toDayKey } from '../../shared/day.js';
 import { REPLAY_MODE } from '../../shared/config.js';
+import { isMenuPost } from '../core/menuPost.js';
 import { getQuestion, getQuestionIdForPost, toPublicQuestion } from '../core/questions.js';
 import { misjudgedLeaderboard } from '../core/stats.js';
 import { EMPTY_USER, getUser, projectStats, recordPlay } from '../core/users.js';
@@ -41,13 +42,18 @@ api.get('/api/state/:postId', async (c) => {
   const postId = c.req.param('postId');
 
   const questionId = await getQuestionIdForPost(postId);
-  if (!questionId) return c.json<ApiError>({ error: 'No question on this post.' }, 404);
+  const userId = context.userId;
+  const stats = projectStats(userId ? await getUser(userId) : EMPTY_USER);
+
+  // No question on this post. The pinned menu post is the legitimate reason for
+  // that, so it is checked here rather than on every load of a playable post.
+  if (!questionId) {
+    if (await isMenuPost(postId)) return c.json<StateResponse>({ kind: 'menu', stats });
+    return c.json<ApiError>({ error: 'No question on this post.' }, 404);
+  }
 
   const question = await getQuestion(questionId);
   if (!question) return c.json<ApiError>({ error: 'That question is gone.' }, 404);
-
-  const userId = context.userId;
-  const stats = projectStats(userId ? await getUser(userId) : EMPTY_USER);
 
   const vote = userId ? await getStoredVote(questionId, userId) : null;
 
@@ -55,6 +61,7 @@ api.get('/api/state/:postId', async (c) => {
   const reveal = vote && userId ? await buildReveal(question, vote, userId, stats) : null;
 
   return c.json<StateResponse>({
+    kind: 'question',
     question: toPublicQuestion(question),
     reveal,
     stats,

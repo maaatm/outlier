@@ -47,15 +47,21 @@ const ENTRIES: Entry[] = [
 /** How many leaderboard rows fit here. The reveal's strip shows fewer. */
 const BOARD_ROWS = 5;
 
+/**
+ * `onExit` is absent on the pinned menu post, where the menu *is* the post and
+ * there is no question behind it to go back to. The button goes with it rather
+ * than sitting there pointing at nothing.
+ */
 export function Menu({
   stats,
   onExit,
 }: {
   stats: PlayerStats;
-  onExit: () => void;
+  onExit?: () => void;
 }): React.JSX.Element {
   const [panel, setPanel] = useState<PanelId | null>(null);
   const open = ENTRIES.find((entry) => entry.id === panel) ?? null;
+  const showBack = open !== null || onExit !== undefined;
 
   return (
     <main className="app">
@@ -78,13 +84,15 @@ export function Menu({
           {open?.id === 'misjudged' && <Misjudged title={open.label} />}
         </div>
 
-        <button
-          type="button"
-          className="button menu__back"
-          onClick={() => (open === null ? onExit() : setPanel(null))}
-        >
-          {open === null ? 'Back to the question' : 'Back to the menu'}
-        </button>
+        {showBack && (
+          <button
+            type="button"
+            className="button menu__back"
+            onClick={() => (open === null ? onExit?.() : setPanel(null))}
+          >
+            {open === null ? 'Back to the question' : 'Back to the menu'}
+          </button>
+        )}
       </section>
     </main>
   );

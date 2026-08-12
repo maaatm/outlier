@@ -54,6 +54,13 @@
         "endpoint": "/internal/menu/post-daily-now"
       },
       {
+        "label": "Outlier: pin the menu post",
+        "description": "Create and pin the how-to-play post",
+        "location": "subreddit",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/pin-menu-post"
+      },
+      {
         "label": "Outlier: post the misjudged leaderboard",
         "description": "Publish the questions the subreddit read worst",
         "location": "subreddit",

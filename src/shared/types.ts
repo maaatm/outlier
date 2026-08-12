@@ -90,8 +90,18 @@ export type PlayerStats = {
   extendedToday: boolean;
 };
 
-/** `GET /api/state/:postId`. Tallies are present only once `reveal` is. */
-export type StateResponse = {
+/**
+ * `GET /api/state/:postId`.
+ *
+ * Two kinds of post carry this app: the ones with a question on them, and the
+ * pinned menu post, which has none. The discriminator is what stops the client
+ * from having to infer which it is from a missing field.
+ */
+export type StateResponse = QuestionState | MenuState;
+
+/** A playable post. Tallies are present only once `reveal` is. */
+export type QuestionState = {
+  kind: 'question';
   question: Question;
   /** Present if and only if this user has already voted. */
   reveal: Reveal | null;
@@ -99,6 +109,15 @@ export type StateResponse = {
   stats: PlayerStats;
   /** Signed-out users can read the question but cannot vote. */
   canVote: boolean;
+};
+
+/**
+ * The pinned menu post. There is nothing to vote on, so there is no question, no
+ * reveal, and — importantly — no tally anywhere in this shape.
+ */
+export type MenuState = {
+  kind: 'menu';
+  stats: PlayerStats;
 };
 
 export type VoteRequest = {

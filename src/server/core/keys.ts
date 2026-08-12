@@ -42,6 +42,15 @@ export const keys = {
   /** string: questionId behind a post. */
   post: (postId: string) => `post:${postId}`,
 
+  /**
+   * string: postId of the pinned menu post, which has no question on it.
+   *
+   * Read only when `post:{postId}` misses, so a playable post never pays for it.
+   * One at a time by design — a second pinned menu post would be a second thing
+   * to keep current, and there is only ever one menu.
+   */
+  menuPost: 'menu:post',
+
   /** hash: a, b, guessSum, guessCount, errSum */
   votes: (questionId: string) => `votes:${questionId}`,
 
