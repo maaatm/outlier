@@ -66,7 +66,7 @@ export async function getStoredVote(
   return decodeVote(await redis.hGet(keys.voted(questionId), userId));
 }
 
-async function readTally(questionId: string): Promise<Tally> {
+export async function readTally(questionId: string): Promise<Tally> {
   const raw = await redis.hGetAll(keys.votes(questionId));
   const a = Number(raw?.[voteFields.a] ?? 0) || 0;
   const b = Number(raw?.[voteFields.b] ?? 0) || 0;
@@ -232,11 +232,6 @@ export async function recordComment(
   commentId: string
 ): Promise<void> {
   await redis.hSet(keys.commented(questionId), { [userId]: commentId });
-}
-
-/** Final numbers for the sticky summary the locking job posts. */
-export async function readFinalTally(questionId: string): Promise<Tally> {
-  return readTally(questionId);
 }
 
 export async function readAverageError(questionId: string): Promise<number | null> {

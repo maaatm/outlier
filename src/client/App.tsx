@@ -185,7 +185,9 @@ function PlayView({
   const [groupColors] = useState(randomGroupColors);
 
   if (locked) {
-    return <p className="notice">Voting closed on this one. The result is in the thread.</p>;
+    // Only reachable for a question closed by hand, which may have no summary in
+    // the thread to point at. Old Dailies are never closed.
+    return <p className="notice">Voting is closed on this one.</p>;
   }
   if (!canVote) {
     return <p className="notice">Sign in to play.</p>;
@@ -511,7 +513,7 @@ function votesCaption(reveal: Reveal, question: Question): string {
   const { total } = reveal.tally;
   const votes = `${total} ${total === 1 ? 'vote' : 'votes'}`;
   if (reveal.provisional) return `${votes} so far`;
-  // A Daily's tally is today's; an open question has been collecting since it
-  // was posted, so claiming "today" for it would be a lie.
-  return question.isDaily && !question.locked ? `${votes} today` : votes;
+  // Only today's Daily can claim "today". An open question, or a Daily played
+  // out of the archive, has been collecting votes since it was posted.
+  return question.isToday ? `${votes} today` : votes;
 }

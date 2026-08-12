@@ -22,7 +22,12 @@ export type Question = {
   dailyDate?: string;
   /** Only changes what the header reads. Every question counts the same. */
   isDaily: boolean;
-  /** No further votes accepted once the Daily is locked. */
+  /** This is the Daily for the current UTC day, rather than one from the archive. */
+  isToday: boolean;
+  /**
+   * No further votes accepted. Never set by the daily cycle — an old Daily stays
+   * open — so this only ever means somebody closed the question by hand.
+   */
   locked: boolean;
 };
 

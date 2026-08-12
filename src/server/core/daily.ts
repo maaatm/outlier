@@ -1,5 +1,5 @@
 /**
- * The Daily: resolution, posting, and locking.
+ * The Daily: resolution, posting, and the next day's summary.
  *
  * Source order is fixed by the spec — a promoted community question first, the
  * house pool second. The house pool exists so the game survives with zero
@@ -14,15 +14,9 @@ import { previousDay, toDayKey } from '../../shared/day.js';
 import { percentAgreeing } from '../../shared/scoring.js';
 import { keys } from './keys.js';
 import { questionAtCursor, poolSize } from './pool.js';
-import {
-  getQuestion,
-  linkQuestionToPost,
-  lockQuestion,
-  markAsDaily,
-  writeQuestion,
-} from './questions.js';
+import { getQuestion, linkQuestionToPost, markAsDaily, writeQuestion } from './questions.js';
 import { nextPromotable, retire } from './queue.js';
-import { readFinalTally } from './votes.js';
+import { readTally } from './votes.js';
 
 export type DailyResolution = {
   questionId: string;
@@ -139,47 +133,70 @@ export async function postDaily(day: string = toDayKey()): Promise<PostDailyResu
   }
 }
 
-export type LockDailyResult =
-  | { status: 'locked'; day: string; questionId: string }
+export type SummarizeDailyResult =
+  | { status: 'summarized'; day: string; questionId: string }
   | { status: 'skipped'; day: string; reason: string };
 
 /**
- * Lock the previous day's Daily: freeze the tallies and sticky a summary of the
- * result as a comment.
+ * Sticky a summary of the previous day's Daily. Voting stays open.
+ *
+ * Yesterday's question is not finished with — it counts toward a streak and pays
+ * points exactly like today's, so closing it would make the archive unplayable
+ * and would quietly cost somebody a streak for answering the wrong question. The
+ * summary therefore reports where the split stands rather than declaring a
+ * result, and it is expected to go stale.
+ *
+ * `daily:summaries` is the double-post guard, claimed before the comment is
+ * submitted for the same reason `daily:claims` is claimed before the question is
+ * resolved: two overlapping runs must leave one sticky, not two.
  */
-export async function lockDaily(day: string = previousDay()): Promise<LockDailyResult> {
+export async function summarizeDaily(
+  day: string = previousDay()
+): Promise<SummarizeDailyResult> {
   const questionId = await redis.get(keys.daily(day));
   if (!questionId) return { status: 'skipped', day, reason: 'no daily for that day' };
 
   const question = await getQuestion(questionId);
   if (!question) return { status: 'skipped', day, reason: 'question record missing' };
-  if (question.lockedAt > 0) return { status: 'skipped', day, reason: 'already locked' };
+  if (!question.postId) return { status: 'skipped', day, reason: 'daily has no post' };
 
-  await lockQuestion(questionId);
+  const claimed = await redis.hSetNX(keys.dailySummaries, day, '1');
+  if (claimed === 0) return { status: 'skipped', day, reason: 'already summarized' };
 
-  if (question.postId) {
-    const tally = await readFinalTally(questionId);
-    const summary = buildLockSummary(question.text, question.labelA, question.labelB, tally);
-    try {
-      const comment = await reddit.submitComment({ id: question.postId as T3, text: summary });
-      await comment.distinguish(true);
-    } catch (error) {
-      // A failed sticky must not leave the question unlocked.
-      console.error(`lock-daily: could not sticky the summary for ${questionId}`, error);
-    }
+  try {
+    const tally = await readTally(questionId);
+    const summary = buildDailySummary(question.text, question.labelA, question.labelB, tally);
+    const comment = await reddit.submitComment({ id: question.postId as T3, text: summary });
+    await comment.distinguish(true);
+  } catch (error) {
+    // Release the claim and let the next run try again. A missing summary is
+    // recoverable; a duplicate sticky is not.
+    await redis.hDel(keys.dailySummaries, [day]);
+    console.error(`summarize-daily: could not sticky the summary for ${questionId}`, error);
+    return { status: 'skipped', day, reason: 'comment failed' };
   }
 
-  return { status: 'locked', day, questionId };
+  return { status: 'summarized', day, questionId };
 }
 
-export function buildLockSummary(
+/**
+ * The sticky itself. Everything it says is true at the moment it is posted and
+ * may not be an hour later, so it never claims to be the last word.
+ */
+export function buildDailySummary(
   text: string,
   labelA: string,
   labelB: string,
   tally: { a: number; b: number; total: number }
 ): string {
   if (tally.total === 0) {
-    return [`> ${text}`, '', 'Nobody played this one.', '', '^(Outlier · final)'].join('\n');
+    return [
+      `> ${text}`,
+      '',
+      'Nobody has played this one yet.',
+      '',
+      '^(Outlier · still open)',
+    ].join('\n');
   }
 
   const percentA = percentAgreeing(tally, 'a');
@@ -194,14 +211,15 @@ export function buildLockSummary(
     '',
     `**${majorityLabel} ${majorityPercent}%** · ${minorityLabel} ${minorityPercent}%`,
     '',
-    `${tally.total} ${tally.total === 1 ? 'vote' : 'votes'}. Voting is closed.`,
+    `${tally.total} ${tally.total === 1 ? 'vote' : 'votes'} so far. Still open — ` +
+      'answer it yourself and the split moves.',
   ];
 
   if (tally.total < PROVISIONAL_VOTE_FLOOR) {
     lines.push('', 'A small enough crowd that the split is mostly noise.');
   }
 
-  lines.push('', '^(Outlier · final)');
+  lines.push('', '^(Outlier · still open)');
   return lines.join('\n');
 }
 

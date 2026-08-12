@@ -138,7 +138,8 @@ Related guarantees:
 - Dedupe is `hSetNX` on `voted:{questionId}` — an atomic claim, so two taps racing each
   other produce one vote.
 - A second vote returns **409** with the reveal the player already earned.
-- A vote on a locked Daily returns **423**.
+- A vote on a closed question returns **423**. Nothing closes a question on a schedule —
+  see below.
 
 ---
 
@@ -151,6 +152,7 @@ q:{questionId}         hash   text, labelA, labelB, authorId, authorName, source
                               createdAt, postId, lockedAt, dailyDate
 daily:{YYYY-MM-DD}     string questionId
 daily:claims           hash   day -> "1"          (double-fire guard, see below)
+daily:summaries        hash   day -> "1"          (double-post guard for the sticky)
 post:{postId}          string questionId
 
 votes:{questionId}     hash   a, b, guessSum, guessCount, errSum
@@ -174,7 +176,9 @@ leaderboard are cheap reads instead of scans over `guesses:` and every question;
 `guesses:` remains the record of truth. `commented:` stops one tap from posting twice.
 `daily:claims` is the `post-daily` lock: the claim has to be taken *before* the question
 is resolved, or two overlapping runs both draw from the house pool and one draw is
-thrown away. `errSum` on `votes:` is what makes `avgError` computable without a scan.
+thrown away. `daily:summaries` is the same idea for `summarize-daily` — it gets its own
+key rather than a flag on the question record, because the summary changes nothing about
+the question. `errSum` on `votes:` is what makes `avgError` computable without a scan.
 
 `voted:{questionId}` is both the dedupe guard and the record of what to render on
 return. A player reopening a post they have answered always lands on the completed
@@ -216,11 +220,27 @@ flag on a menu item hides a button; it does not gate the endpoint behind it.
 | Job | Cadence | Action |
 |---|---|---|
 | `post-daily` | `0 0 * * *` | Resolve source, create the Daily post, write `daily:{date}` |
-| `lock-daily` | `0 0 * * *` | Lock the *previous* day, freeze tallies, sticky the summary |
+| `summarize-daily` | `0 0 * * *` | Sticky where the *previous* day's split stands |
 | `refresh-queue` | hourly | Re-score `queue:pending` from live post upvotes |
 
 Both midnight jobs are idempotent and touch different day keys, so the order they fire
-in does not matter.
+in does not matter. `post-daily` guards on `daily:claims`, `summarize-daily` on
+`daily:summaries`; both claim before they act, so two overlapping runs produce one post
+and one sticky.
+
+### Nothing closes on a schedule
+
+**Yesterday's Daily stays open.** An archived question still counts toward a streak and
+still pays points, so closing it the next midnight would make the archive unplayable and
+would quietly cost somebody a streak for answering the wrong question. The midnight job
+posts a summary and changes nothing about the question.
+
+The summary therefore reports where the split *stands* rather than declaring a result —
+"so far", "still open" — and is expected to go stale as people keep playing.
+
+`lockQuestion` still exists and the client still renders a closed question, but nothing
+calls it automatically: closing one is a deliberate act for a question that turned out to
+be a problem. There is no mod affordance wired to it yet.
 
 ---
 
@@ -332,7 +352,7 @@ votes and then showing it live, but §6 marks "no tallies before a vote" as crit
 showing a live percentage pre-vote would break it — the guess becomes free. §6 won.
 Tallies are never exposed before a vote on any question. `PROVISIONAL_VOTE_FLOOR` (20) is
 still used, but for honesty rather than secrecy: below it the reveal says "N votes so
-far. This split will move", the comment says "so far", and the locking summary notes when
+far. This split will move", the comment says "so far", and the daily summary notes when
 a sample was too small to mean anything. This is flagged rather than buried because it is
 a real departure from one reading of §13.
 

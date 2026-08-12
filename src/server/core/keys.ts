@@ -30,6 +30,15 @@ export const keys = {
    */
   dailyClaims: 'daily:claims',
 
+  /**
+   * hash: day -> "1". The double-post guard for `summarize-daily`.
+   *
+   * Its own key rather than a flag on the question, because the question is
+   * never modified by the summary — the Daily stays open and unchanged, and the
+   * only thing that happened is that a comment went up.
+   */
+  dailySummaries: 'daily:summaries',
+
   /** string: questionId behind a post. */
   post: (postId: string) => `post:${postId}`,
 

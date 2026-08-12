@@ -74,8 +74,8 @@
         "endpoint": "/internal/tasks/post-daily",
         "cron": "0 0 * * *"
       },
-      "lock-daily": {
-        "endpoint": "/internal/tasks/lock-daily",
+      "summarize-daily": {
+        "endpoint": "/internal/tasks/summarize-daily",
         "cron": "0 0 * * *"
       },
       "refresh-queue": {
