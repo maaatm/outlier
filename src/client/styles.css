@@ -242,11 +242,28 @@ button {
   letter-spacing: -0.01em;
 }
 
+/*
+ * Who asked, with their blob in front of it.
+ *
+ * Aligned to the bottom rather than the middle. A blob's element is half again
+ * as tall as the dot in it — the accessory lives inside the SVG's box rather
+ * than overflowing it — so centring the row would centre the name against a
+ * third of a box that is deliberately empty and leave it floating above the
+ * head. The alternative, pulling the artwork out of its box with a negative
+ * margin, is the thing the taller viewBox exists to avoid.
+ */
+.question__byline {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--s2);
+  margin: 0 0 var(--s2);
+}
+
 .question__meta {
   font-family: var(--font-mono);
   font-size: 12px;
   color: var(--ink-soft);
-  margin: 0 0 var(--s2);
+  margin: 0;
 }
 
 .rule {
@@ -1214,6 +1231,108 @@ button {
 .axis__line {
   margin: 0;
   font-size: 14px;
+}
+
+/* ── Blobs and the wardrobe ─────────────────────────────────────────────── */
+
+/*
+ * A blob is a dot with more shape, drawn as one SVG so the accessory and the
+ * head scale together. Its box is `size` wide and half again as tall: the
+ * accessory is inside the viewBox rather than painted outside the element, which
+ * is what keeps it out of trouble with `.slide` and `.menu__body` above.
+ *
+ * `overflow: visible` covers the hairline case only. The circle's outer edge is
+ * exactly the edge of the viewBox — that is what makes the element `size` across
+ * including its ink, the same as `.dot` — so antialiasing has half a pixel of
+ * nowhere to go at the extreme left and right.
+ */
+.blob {
+  display: block;
+  flex: none;
+  overflow: visible;
+}
+
+/* Your blob and the way to change it, above the totals in Your record. Bottom
+   aligned for the same reason the byline is. */
+.record__blob {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--s3);
+}
+
+.wardrobe {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+}
+
+.wardrobe__preview {
+  display: flex;
+  justify-content: center;
+}
+
+.wardrobe__rack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+}
+
+.wardrobe__rack-label {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.wardrobe__grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+  gap: var(--s2);
+}
+
+.wardrobe__tile {
+  flex-direction: column;
+  gap: var(--s1);
+  padding: var(--s2);
+  text-align: center;
+}
+
+/*
+ * Rarity, in outline weight and in the word under the name. It gets no colour:
+ * the screen is allowed two accents with one meaning each, and a five-rung
+ * rarity ladder would spend the budget here and nowhere else.
+ */
+.wardrobe__tile--uncommon {
+  border-width: 3px;
+}
+
+.wardrobe__tile--rare {
+  border-width: 4px;
+}
+
+/*
+ * The one you have on is pressed into the page, using the same shadow the app
+ * gives anything held down. A sticker that is stuck down reads as chosen without
+ * spending a colour on saying so.
+ */
+.wardrobe__tile.is-worn {
+  box-shadow: var(--drop-pressed);
+  transform: translate(2px, 2px);
+}
+
+.wardrobe__name {
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.wardrobe__meta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--ink-soft);
 }
 
 /* ── States ─────────────────────────────────────────────────────────────── */

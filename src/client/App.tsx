@@ -9,12 +9,14 @@ import { context } from '@devvit/web/client';
 import { useCallback, useEffect, useState } from 'react';
 
 import { getBadge } from '../shared/badges.js';
-import { CROWD_SIZE } from '../shared/config.js';
+import { BLOB_SIZE, CROWD_SIZE } from '../shared/config.js';
+import type { Equipped } from '../shared/items.js';
 import { getBand, type Award } from '../shared/points.js';
 import type { Choice, Question, QuestionState, Reveal, StateResponse } from '../shared/types.js';
 import { ApiFailure, castVote, fetchState } from './api.js';
 import { randomGroupColors } from './colors.js';
 import { BadgeStamp } from './components/BadgeStamp.js';
+import { Blob } from './components/Blob.js';
 import { Compose } from './components/Compose.js';
 import { DotCrowd } from './components/DotCrowd.js';
 import { Histogram } from './components/Histogram.js';
@@ -130,7 +132,7 @@ function Game({
   onOpenMenu: () => void;
   onReveal: (reveal: Reveal) => void;
 }): React.JSX.Element {
-  const { question, reveal, stats, canVote } = state;
+  const { question, reveal, stats, canVote, authorAvatar } = state;
 
   return (
     <main className="app">
@@ -144,7 +146,7 @@ function Game({
 
       <section className="card">
         {question.source === 'community' && question.authorName && (
-          <p className="question__meta">asked by u/{question.authorName}</p>
+          <Byline name={question.authorName} avatar={authorAvatar} />
         )}
         <h1 className="question">{question.text}</h1>
         <WobbleRule />
@@ -170,6 +172,35 @@ function Game({
         )}
       </section>
     </main>
+  );
+}
+
+/**
+ * Who asked, and what they look like.
+ *
+ * The single highest-value blob in the app: it is the one a player sees before
+ * they have one, on somebody else, attached to a name — which is what makes
+ * wanting one make sense. It costs one avatar lookup on an id the server was
+ * already holding.
+ *
+ * House questions never reach here; they have no author line at all.
+ */
+function Byline({
+  name,
+  avatar,
+}: {
+  name: string;
+  avatar: Equipped | null;
+}): React.JSX.Element {
+  return (
+    <p className="question__byline">
+      <Blob
+        face={avatar?.face}
+        accessory={avatar?.accessory}
+        size={BLOB_SIZE.inline}
+      />
+      <span className="question__meta">asked by u/{name}</span>
+    </p>
   );
 }
 
