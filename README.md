@@ -205,7 +205,7 @@ GET  /api/state/:postId       question, prior answer, tallies only if voted
 POST /api/vote                { postId, choice, guess } -> reveal
 POST /api/comment             posts the generated comment as this user
 POST /api/submit              create an open question + post
-GET  /api/leaderboard         most misjudged questions ever
+GET  /api/leaderboard/questions  most misjudged questions ever
 GET  /api/today               today's UTC day key
 GET  /api/daily?from={postId} where today's Daily is — a state and a permalink
 GET  /api/queue               mod-only

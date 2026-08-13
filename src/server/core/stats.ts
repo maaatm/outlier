@@ -9,7 +9,7 @@
 import { redis } from '@devvit/web/server';
 
 import { LEADERBOARD_MIN_VOTES, LEADERBOARD_SIZE } from '../../shared/config.js';
-import type { LeaderboardEntry } from '../../shared/types.js';
+import type { MisjudgedEntry } from '../../shared/types.js';
 import { keys, voteFields } from './keys.js';
 import { getQuestion } from './questions.js';
 
@@ -22,8 +22,8 @@ import { getQuestion } from './questions.js';
  */
 export async function misjudgedLeaderboard(
   limit: number = LEADERBOARD_SIZE
-): Promise<LeaderboardEntry[]> {
-  const entries: LeaderboardEntry[] = [];
+): Promise<MisjudgedEntry[]> {
+  const entries: MisjudgedEntry[] = [];
   const page = Math.max(limit * 3, 30);
 
   const ranked = await redis.zRange(keys.misjudged, 0, page - 1, {
@@ -56,7 +56,7 @@ export async function misjudgedLeaderboard(
 }
 
 /** The leaderboard as a post body, for the recurring event post. */
-export function renderLeaderboardPost(entries: LeaderboardEntry[]): string {
+export function renderLeaderboardPost(entries: MisjudgedEntry[]): string {
   if (entries.length === 0) {
     return [
       'No question has enough votes to rank yet.',

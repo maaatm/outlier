@@ -18,7 +18,7 @@ import type {
   CommentRequest,
   CommentResponse,
   DailyPointer,
-  LeaderboardResponse,
+  MisjudgedResponse,
   StateResponse,
   VoteRequest,
 } from '../../shared/types.js';
@@ -164,8 +164,8 @@ api.post('/api/comment', async (c) => {
 });
 
 /** The most misjudged questions ever. Safe to read without having voted. */
-api.get('/api/leaderboard', async (c) => {
-  return c.json<LeaderboardResponse>({ entries: await misjudgedLeaderboard() });
+api.get('/api/leaderboard/questions', async (c) => {
+  return c.json<MisjudgedResponse>({ entries: await misjudgedLeaderboard() });
 });
 
 /** Today's UTC day, so the client never has to consult a local clock. */

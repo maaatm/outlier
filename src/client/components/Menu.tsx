@@ -22,7 +22,7 @@ import { useEffect, useState } from 'react';
 import { CROWD_SIZE, HIT_THRESHOLD, LEADERBOARD_MIN_VOTES } from '../../shared/config.js';
 import type { DailyPointer, PlayerStats } from '../../shared/types.js';
 import { fetchDaily } from '../api.js';
-import { Leaderboard } from './Leaderboard.js';
+import { MisjudgedBoard } from './MisjudgedBoard.js';
 import { StatBar } from './StatBar.js';
 import { WobbleRule } from './WobbleRule.js';
 
@@ -303,7 +303,7 @@ function Misjudged({ title }: { title: string }): React.JSX.Element {
         </>
       }
     >
-      <Leaderboard rows={BOARD_ROWS} />
+      <MisjudgedBoard rows={BOARD_ROWS} />
     </Panel>
   );
 }

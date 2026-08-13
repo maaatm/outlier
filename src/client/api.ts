@@ -4,7 +4,7 @@ import type {
   ApiError,
   CommentResponse,
   DailyPointer,
-  LeaderboardResponse,
+  MisjudgedResponse,
   Reveal,
   StateResponse,
 } from '../shared/types.js';
@@ -73,8 +73,8 @@ export function postComment(
   });
 }
 
-export function fetchLeaderboard(): Promise<LeaderboardResponse> {
-  return request<LeaderboardResponse>('/api/leaderboard');
+export function fetchMisjudged(): Promise<MisjudgedResponse> {
+  return request<MisjudgedResponse>('/api/leaderboard/questions');
 }
 
 /**

@@ -168,8 +168,8 @@ export type QueueResponse = {
   approved: QueueEntry[];
 };
 
-/** One row of the most-misjudged-questions leaderboard. */
-export type LeaderboardEntry = {
+/** One row of the most-misjudged-questions board. */
+export type MisjudgedEntry = {
   id: string;
   text: string;
   avgError: number;
@@ -177,8 +177,8 @@ export type LeaderboardEntry = {
   source: QuestionSource;
 };
 
-export type LeaderboardResponse = {
-  entries: LeaderboardEntry[];
+export type MisjudgedResponse = {
+  entries: MisjudgedEntry[];
 };
 
 /**

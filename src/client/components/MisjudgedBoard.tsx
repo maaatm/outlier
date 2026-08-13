@@ -6,19 +6,19 @@
 
 import { useEffect, useState } from 'react';
 
-import type { LeaderboardEntry } from '../../shared/types.js';
-import { fetchLeaderboard } from '../api.js';
+import type { MisjudgedEntry } from '../../shared/types.js';
+import { fetchMisjudged } from '../api.js';
 
 /** Rows on the reveal's detail strip. The menu has room for more and asks for it. */
 const ROWS = 3;
 
-export function Leaderboard({ rows = ROWS }: { rows?: number }): React.JSX.Element {
-  const [entries, setEntries] = useState<LeaderboardEntry[] | null>(null);
+export function MisjudgedBoard({ rows = ROWS }: { rows?: number }): React.JSX.Element {
+  const [entries, setEntries] = useState<MisjudgedEntry[] | null>(null);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let live = true;
-    fetchLeaderboard()
+    fetchMisjudged()
       .then((response) => live && setEntries(response.entries))
       .catch(() => live && setFailed(true));
     return () => {
