@@ -4,7 +4,8 @@ import { filterQuestionText } from '../src/server/core/filter.js';
 import { NOTE_MAX_LENGTH, QUESTION_MAX_LENGTH } from '../src/shared/config.js';
 import { buildComment, normalizeNote } from '../src/shared/comment.js';
 import { bucketFor } from '../src/server/core/votes.js';
-import { buildLockSummary } from '../src/server/core/daily.js';
+import { buildDailySummary } from '../src/server/core/daily.js';
+import { toPublicQuestion } from '../src/server/core/questions.js';
 import type { Question, Reveal } from '../src/shared/types.js';
 import {
   normalizeQuestionText,
@@ -84,6 +85,7 @@ describe('the generated comment', () => {
     labelB: 'No',
     source: 'house',
     isDaily: true,
+    isToday: true,
     dailyDate: '2026-04-02',
     locked: false,
   };
@@ -102,9 +104,11 @@ describe('the generated comment', () => {
     provisional: false,
     commentPreview: '',
     commented: false,
-    streaks: {
-      playStreak: 12,
-      readStreak: 0,
+    award: { base: 10, bonus: 0, total: 10, band: 'cold' },
+    stats: {
+      streak: 12,
+      bestStreak: 19,
+      points: 430,
       totalPlayed: 30,
       totalHits: 11,
       extendedToday: true,
@@ -117,7 +121,17 @@ describe('the generated comment', () => {
     expect(text).toContain('19 of 100 are with me');
     expect(text).toContain('I guessed 40%, off by 21.');
     expect(text).toContain('Living in a bubble');
-    expect(text).toContain('play 12');
+    expect(text).toContain('streak 12');
+  });
+
+  it('carries the band the vote earned, not just the number', () => {
+    const bullseye: Reveal = {
+      ...reveal,
+      error: 1,
+      award: { base: 10, bonus: 50, total: 60, band: 'bullseye' },
+    };
+    expect(buildComment(question, bullseye)).toContain('Bullseye +60');
+    expect(buildComment(question, reveal)).toContain('Cold +10');
   });
 
   it('stays short enough to read without scrolling', () => {
@@ -164,27 +178,80 @@ describe('histogram buckets', () => {
   });
 });
 
-describe('the locking summary', () => {
+describe('the public question projection', () => {
+  const record = {
+    id: 'h001',
+    text: 'Do you eat the pizza crust?',
+    labelA: 'Yes',
+    labelB: 'No',
+    authorId: '',
+    authorName: '',
+    source: 'house' as const,
+    createdAt: 0,
+    postId: 't3_abc',
+    lockedAt: 0,
+    dailyDate: '2026-04-02',
+  };
+
+  it('marks the current day’s Daily as today’s', () => {
+    expect(toPublicQuestion(record, '2026-04-02').isToday).toBe(true);
+  });
+
+  it('does not let yesterday’s Daily keep claiming today', () => {
+    const archived = toPublicQuestion(record, '2026-04-03');
+    expect(archived.isToday).toBe(false);
+    // Still a Daily, still open, still playable — just not the current one.
+    expect(archived.isDaily).toBe(true);
+    expect(archived.locked).toBe(false);
+  });
+
+  it('never calls an open question today’s', () => {
+    const open = toPublicQuestion({ ...record, dailyDate: '' }, '2026-04-02');
+    expect(open.isToday).toBe(false);
+    expect(open.isDaily).toBe(false);
+  });
+
+  it('reports a hand-closed question as locked', () => {
+    expect(toPublicQuestion({ ...record, lockedAt: 1 }, '2026-04-02').locked).toBe(true);
+  });
+});
+
+describe('the daily summary', () => {
   it('leads with the majority side', () => {
-    const summary = buildLockSummary('Do you eat the crust?', 'Yes', 'No', {
+    const summary = buildDailySummary('Do you eat the crust?', 'Yes', 'No', {
       a: 19,
       b: 81,
       total: 100,
     });
     expect(summary).toContain('**No 81%**');
     expect(summary).toContain('Yes 19%');
-    expect(summary).toContain('Voting is closed.');
+    expect(summary).toContain('100 votes so far');
   });
 
-  it('says so when nobody played', () => {
+  it('never claims the question is finished', () => {
+    // Yesterday's Daily is still playable, so the sticky must not tell the
+    // subreddit otherwise.
+    for (const tally of [
+      { a: 19, b: 81, total: 100 },
+      { a: 2, b: 1, total: 3 },
+      { a: 0, b: 0, total: 0 },
+    ]) {
+      const summary = buildDailySummary('Do you eat the crust?', 'Yes', 'No', tally);
+      expect(summary).not.toContain('closed');
+      expect(summary).not.toContain('final');
+      expect(summary).toContain('still open');
+    }
+  });
+
+  it('says so when nobody has played yet', () => {
     expect(
-      buildLockSummary('Do you eat the crust?', 'Yes', 'No', { a: 0, b: 0, total: 0 })
-    ).toContain('Nobody played this one.');
+      buildDailySummary('Do you eat the crust?', 'Yes', 'No', { a: 0, b: 0, total: 0 })
+    ).toContain('Nobody has played this one yet.');
   });
 
   it('flags a sample too small to mean anything', () => {
     expect(
-      buildLockSummary('Do you eat the crust?', 'Yes', 'No', { a: 2, b: 1, total: 3 })
+      buildDailySummary('Do you eat the crust?', 'Yes', 'No', { a: 2, b: 1, total: 3 })
     ).toContain('mostly noise');
   });
 });

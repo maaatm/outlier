@@ -1,12 +1,12 @@
 /**
  * Scheduler task endpoints, wired to cron in `devvit.json`.
  *
- *   post-daily     00:00 UTC  resolve the source, post the Daily, write daily:{date}
- *   lock-daily     00:00 UTC  lock yesterday's post, freeze tallies, sticky the summary
- *   refresh-queue  hourly     re-score the pending queue from live post upvotes
+ *   post-daily       00:00 UTC  resolve the source, post the Daily, write daily:{date}
+ *   summarize-daily  00:00 UTC  sticky where yesterday's split stands. Voting stays open.
+ *   refresh-queue    hourly     re-score the pending queue from live post upvotes
  *
  * Both midnight jobs are idempotent, so the order they fire in does not matter:
- * `lock-daily` works on yesterday's key and `post-daily` on today's.
+ * `summarize-daily` works on yesterday's key and `post-daily` on today's.
  */
 
 import { reddit } from '@devvit/web/server';
@@ -14,7 +14,7 @@ import type { T3 } from '@devvit/web/shared';
 import { Hono } from 'hono';
 
 import { previousDay, toDayKey } from '../../shared/day.js';
-import { lockDaily, postDaily } from '../core/daily.js';
+import { postDaily, summarizeDaily } from '../core/daily.js';
 import { getQuestion } from '../core/questions.js';
 import {
   allApprovedIds,
@@ -35,9 +35,9 @@ taskRoutes.post('/internal/tasks/post-daily', async (c) => {
   return c.json({});
 });
 
-taskRoutes.post('/internal/tasks/lock-daily', async (c) => {
-  const result = await lockDaily(previousDay());
-  console.log(`lock-daily: ${result.day} ${result.status}`);
+taskRoutes.post('/internal/tasks/summarize-daily', async (c) => {
+  const result = await summarizeDaily(previousDay());
+  console.log(`summarize-daily: ${result.day} ${result.status}`);
   return c.json({});
 });
 

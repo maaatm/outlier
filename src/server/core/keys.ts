@@ -30,8 +30,26 @@ export const keys = {
    */
   dailyClaims: 'daily:claims',
 
+  /**
+   * hash: day -> "1". The double-post guard for `summarize-daily`.
+   *
+   * Its own key rather than a flag on the question, because the question is
+   * never modified by the summary — the Daily stays open and unchanged, and the
+   * only thing that happened is that a comment went up.
+   */
+  dailySummaries: 'daily:summaries',
+
   /** string: questionId behind a post. */
   post: (postId: string) => `post:${postId}`,
+
+  /**
+   * string: postId of the pinned menu post, which has no question on it.
+   *
+   * Read only when `post:{postId}` misses, so a playable post never pays for it.
+   * One at a time by design — a second pinned menu post would be a second thing
+   * to keep current, and there is only ever one menu.
+   */
+  menuPost: 'menu:post',
 
   /** hash: a, b, guessSum, guessCount, errSum */
   votes: (questionId: string) => `votes:${questionId}`,
@@ -39,7 +57,10 @@ export const keys = {
   /** zset: userId -> guess. The distribution record. */
   guesses: (questionId: string) => `guesses:${questionId}`,
 
-  /** hash: userId -> "a:45". Dedupe guard and the record of what to re-render. */
+  /**
+   * hash: userId -> "a:45:21" — choice, guess, and the error the points were
+   * paid on. Dedupe guard and the record of what to re-render.
+   */
   voted: (questionId: string) => `voted:${questionId}`,
 
   /** hash: bucket index "0".."9" -> count. Derived from `guesses`. */
@@ -48,7 +69,7 @@ export const keys = {
   /** hash: userId -> commentId. */
   commented: (questionId: string) => `commented:${questionId}`,
 
-  /** hash: playStreak, readStreak, lastPlayedDay, totalPlayed, totalHits */
+  /** hash: streak, bestStreak, lastPlayedDay, points, totalPlayed, totalHits */
   user: (userId: string) => `user:${userId}`,
 
   /** string with a 24h TTL. Presence means "already submitted today". */

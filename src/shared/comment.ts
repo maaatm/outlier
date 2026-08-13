@@ -9,6 +9,7 @@
 
 import { getBadge } from './badges.js';
 import { CROWD_SIZE, NOTE_MAX_LENGTH } from './config.js';
+import { getBand } from './points.js';
 import type { Question, Reveal } from './types.js';
 
 function labelFor(question: Question, choice: 'a' | 'b'): string {
@@ -49,12 +50,15 @@ export function buildComment(question: Question, reveal: Reveal, note?: string):
     lines.push(cleanNote);
   }
 
-  const streak = reveal.streaks
-    ? `play ${reveal.streaks.playStreak} · read ${reveal.streaks.readStreak} · `
-    : '';
+  // The band is today's brag and the streak is the standing one. The points
+  // ride along with the band rather than on their own, because a bare number
+  // means nothing to a reader who has not played.
+  const band = getBand(reveal.award.band);
 
   lines.push('');
-  lines.push(`^(${streak}via Outlier)`);
+  lines.push(
+    `^(streak ${reveal.stats.streak} · ${band.label} +${reveal.award.total} · via Outlier)`
+  );
 
   return lines.join('\n');
 }

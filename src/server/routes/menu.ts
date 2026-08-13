@@ -10,6 +10,7 @@ import { Hono } from 'hono';
 import { LABEL_MAX_LENGTH, QUESTION_MAX_LENGTH, MOD_QUEUE_PAGE_SIZE } from '../../shared/config.js';
 import { SUBMISSION_GUIDANCE } from '../../shared/validate.js';
 import { currentSubredditName, postDaily } from '../core/daily.js';
+import { pinMenuPost } from '../core/menuPost.js';
 import { isModerator } from '../core/mod.js';
 import { listPending } from '../core/queue.js';
 import { checkCooldown } from '../core/submit.js';
@@ -130,6 +131,29 @@ menuRoutes.post('/internal/menu/post-daily-now', async (c) => {
   return c.json<UiResponse>({
     navigateTo: `https://reddit.com/comments/${result.postId.replace(/^t3_/, '')}`,
     showToast: { text: 'Daily posted.', appearance: 'success' },
+  });
+});
+
+/** "Pin the menu post" — the subreddit's front door for somebody new. */
+menuRoutes.post('/internal/menu/pin-menu-post', async (c) => {
+  if (!(await isModerator())) {
+    return c.json<UiResponse>({ showToast: 'Moderators only.' });
+  }
+
+  const result = await pinMenuPost();
+
+  if (result.status === 'exists') {
+    return c.json<UiResponse>({
+      navigateTo: result.permalink,
+      showToast: 'The menu post is already up.',
+    });
+  }
+
+  return c.json<UiResponse>({
+    navigateTo: result.permalink,
+    showToast: result.pinned
+      ? { text: 'Menu post pinned.', appearance: 'success' }
+      : 'Menu post created, but it could not be pinned — check the sticky slots.',
   });
 });
 

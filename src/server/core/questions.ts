@@ -2,6 +2,7 @@
 
 import { redis } from '@devvit/web/server';
 
+import { toDayKey } from '../../shared/day.js';
 import type { Question, QuestionSource } from '../../shared/types.js';
 import { keys } from './keys.js';
 
@@ -81,12 +82,24 @@ export async function markAsDaily(questionId: string, day: string): Promise<void
   await redis.hSet(keys.question(questionId), { dailyDate: day });
 }
 
+/**
+ * Close a question for good.
+ *
+ * Nothing calls this on a schedule. Yesterday's Daily stays open — it still
+ * counts toward a streak — so closing one is a deliberate act for a question
+ * that turned out to be a problem, not part of the daily cycle.
+ */
 export async function lockQuestion(questionId: string): Promise<void> {
   await redis.hSet(keys.question(questionId), { lockedAt: String(Date.now()) });
 }
 
-/** The public projection. Author id and timestamps never cross the wire. */
-export function toPublicQuestion(record: QuestionRecord): Question {
+/**
+ * The public projection. Author id and timestamps never cross the wire.
+ *
+ * `isToday` is resolved here rather than on the client for the usual reason: the
+ * client has no business reading a local clock to decide what "today" means.
+ */
+export function toPublicQuestion(record: QuestionRecord, today: string = toDayKey()): Question {
   const question: Question = {
     id: record.id,
     text: record.text,
@@ -94,6 +107,7 @@ export function toPublicQuestion(record: QuestionRecord): Question {
     labelB: record.labelB,
     source: record.source,
     isDaily: record.dailyDate !== '',
+    isToday: record.dailyDate !== '' && record.dailyDate === today,
     locked: record.lockedAt > 0,
   };
   if (record.source === 'community' && record.authorName) {

@@ -9,6 +9,12 @@ export const PROMOTION_THRESHOLD = 10;
 /** `error <= HIT_THRESHOLD` counts as reading the room correctly. */
 export const HIT_THRESHOLD = 10;
 
+/**
+ * What every vote pays before any accuracy bonus. The bonus bands, and the words
+ * for them, live in `points.ts`.
+ */
+export const POINTS_BASE = 10;
+
 /** Your side is the minority when it holds less than this share of the vote. */
 export const MINORITY_THRESHOLD = 35;
 
@@ -59,8 +65,8 @@ export const POOL_SHUFFLE_SEED = 0x0dd1e5;
  * This deliberately disables the server-side dedupe guard, which is the only
  * thing stopping one account from voting a hundred times. Votes still count
  * toward the tallies, so a test subreddit builds up a real distribution to look
- * at — and a live subreddit would build up a fake one. Streaks are untouched
- * and still work normally.
+ * at — and a live subreddit would build up a fake one. The streak is untouched
+ * and still works normally; points are not, since every replay pays again.
  */
 export const REPLAY_MODE = true;
 

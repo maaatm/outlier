@@ -188,17 +188,27 @@ button {
   letter-spacing: -0.01em;
 }
 
+/*
+ * The one thing in the header that may be cut. The points tile grows a digit at
+ * a time and the counters are never abbreviated, so on a narrow phone the date
+ * gives up its width rather than pushing the wordmark off the row.
+ */
 .header__day {
   color: var(--ink-soft);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.streaks {
+.stats {
   display: flex;
   align-items: center;
   gap: var(--s2);
+  flex: none;
 }
 
-.streak {
+.stat {
   display: inline-flex;
   align-items: center;
   gap: var(--s1);
@@ -211,12 +221,12 @@ button {
   white-space: nowrap;
 }
 
-.streak--live {
+.stat--live {
   background: var(--sun);
   color: #15181d;
 }
 
-.streak__count {
+.stat__count {
   font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
@@ -711,6 +721,79 @@ button {
   font-size: 0.6em;
   color: var(--ink-soft);
   margin-left: 1px;
+}
+
+/* ── The award ──────────────────────────────────────────────────────────── */
+
+/*
+ * What the vote paid, on the score slide.
+ *
+ * No accent: the badge stamp and the histogram beneath it already spend both of
+ * the two the screen is allowed. It earns its place with the band word and the
+ * count-up instead of with colour.
+ */
+.award {
+  border: var(--stroke) solid var(--ink);
+  border-radius: var(--radius-button);
+  padding: var(--s2) var(--s3);
+  background: var(--card);
+}
+
+.award__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s2);
+}
+
+.award__band {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.award__total {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 500;
+  line-height: 1;
+  /* Tabular, or every frame of the count-up shifts the band word beside it. */
+  font-variant-numeric: tabular-nums;
+}
+
+.award__breakdown {
+  margin: 2px 0 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+/* The same table as the reveal pays from, listed in the menu. */
+.bands {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s1);
+  list-style: none;
+  margin: var(--s2) 0 0;
+  padding: 0;
+}
+
+.band {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s1);
+  border: var(--stroke) solid var(--ink);
+  border-radius: var(--radius-button);
+  padding: 2px var(--s2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.band__bonus {
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── Slide navigation ───────────────────────────────────────────────────── */
@@ -1315,6 +1398,24 @@ button {
   }
 
   .compose__hint {
+    display: none;
+  }
+
+  /* The award gives up its padding and a few points of size before the badge
+     stamp does — the stamp is the moment, this is the receipt. */
+  .award {
+    padding: var(--s1) var(--s2);
+  }
+
+  .award__band {
+    font-size: 18px;
+  }
+
+  .award__total {
+    font-size: 22px;
+  }
+
+  .award__breakdown {
     display: none;
   }
 }

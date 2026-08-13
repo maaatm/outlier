@@ -72,14 +72,35 @@ error is kept for stats; the binary is what makes a streak legible.
 Badge copy lives in `src/shared/badges.ts` so the tone can be tuned without touching
 logic. Thresholds live in `src/shared/config.ts`.
 
-### Streaks
+### Streak and points
 
-- `playStreak` — consecutive days with a Daily submission. The habit metric.
-- `readStreak` — consecutive Dailies where `error <= 10`. The brag metric.
+- `streak` — consecutive UTC days on which the player submitted at least one vote. The
+  habit metric. A missed day resets it to zero; `bestStreak` keeps the number it reached
+  and is never reduced.
+- `points` — lifetime, banked per vote rather than per day.
 
-Both reset on a missed day. **Day boundaries are UTC**, matching the post schedule; local
-time is never consulted on either side of the wire. Only the Daily moves streaks — open
-questions accumulate vote data and nothing else.
+**Every question counts** toward both: the Daily, an open question somebody submitted, or
+one played out of the archive. The day recorded is the day the vote was *cast*, not the
+day the question ran, so an archived puzzle cannot back-date a streak.
+
+**Day boundaries are UTC**, matching the post schedule; local time is never consulted on
+either side of the wire. The streak moves once a day however many questions are in it;
+points move on every vote.
+
+Each vote pays `POINTS_BASE` (10) plus one accuracy band, on `error = |guess - actual|`:
+
+| Band | Error | Bonus |
+|---|---|---|
+| Bullseye | ≤ 2 | +50 |
+| Sharp | ≤ 5 | +30 |
+| Close | ≤ 10 | +15 |
+| Warm | ≤ 20 | +5 |
+| Cold | — | 0 |
+
+The label is what the reveal and the shared comment lead with; the number is the receipt.
+`Close` shares its ceiling with `HIT_THRESHOLD` on purpose — the point at which the game
+says you read the room is the point at which it stops paying much for it. The table lives
+in `src/shared/points.ts` alongside its copy, the same way badges do.
 
 ---
 
@@ -93,7 +114,8 @@ rather than the reveal you already earned.
 It does this by disabling the server-side dedupe guard — the only thing stopping
 one account from voting a hundred times. Votes still count toward the tallies,
 so a test subreddit builds a real distribution and a live one would build a fake
-one. Streaks are unaffected and still work normally.
+one. The streak still works normally, but with the guard off the same account
+banks points on every replay, so lifetime totals inflate too.
 
 The server logs a warning on boot while it is on. Set it to `false` before this
 goes anywhere real.
@@ -116,7 +138,8 @@ Related guarantees:
 - Dedupe is `hSetNX` on `voted:{questionId}` — an atomic claim, so two taps racing each
   other produce one vote.
 - A second vote returns **409** with the reveal the player already earned.
-- A vote on a locked Daily returns **423**.
+- A vote on a closed question returns **423**. Nothing closes a question on a schedule —
+  see below.
 
 ---
 
@@ -129,15 +152,17 @@ q:{questionId}         hash   text, labelA, labelB, authorId, authorName, source
                               createdAt, postId, lockedAt, dailyDate
 daily:{YYYY-MM-DD}     string questionId
 daily:claims           hash   day -> "1"          (double-fire guard, see below)
+daily:summaries        hash   day -> "1"          (double-post guard for the sticky)
 post:{postId}          string questionId
+menu:post              string postId of the pinned menu post (no question on it)
 
 votes:{questionId}     hash   a, b, guessSum, guessCount, errSum
 guesses:{questionId}   zset   userId -> guess     (the distribution record)
-voted:{questionId}     hash   userId -> "a:45"    (dedupe guard + what to re-render)
+voted:{questionId}     hash   userId -> "a:45:21" (dedupe guard + what to re-render)
 hist:{questionId}      hash   bucket -> count     (derived from guesses)
 commented:{questionId} hash   userId -> commentId
 
-user:{userId}          hash   playStreak, readStreak, lastPlayedDay,
+user:{userId}          hash   streak, bestStreak, lastPlayedDay, points,
                               totalPlayed, totalHits
 sub:cooldown:{userId}  string TTL 24h
 
@@ -152,19 +177,24 @@ leaderboard are cheap reads instead of scans over `guesses:` and every question;
 `guesses:` remains the record of truth. `commented:` stops one tap from posting twice.
 `daily:claims` is the `post-daily` lock: the claim has to be taken *before* the question
 is resolved, or two overlapping runs both draw from the house pool and one draw is
-thrown away. `errSum` on `votes:` is what makes `avgError` computable without a scan.
+thrown away. `daily:summaries` is the same idea for `summarize-daily` — it gets its own
+key rather than a flag on the question record, because the summary changes nothing about
+the question. `errSum` on `votes:` is what makes `avgError` computable without a scan.
 
 `voted:{questionId}` is both the dedupe guard and the record of what to render on
 return. A player reopening a post they have answered always lands on the completed
-reveal — never a blank form, never a second vote.
+reveal — never a blank form, never a second vote. Its third field is the error the
+points were paid on, banked at vote time; a two-field value is a vote from before points
+existed and still renders.
 
 ### What a returning player sees
 
-Everything except the streak counters is recomputed from the **live** tally, so the
-crowd is as it stands now rather than a fossil of the moment they voted. Streaks are
-banked at vote time and never recomputed: a day already counted stays counted, and a
-`readStreak` earned on the day's numbers is not retroactively taken away because the
-crowd moved afterwards.
+Everything except the counters and the award is recomputed from the **live** tally, so
+the crowd is as it stands now rather than a fossil of the moment they voted. The streak
+and the points are banked at vote time and never recomputed: a day already counted stays
+counted, and points already paid are not retroactively taken away because the crowd moved
+afterwards. That is why the vote-time error is stored — an award re-derived from a tally
+that has since moved would contradict the total it already added to.
 
 ---
 
@@ -191,11 +221,27 @@ flag on a menu item hides a button; it does not gate the endpoint behind it.
 | Job | Cadence | Action |
 |---|---|---|
 | `post-daily` | `0 0 * * *` | Resolve source, create the Daily post, write `daily:{date}` |
-| `lock-daily` | `0 0 * * *` | Lock the *previous* day, freeze tallies, sticky the summary |
+| `summarize-daily` | `0 0 * * *` | Sticky where the *previous* day's split stands |
 | `refresh-queue` | hourly | Re-score `queue:pending` from live post upvotes |
 
 Both midnight jobs are idempotent and touch different day keys, so the order they fire
-in does not matter.
+in does not matter. `post-daily` guards on `daily:claims`, `summarize-daily` on
+`daily:summaries`; both claim before they act, so two overlapping runs produce one post
+and one sticky.
+
+### Nothing closes on a schedule
+
+**Yesterday's Daily stays open.** An archived question still counts toward a streak and
+still pays points, so closing it the next midnight would make the archive unplayable and
+would quietly cost somebody a streak for answering the wrong question. The midnight job
+posts a summary and changes nothing about the question.
+
+The summary therefore reports where the split *stands* rather than declaring a result —
+"so far", "still open" — and is expected to go stale as people keep playing.
+
+`lockQuestion` still exists and the client still renders a closed question, but nothing
+calls it automatically: closing one is a deliberate act for a question that turned out to
+be a problem. There is no mod affordance wired to it yet.
 
 ---
 
@@ -210,8 +256,9 @@ in does not matter.
    the first.
 
 Anyone can submit an open question from the subreddit menu. It becomes its own playable
-post immediately, does not affect streaks, accumulates real vote data, and enters the
-promotion queue. One submission per user per 24h, enforced server-side with a TTL.
+post immediately, counts toward the streak and pays points like any other question,
+accumulates real vote data, and enters the promotion queue. One submission per user per
+24h, enforced server-side with a TTL.
 
 Question text is validated and filtered before a post is created — length, a single
 trailing question mark, no links or usernames, and a content filter that turns away
@@ -259,8 +306,11 @@ tap on a phone never leaves a button stuck in the raised state.
 **Motion** is one orchestrated moment. On lock-in the dots travel to their camps over
 600ms with a 6ms stagger and a light spring overshoot; your dot lands ~150ms behind the
 pack with a small pop; the badge stamps in after. Under a second total — a verdict, not
-a loading screen. `prefers-reduced-motion` gets a straight cross-fade to the same final
-state. No confetti, no shake, no celebratory burst; the copy voice matches.
+a loading screen. The point total counts up on the score slide, the only number in the
+app that arrives moving, because it is the only one that was earned rather than reported.
+`prefers-reduced-motion` gets a straight cross-fade to the same final state — and the
+count-up checks it in JavaScript, since the movement is in a value no media query can
+reach. No confetti, no shake, no celebratory burst; the copy voice matches.
 
 ---
 
@@ -276,7 +326,7 @@ Four rooms, one open at a time, each with its fine print pinned to the bottom.
 | Room | What it holds |
 |---|---|
 | How to play | the three steps, then the two axes |
-| Your record | both streaks, questions answered, read rate |
+| Your record | streak, best, points, questions answered, read rate |
 | The four outcomes | the 2x2, asked of `badgeFor` corner by corner |
 | Hardest to read | the misjudged leaderboard, five rows |
 
@@ -287,10 +337,29 @@ the rule is two.
 
 Nothing here is a leak. The leaderboard is average error on questions that are long
 since answered, and the counters are the player's own — the menu never touches a live
-tally, and it is only reachable after a reveal in any case.
+tally. That is what makes it safe to hand out on its own, below.
 
 The reveal's page index lives in `App` rather than inside the reveal, which is what makes
 the trip out to the menu and back land on the slide it left from.
+
+### The pinned menu post
+
+**Outlier: pin the menu post** (mod menu) creates a custom post that opens straight onto
+the menu, and stickies it. It is the subreddit's front door: somebody arriving cold gets
+the rules and the four outcomes without having to find a question first.
+
+The post carries no question, so `GET /api/state/:postId` answers it with a second shape.
+`StateResponse` is a discriminated union on `kind` rather than a question-shaped object
+with holes in it — which also means the menu post's response has no field that could
+carry a `Tally` at all.
+
+`menu:post` records which post it is. It is read *only* when `post:{postId}` misses, so a
+playable post never pays for the lookup. The action is idempotent: it confirms the
+recorded post still exists before reporting it, so a deleted one does not permanently
+block a new one, and a moderator running it twice does not get two front doors.
+
+A failed sticky is not a failed post — Reddit allows two, and a subreddit that already
+has both gets the post plus a note rather than an error and nothing.
 
 ---
 
@@ -303,7 +372,7 @@ votes and then showing it live, but §6 marks "no tallies before a vote" as crit
 showing a live percentage pre-vote would break it — the guess becomes free. §6 won.
 Tallies are never exposed before a vote on any question. `PROVISIONAL_VOTE_FLOOR` (20) is
 still used, but for honesty rather than secrecy: below it the reveal says "N votes so
-far. This split will move", the comment says "so far", and the locking summary notes when
+far. This split will move", the comment says "so far", and the daily summary notes when
 a sample was too small to mean anything. This is flagged rather than buried because it is
 a real departure from one reading of §13.
 
