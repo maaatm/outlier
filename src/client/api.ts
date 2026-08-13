@@ -3,6 +3,7 @@
 import type {
   ApiError,
   CommentResponse,
+  DailyPointer,
   LeaderboardResponse,
   Reveal,
   StateResponse,
@@ -74,4 +75,14 @@ export function postComment(
 
 export function fetchLeaderboard(): Promise<LeaderboardResponse> {
   return request<LeaderboardResponse>('/api/leaderboard');
+}
+
+/**
+ * Where today's Daily is. `from` is the post the menu is open on, which is the
+ * only way the server can tell that the Daily is the post you are already
+ * standing on — the pinned menu post has no question to look it up by.
+ */
+export function fetchDaily(from?: string): Promise<DailyPointer> {
+  const query = from ? `?from=${encodeURIComponent(from)}` : '';
+  return request<DailyPointer>(`/api/daily${query}`);
 }

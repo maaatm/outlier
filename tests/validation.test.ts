@@ -189,6 +189,7 @@ describe('the public question projection', () => {
     source: 'house' as const,
     createdAt: 0,
     postId: 't3_abc',
+    permalink: '/r/PlayOutlier/comments/abc/daily/',
     lockedAt: 0,
     dailyDate: '2026-04-02',
   };
@@ -213,6 +214,13 @@ describe('the public question projection', () => {
 
   it('reports a hand-closed question as locked', () => {
     expect(toPublicQuestion({ ...record, lockedAt: 1 }, '2026-04-02').locked).toBe(true);
+  });
+
+  // The projection is deliberately narrow: it carries what it takes to draw a
+  // question and nothing else. The permalink is cached for the menu's Daily
+  // button and has no business on a question the client is already looking at.
+  it('keeps the cached permalink off the wire', () => {
+    expect(toPublicQuestion(record, '2026-04-02')).not.toHaveProperty('permalink');
   });
 });
 

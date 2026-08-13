@@ -181,6 +181,30 @@ export type LeaderboardResponse = {
   entries: LeaderboardEntry[];
 };
 
+/**
+ * `GET /api/daily` — where today's Daily is, and nothing else.
+ *
+ * `state` is the whole answer. It says whether this player can still play
+ * today's question; it never says how anyone answered it. There is no field
+ * here that a tally could be derived from, and that is deliberate — see the
+ * header on the route.
+ */
+export type DailyPointer = {
+  /** `YYYY-MM-DD`, UTC, resolved on the server. The client never reads a clock. */
+  day: string;
+  /**
+   * `playable` — a Daily exists and this player has not answered it.
+   * `voted`    — they have. The button still travels; it just stops leading.
+   * `here`     — the post this menu is open on *is* today's Daily.
+   * `none`     — no Daily today yet. Reachable: `post-daily` runs at midnight
+   *              UTC, so an install at 00:30 has none until the next one.
+   */
+  state: 'playable' | 'voted' | 'here' | 'none';
+  postId?: string;
+  /** Reddit path, not a URL. Absent when there is nowhere to go. */
+  permalink?: string;
+};
+
 export type ApiError = {
   error: string;
   /** Populated on a 409 so the client can render the reveal it already earned. */

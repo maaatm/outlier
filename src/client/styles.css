@@ -769,33 +769,6 @@ button {
   color: var(--ink-soft);
 }
 
-/* The same table as the reveal pays from, listed in the menu. */
-.bands {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--s1);
-  list-style: none;
-  margin: var(--s2) 0 0;
-  padding: 0;
-}
-
-.band {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--s1);
-  border: var(--stroke) solid var(--ink);
-  border-radius: var(--radius-button);
-  padding: 2px var(--s2);
-  font-family: var(--font-mono);
-  font-size: 12px;
-  white-space: nowrap;
-}
-
-.band__bonus {
-  color: var(--ink-soft);
-  font-variant-numeric: tabular-nums;
-}
-
 /* ── Slide navigation ───────────────────────────────────────────────────── */
 
 .slides__nav {
@@ -1178,87 +1151,17 @@ button {
   margin-top: var(--s3);
 }
 
-.steps {
-  list-style: none;
-  counter-reset: step;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--s2);
-}
-
-.steps li {
-  display: flex;
-  align-items: center;
-  gap: var(--s2);
-  font-size: 15px;
-}
-
-.steps li::before {
-  counter-increment: step;
-  content: counter(step);
-  flex: none;
-  width: 26px;
-  height: 26px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: var(--stroke) solid var(--ink);
-  border-radius: 50%;
-  background: var(--card);
-  font-family: var(--font-mono);
-  font-size: 12px;
-}
-
-.axes {
-  display: flex;
-  flex-direction: column;
-  gap: var(--s3);
+/*
+ * The one control on this screen that leaves the post, so it sits above the
+ * rule and clear of the list — everything below the rule opens in place.
+ */
+.menu__daily {
+  margin-top: var(--s3);
 }
 
 .axis__line {
   margin: 0;
   font-size: 14px;
-}
-
-/*
- * The 2x2, drawn flat. Filling the four corners with their badge colours would
- * put three meanings of colour on one screen and the rule is two, so the corners
- * are outline-only and the mono line carries the axes instead.
- */
-.outcomes {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--s2);
-}
-
-.outcome {
-  border: var(--stroke) solid var(--ink);
-  border-radius: var(--radius-button);
-  padding: var(--s2);
-  background: var(--card);
-}
-
-.outcome__axes {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--ink-soft);
-  margin: 0 0 var(--s1);
-}
-
-.outcome__title {
-  font-family: var(--font-display);
-  font-weight: 500;
-  font-size: 16px;
-  line-height: 1.15;
-  margin: 0;
-}
-
-.outcome__line {
-  margin: var(--s1) 0 0;
-  font-size: 13px;
-  color: var(--ink-soft);
 }
 
 /* ── States ─────────────────────────────────────────────────────────────── */
@@ -1384,12 +1287,12 @@ button {
   }
 
   .menu__root,
-  .menu__panel,
-  .axes {
+  .menu__panel {
     gap: var(--s2);
   }
 
-  .menu__back {
+  .menu__back,
+  .menu__daily {
     margin-top: var(--s2);
   }
 

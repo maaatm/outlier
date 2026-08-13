@@ -90,7 +90,7 @@ export async function submitOpenQuestion(input: {
     },
   });
 
-  await linkQuestionToPost(questionId, post.id);
+  await linkQuestionToPost(questionId, post.id, post.permalink);
   await enqueuePending(questionId, 1);
 
   return { status: 'ok', questionId, postId: post.id, permalink: post.permalink };

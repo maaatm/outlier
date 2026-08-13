@@ -17,6 +17,14 @@ export type QuestionRecord = {
   createdAt: number;
   /** The post this question is played on. Set once the post exists. */
   postId: string;
+  /**
+   * The post's permalink, cached at link time.
+   *
+   * `submitCustomPost` hands one back for free, so storing it here saves a
+   * `reddit.getPostById` on every menu open. Empty on records written before it
+   * was cached, which is why every reader needs a fallback.
+   */
+  permalink: string;
   /** Epoch ms when the Daily was locked, or 0 while it is still open. */
   lockedAt: number;
   /** `YYYY-MM-DD` when this ran as a Daily, or '' for an open question. */
@@ -43,6 +51,7 @@ export async function writeQuestion(question: NewQuestion): Promise<void> {
     source: question.source,
     createdAt: String(Date.now()),
     postId: '',
+    permalink: '',
     lockedAt: '0',
     dailyDate: '',
   });
@@ -61,16 +70,27 @@ export async function getQuestion(questionId: string): Promise<QuestionRecord | 
     source: raw.source === 'community' ? 'community' : 'house',
     createdAt: Number(raw.createdAt ?? 0),
     postId: raw.postId ?? '',
+    permalink: raw.permalink ?? '',
     lockedAt: Number(raw.lockedAt ?? 0),
     dailyDate: raw.dailyDate ?? '',
   };
 }
 
-/** Bind a question to the post it is played on, in both directions. */
-export async function linkQuestionToPost(questionId: string, postId: string): Promise<void> {
+/**
+ * Bind a question to the post it is played on, in both directions.
+ *
+ * The permalink rides along because the caller is holding the `Post` that just
+ * came back from `submitCustomPost` and it costs nothing to write here — where
+ * reading it later costs a `reddit.getPostById` on every menu open.
+ */
+export async function linkQuestionToPost(
+  questionId: string,
+  postId: string,
+  permalink: string
+): Promise<void> {
   await Promise.all([
     redis.set(keys.post(postId), questionId),
-    redis.hSet(keys.question(questionId), { postId }),
+    redis.hSet(keys.question(questionId), { postId, permalink }),
   ]);
 }
 

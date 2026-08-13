@@ -90,11 +90,11 @@ export function App(): React.JSX.Element {
   // The pinned menu post has no question behind it, so the menu is the whole
   // screen and there is nothing to exit to.
   if (state.kind === 'menu') {
-    return <Menu stats={state.stats} />;
+    return <Menu stats={state.stats} postId={postId} />;
   }
 
   if (screen === 'menu') {
-    return <Menu stats={state.stats} onExit={() => setScreen('game')} />;
+    return <Menu stats={state.stats} postId={postId} onExit={() => setScreen('game')} />;
   }
 
   return (

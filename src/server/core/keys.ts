@@ -15,7 +15,7 @@
  */
 
 export const keys = {
-  /** hash: text, labelA, labelB, authorId, authorName, source, createdAt, postId, lockedAt, dailyDate */
+  /** hash: text, labelA, labelB, authorId, authorName, source, createdAt, postId, permalink, lockedAt, dailyDate */
   question: (questionId: string) => `q:${questionId}`,
 
   /** string: questionId of the Daily for a `YYYY-MM-DD` day. */
