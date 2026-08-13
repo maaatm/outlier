@@ -18,8 +18,8 @@ import { BadgeStamp } from './components/BadgeStamp.js';
 import { Compose } from './components/Compose.js';
 import { DotCrowd } from './components/DotCrowd.js';
 import { Histogram } from './components/Histogram.js';
-import { Leaderboard } from './components/Leaderboard.js';
 import { Menu } from './components/Menu.js';
+import { MisjudgedBoard } from './components/MisjudgedBoard.js';
 import { StatBar } from './components/StatBar.js';
 import { WobbleRule } from './components/WobbleRule.js';
 import { useCountUp } from './countUp.js';
@@ -429,7 +429,7 @@ function RevealView({
             {detail === 'guesses' ? (
               <Histogram buckets={reveal.histogram} yourGuess={reveal.guess} accent={accent} />
             ) : (
-              <Leaderboard />
+              <MisjudgedBoard />
             )}
           </div>
         </div>

@@ -1067,6 +1067,58 @@ button {
   white-space: nowrap;
 }
 
+/*
+ * Player rows are three columns rather than two, and the middle one takes the
+ * slack: rank and points are as wide as their digits and no wider, so the
+ * numbers line up down the board however long the names between them are.
+ *
+ * No rank is accented, including the first. Position already says who is
+ * winning, and the screen's two accents are spent elsewhere.
+ */
+.board__row--player {
+  display: grid;
+  grid-template-columns: 1.75em 1fr auto;
+  align-items: baseline;
+}
+
+.board__rank,
+.board__points {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.board__points {
+  color: var(--ink);
+}
+
+.board__name {
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*
+ * The viewer's own row, pinned under the list. Separated by a rule rather than
+ * a fill, because it is the same kind of row as the ones above it — it is just
+ * not part of the ranking they form.
+ */
+.board__you {
+  border-top: var(--stroke) solid var(--ink);
+  padding-top: var(--s2);
+  margin-top: var(--s2);
+  flex: none;
+}
+
+.board__you .board__name {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
 .section__title {
   font-family: var(--font-mono);
   font-size: 12px;

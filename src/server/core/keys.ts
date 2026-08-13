@@ -12,6 +12,11 @@
  *
  * `guesses:{questionId}` is still the record of truth for the distribution; the
  * histogram is a cache of it.
+ *
+ * The `lb:points:*` boards and `users:names` arrived later, with the player
+ * leaderboard. Neither is a cache: a weekly total is not derivable from
+ * anything else once the week has turned, and a voter's username is not stored
+ * anywhere else at all.
  */
 
 export const keys = {
@@ -83,6 +88,31 @@ export const keys = {
 
   /** zset: questionId -> avgError. */
   misjudged: 'stats:misjudged',
+
+  /**
+   * zset: userId -> points banked this ISO week, tiebreak folded in.
+   *
+   * Weekly rather than lifetime because nothing in this game closes on a
+   * schedule: the archive stays playable forever, so on an all-time board the
+   * fastest climb is grinding it rather than reading the room well. A week
+   * bounds that, since the archive can only be farmed once per player.
+   *
+   * Written with a 9-day TTL, so a week that has closed cleans itself up
+   * without a sweep job — and stays readable for a day or two after it closed.
+   */
+  pointsWeek: (week: string) => `lb:points:${week}`,
+
+  /** zset: userId -> lifetime points, tiebreak folded in. The second tab. */
+  pointsAll: 'lb:points:all',
+
+  /**
+   * hash: userId -> username.
+   *
+   * Both boards render names and a vote otherwise stores none. Written once per
+   * player, because the name behind a userId costs a Reddit API call and the
+   * vote path cannot afford one every time.
+   */
+  names: 'users:names',
 
   /** string: index into the shuffled house pool. */
   poolCursor: 'pool:cursor',

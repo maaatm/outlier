@@ -15,16 +15,19 @@ import { awardFor } from '../../shared/points.js';
 import { isValidChoice, isValidGuess } from '../../shared/scoring.js';
 import type {
   ApiError,
+  BoardRange,
   CommentRequest,
   CommentResponse,
   DailyPointer,
-  LeaderboardResponse,
+  MisjudgedResponse,
+  PlayerBoardResponse,
   StateResponse,
   VoteRequest,
 } from '../../shared/types.js';
 import { toDayKey } from '../../shared/day.js';
 import { REPLAY_MODE } from '../../shared/config.js';
 import { getDailyQuestionId } from '../core/daily.js';
+import { readPlayerBoard } from '../core/leaderboard.js';
 import { isMenuPost } from '../core/menuPost.js';
 import { getQuestion, getQuestionIdForPost, toPublicQuestion } from '../core/questions.js';
 import { misjudgedLeaderboard } from '../core/stats.js';
@@ -164,8 +167,26 @@ api.post('/api/comment', async (c) => {
 });
 
 /** The most misjudged questions ever. Safe to read without having voted. */
-api.get('/api/leaderboard', async (c) => {
-  return c.json<LeaderboardResponse>({ entries: await misjudgedLeaderboard() });
+api.get('/api/leaderboard/questions', async (c) => {
+  return c.json<MisjudgedResponse>({ entries: await misjudgedLeaderboard() });
+});
+
+/**
+ * Who has banked the most points — this week by default, or all time.
+ *
+ * **This route returns no per-question data of any kind.** Points, and the
+ * streaks and rates beside them elsewhere, are per-player aggregates across
+ * every question that player ever answered: none of them narrows down how an
+ * individual answered an individual question, and no shape here can carry a
+ * `Tally`. That is what makes a board safe to hand to somebody who has not
+ * voted — see the invariant on this file and in `votes.ts`.
+ *
+ * Unrecognised `range` values fall back to the weekly board rather than
+ * erroring. There are two boards and a mistyped query is not worth a 400.
+ */
+api.get('/api/leaderboard/players', async (c) => {
+  const range: BoardRange = c.req.query('range') === 'all' ? 'all' : 'week';
+  return c.json<PlayerBoardResponse>(await readPlayerBoard(range, context.userId));
 });
 
 /** Today's UTC day, so the client never has to consult a local clock. */
