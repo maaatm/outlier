@@ -182,6 +182,43 @@ export type MisjudgedResponse = {
 };
 
 /**
+ * Which player board is being read.
+ *
+ * `week` is the default everywhere. Nothing in this game closes on a schedule,
+ * so an all-time board rewards grinding the archive over reading the room; a
+ * week bounds that, because the archive can only be farmed once per player.
+ */
+export type BoardRange = 'week' | 'all';
+
+/** One row of the player leaderboard. */
+export type PlayerBoardEntry = {
+  /** Position on the board, from 1. */
+  rank: number;
+  userId: string;
+  name: string;
+  /** Points banked — this week on the weekly board, lifetime on the other. */
+  points: number;
+};
+
+/**
+ * `GET /api/leaderboard/players` — points banked, and nothing else.
+ *
+ * Every number in this shape is a per-player aggregate over every question that
+ * player ever answered. None of them narrows down how anyone answered any
+ * individual question, and there is no field here a `Tally` could travel in.
+ */
+export type PlayerBoardResponse = {
+  range: BoardRange;
+  rows: PlayerBoardEntry[];
+  /**
+   * Where the viewer stands. Returned even when they are already in `rows` —
+   * the client decides whether to render it twice. Null when they have never
+   * banked a point on this board, or are not signed in.
+   */
+  you: { rank: number; points: number } | null;
+};
+
+/**
  * `GET /api/daily` — where today's Daily is, and nothing else.
  *
  * `state` is the whole answer. It says whether this player can still play

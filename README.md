@@ -115,7 +115,10 @@ It does this by disabling the server-side dedupe guard — the only thing stoppi
 one account from voting a hundred times. Votes still count toward the tallies,
 so a test subreddit builds a real distribution and a live one would build a fake
 one. The streak still works normally, but with the guard off the same account
-banks points on every replay, so lifetime totals inflate too.
+banks points on every replay, so lifetime totals inflate too — and with them both
+player leaderboards, which are read off those totals. That is expected while the
+flag is on. Nothing compensates for it: the flag disables exactly one guard, and
+everything layered on top stays flag-agnostic so it is correct the moment it flips.
 
 The server logs a warning on boot while it is on. Set it to `false` before this
 goes anywhere real.
@@ -163,13 +166,17 @@ hist:{questionId}      hash   bucket -> count     (derived from guesses)
 commented:{questionId} hash   userId -> commentId
 
 user:{userId}          hash   streak, bestStreak, lastPlayedDay, points,
-                              totalPlayed, totalHits
+                              totalPlayed, totalHits, weekPoints, weekKey
 sub:cooldown:{userId}  string TTL 24h
 
 queue:pending          zset   questionId -> upvotes
 queue:approved         zset   questionId -> upvotes
 stats:misjudged        zset   questionId -> avgError
 pool:cursor            string index into the shuffled house pool
+
+lb:points:{YYYY-Www}   zset   userId -> weekly points + tiebreak, TTL 9 days
+lb:points:all          zset   userId -> lifetime points + tiebreak
+users:names            hash   userId -> username
 ```
 
 **Additions and why.** `hist:` and `stats:misjudged` are caches so the reveal and the
@@ -180,6 +187,17 @@ is resolved, or two overlapping runs both draw from the house pool and one draw 
 thrown away. `daily:summaries` is the same idea for `summarize-daily` — it gets its own
 key rather than a flag on the question record, because the summary changes nothing about
 the question. `errSum` on `votes:` is what makes `avgError` computable without a scan.
+
+**The player boards.** `lb:points:*` are written only by `recordPlay`, which is already
+the one function that knows a player's new totals — a second writer would be a second
+chance for a board to disagree with the record behind it. The weekly board is keyed by
+ISO week and expires nine days after it is opened, so a closed week cleans itself up and
+stays readable for a day or two after it closes. `weekPoints`/`weekKey` on the user hash
+exist so the weekly figure can be `zAdd`ed as a computed value: the score carries a
+tiebreak fraction under the points (see `src/shared/board.ts`) and `zIncrBy` cannot be
+trusted to carry that fraction across increments. `users:names` is the only place a
+voter's username is stored; it is written once per player, because the alternative is a
+Reddit API call on every vote.
 
 `voted:{questionId}` is both the dedupe guard and the record of what to render on
 return. A player reopening a post they have answered always lands on the completed
@@ -206,6 +224,7 @@ POST /api/vote                { postId, choice, guess } -> reveal
 POST /api/comment             posts the generated comment as this user
 POST /api/submit              create an open question + post
 GET  /api/leaderboard/questions  most misjudged questions ever
+GET  /api/leaderboard/players?range=week|all   players by points banked
 GET  /api/today               today's UTC day key
 GET  /api/daily?from={postId} where today's Daily is — a state and a permalink
 GET  /api/queue               mod-only
@@ -330,7 +349,7 @@ action above them that is not a room at all.
 |---|---|
 | **Today's question** | leaves the post for today's Daily. Not a room |
 | Your record | streak, best, points, questions answered, read rate |
-| Leaderboard | who has banked the most points |
+| Leaderboard | who has banked the most points, weekly or all time |
 | Hardest to read | the misjudged leaderboard, five rows |
 
 The Daily action sits above the wobbled rule and the others below it, because every
@@ -340,6 +359,23 @@ of four states: `playable`, `voted`, `here` (you are already on today's Daily), 
 (no Daily yet today). While the pointer is in flight the button renders disabled rather
 than absent; a control that arrives after the screen settles shifts everything under it.
 
+**The leaderboard opens on the week, not on all time.** Points are banked per vote and
+nothing closes on a schedule, so on an all-time board the fastest climb is grinding the
+archive rather than reading the room well — and a board carrying months of accumulated
+lead is not worth opening for anyone who joined late. A weekly reset bounds both: the
+archive is finite and can only be farmed once per player, not once per week. All time is
+still there as the second tab, because it is a real thing players want to see; it is
+just not the thing that should greet them. Ten rows of rank, name and points, with the
+viewer's own row pinned below the list whether or not they are on it — a board you are
+absent from is a board you stop opening.
+
+Ties are settled inside the score rather than left to Redis, which orders tied members
+lexically and would silently rank by account ID. `boardScore` in `src/shared/board.ts`
+adds a fraction below 1 that shrinks with each day since launch, so of two players on the
+same total the one who has held it longer ranks higher, and the points are recoverable
+with `Math.floor`. That also makes `zRank` an unambiguous rank on its own, which matters
+because Devvit's Redis has no `zCount` to count a tied group with.
+
 The game itself is explained in the subreddit description rather than in a room — see
 [docs/subreddit-copy.md](docs/subreddit-copy.md). What survives in the app is the menu
 root's three-sentence tagline, which has to name both things being scored without
@@ -347,8 +383,10 @@ becoming a rules page. Every threshold the menu still quotes is read from `src/s
 so it cannot drift from what the game actually scores.
 
 Nothing here is a leak, including the Daily pointer. The misjudged board is average error
-on questions long since answered, the counters are the player's own, and `/api/daily`
-returns a state and a permalink — `voted` is a boolean about *you*, never a count. The
+on questions long since answered, the counters are the player's own, the player board is
+points totalled across every question a player ever answered — an aggregate that narrows
+down nobody's answer to anything — and `/api/daily` returns a state and a permalink:
+`voted` is a boolean about *you*, never a count. The
 menu never touches a live tally, which is what makes it safe to hand out on its own,
 below.
 

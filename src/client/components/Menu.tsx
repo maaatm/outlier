@@ -23,6 +23,7 @@ import { CROWD_SIZE, HIT_THRESHOLD, LEADERBOARD_MIN_VOTES } from '../../shared/c
 import type { DailyPointer, PlayerStats } from '../../shared/types.js';
 import { fetchDaily } from '../api.js';
 import { MisjudgedBoard } from './MisjudgedBoard.js';
+import { PlayerBoard } from './PlayerBoard.js';
 import { StatBar } from './StatBar.js';
 import { WobbleRule } from './WobbleRule.js';
 
@@ -275,7 +276,7 @@ function Record({ title, stats }: { title: string; stats: PlayerStats }): React.
   );
 }
 
-/** An empty room with its door already hung. The board itself is the next change. */
+/** Players by points banked, weekly by default. */
 function Board({ title }: { title: string }): React.JSX.Element {
   return (
     <Panel
@@ -283,11 +284,12 @@ function Board({ title }: { title: string }): React.JSX.Element {
       note={
         <>
           Points are banked per vote, so every question pays &mdash; the Daily, an open
-          question, or one from the archive.
+          question, or one from the archive. The weekly board starts over on Monday at
+          midnight UTC; all time never resets.
         </>
       }
     >
-      <p className="notice notice--quiet">Nothing ranked yet.</p>
+      <PlayerBoard />
     </Panel>
   );
 }

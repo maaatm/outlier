@@ -2,9 +2,11 @@
 
 import type {
   ApiError,
+  BoardRange,
   CommentResponse,
   DailyPointer,
   MisjudgedResponse,
+  PlayerBoardResponse,
   Reveal,
   StateResponse,
 } from '../shared/types.js';
@@ -75,6 +77,11 @@ export function postComment(
 
 export function fetchMisjudged(): Promise<MisjudgedResponse> {
   return request<MisjudgedResponse>('/api/leaderboard/questions');
+}
+
+/** Who has banked the most points. One read per tab, no cache behind it. */
+export function fetchPlayerBoard(range: BoardRange): Promise<PlayerBoardResponse> {
+  return request<PlayerBoardResponse>(`/api/leaderboard/players?range=${range}`);
 }
 
 /**

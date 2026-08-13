@@ -10,13 +10,20 @@
  * Points are per vote rather than per day, so a second question answered the
  * same day still pays even though the streak has already moved.
  *
+ * `weekPoints` is the same points counted again inside the current ISO week,
+ * for the weekly leaderboard. It is a field on the record rather than a
+ * `zIncrBy` on the board because the board score carries a tiebreak fraction
+ * that increments cannot be trusted to add up — see `shared/board.ts`.
+ *
  * Day boundaries are UTC, matching the post schedule. Local time is never
  * consulted, on either side of the wire.
  */
 
-import { redis } from '@devvit/web/server';
+import { context, redis, reddit } from '@devvit/web/server';
 
-import { daysBetween, toDayKey } from '../../shared/day.js';
+import { boardScore, daysSinceLaunch } from '../../shared/board.js';
+import { WEEK_BOARD_TTL_SECONDS } from '../../shared/config.js';
+import { daysBetween, fromDayKey, toDayKey, toWeekKey } from '../../shared/day.js';
 import type { PlayerStats } from '../../shared/types.js';
 import { keys } from './keys.js';
 
@@ -27,6 +34,10 @@ export type UserRecord = {
   points: number;
   totalPlayed: number;
   totalHits: number;
+  /** Points banked inside `weekKey`. Reset, not carried, when the week turns. */
+  weekPoints: number;
+  /** `YYYY-Www` the weekly total belongs to. Empty on a record that predates it. */
+  weekKey: string;
 };
 
 export const EMPTY_USER: UserRecord = {
@@ -36,6 +47,8 @@ export const EMPTY_USER: UserRecord = {
   points: 0,
   totalPlayed: 0,
   totalHits: 0,
+  weekPoints: 0,
+  weekKey: '',
 };
 
 export async function getUser(userId: string): Promise<UserRecord> {
@@ -55,6 +68,11 @@ export async function getUser(userId: string): Promise<UserRecord> {
     points: Number(raw.points ?? 0) || 0,
     totalPlayed: Number(raw.totalPlayed ?? 0) || 0,
     totalHits: Number(raw.totalHits ?? 0) || 0,
+    // A record written before the weekly board existed has no week on it. It
+    // reads as a week that has since turned, so the next vote opens a fresh
+    // one rather than back-dating a lifetime total into this week.
+    weekPoints: Number(raw.weekPoints ?? 0) || 0,
+    weekKey: raw.weekKey ?? '',
   };
 }
 
@@ -93,10 +111,20 @@ export type Play = {
  * every vote, and the streak moves once per day.
  */
 export function advance(record: UserRecord, play: Play, today: string): UserRecord {
+  // The week is derived from the day rather than passed in, so there is one
+  // clock in this function and the weekly total cannot drift out of step with
+  // the daily one.
+  const weekKey = toWeekKey(fromDayKey(today));
+
   const banked = {
     points: record.points + play.points,
     totalPlayed: record.totalPlayed + 1,
     totalHits: record.totalHits + (play.hit ? 1 : 0),
+    weekKey,
+    // A new week starts at this vote, not at the total carried into it: the
+    // weekly board is points banked *this week*, which is the whole reason it
+    // bounds the archive.
+    weekPoints: (record.weekKey === weekKey ? record.weekPoints : 0) + play.points,
   };
 
   // Already counted today. The second question of the day pays, but one day is
@@ -124,13 +152,18 @@ export function advance(record: UserRecord, play: Play, today: string): UserReco
 /**
  * Record a vote against a player. Every vote calls this — the Daily, an open
  * question, or one played out of the archive, all on the day it was cast.
+ *
+ * This is the only place either leaderboard is written. It is already the one
+ * function that knows the new totals, and a second writer would be a second
+ * chance for a board to disagree with the record behind it.
  */
 export async function recordPlay(
   userId: string,
   play: Play,
   today: string = toDayKey()
 ): Promise<PlayerStats> {
-  const next = advance(await getUser(userId), play, today);
+  const record = await getUser(userId);
+  const next = advance(record, play, today);
 
   await redis.hSet(keys.user(userId), {
     streak: String(next.streak),
@@ -139,7 +172,12 @@ export async function recordPlay(
     points: String(next.points),
     totalPlayed: String(next.totalPlayed),
     totalHits: String(next.totalHits),
+    weekPoints: String(next.weekPoints),
+    weekKey: next.weekKey,
   });
+
+  await writeBoards(userId, next, record.weekKey !== next.weekKey, today);
+  await rememberName(userId);
 
   return {
     streak: next.streak,
@@ -149,4 +187,48 @@ export async function recordPlay(
     totalHits: next.totalHits,
     extendedToday: next.lastPlayedDay === today,
   };
+}
+
+/**
+ * Put the new totals on both boards.
+ *
+ * Both are `zAdd` rather than `zIncrBy`, because the score is not the points —
+ * it is the points with a tiebreak fraction under them, and an increment cannot
+ * carry that fraction correctly. The record above is what the totals are read
+ * off, so the boards are always set to a value rather than nudged toward one.
+ *
+ * `openedWeek` is this player's first vote of the week, which is necessarily
+ * also the first write to a brand new week key by *somebody*. That is where the
+ * TTL is set, so a closed week expires without a sweep job.
+ */
+async function writeBoards(
+  userId: string,
+  next: UserRecord,
+  openedWeek: boolean,
+  today: string
+): Promise<void> {
+  const age = daysSinceLaunch(today);
+  const weekKey = keys.pointsWeek(next.weekKey);
+
+  await redis.zAdd(weekKey, { member: userId, score: boardScore(next.weekPoints, age) });
+  if (openedWeek) await redis.expire(weekKey, WEEK_BOARD_TTL_SECONDS);
+
+  await redis.zAdd(keys.pointsAll, { member: userId, score: boardScore(next.points, age) });
+}
+
+/**
+ * Once per player, forever. One extra `hGet` on the vote path buys one API call
+ * in a player's entire lifetime.
+ *
+ * Reddit usernames change rarely and a stale name on a board is cosmetic, so
+ * nothing here ever refreshes one. Deleted and suspended accounts are handled
+ * lazily at render time instead — see the read path in `routes/api.ts`.
+ */
+async function rememberName(userId: string): Promise<void> {
+  if (await redis.hGet(keys.names, userId)) return;
+
+  // `context.username` is already there on a vote; the API call is the fallback
+  // for the paths where it is not.
+  const name = context.username ?? (await reddit.getCurrentUsername());
+  if (name) await redis.hSet(keys.names, { [userId]: name });
 }

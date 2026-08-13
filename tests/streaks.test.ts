@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { addDays, daysBetween, previousDay, toDayKey } from '../src/shared/day.js';
+import { addDays, daysBetween, fromDayKey, previousDay, toDayKey, toWeekKey } from '../src/shared/day.js';
 import { advance, projectStats, type Play, type UserRecord } from '../src/server/core/users.js';
 
 /** A vote worth the base rate and nothing else, for tests that are about days. */
@@ -14,8 +14,11 @@ const fresh = (): UserRecord => ({
   points: 0,
   totalPlayed: 0,
   totalHits: 0,
+  weekPoints: 0,
+  weekKey: '',
 });
 
+/** A player mid-run, with everything they have banked in the week of `day`. */
 const on = (day: string, streak: number, bestStreak: number = streak): UserRecord => ({
   streak,
   bestStreak,
@@ -23,6 +26,8 @@ const on = (day: string, streak: number, bestStreak: number = streak): UserRecor
   points: 100,
   totalPlayed: streak,
   totalHits: 0,
+  weekPoints: 100,
+  weekKey: toWeekKey(fromDayKey(day)),
 });
 
 /** Answer one question a day, starting from nothing. */
@@ -271,6 +276,80 @@ describe('points and totals', () => {
     expect(record.totalPlayed).toBe(3);
     expect(record.totalHits).toBe(2);
     expect(record.streak).toBe(2);
+  });
+});
+
+/*
+ * The weekly total is what the default leaderboard tab ranks on, and it is the
+ * one figure on the record that goes *down*. Everything here is about the
+ * moment it does.
+ */
+describe('weekly points', () => {
+  it('opens a week on the first vote of it', () => {
+    const next = advance(fresh(), hit, '2026-08-12');
+    expect(next.weekKey).toBe('2026-W33');
+    expect(next.weekPoints).toBe(60);
+    expect(next.points).toBe(60);
+  });
+
+  it('accumulates across the days of one week', () => {
+    const record = run(['2026-08-10', '2026-08-13', '2026-08-16']);
+    expect(record.weekKey).toBe('2026-W33');
+    expect(record.weekPoints).toBe(30);
+    expect(record.points).toBe(30);
+  });
+
+  it('starts the new week at the vote, not at the total carried into it', () => {
+    // The whole reason the weekly board bounds archive grinding: a lead does
+    // not travel across Monday.
+    const record = run(['2026-08-14', '2026-08-15', '2026-08-16']);
+    expect(record.weekPoints).toBe(30);
+
+    const monday = advance(record, play, '2026-08-17');
+    expect(monday.weekKey).toBe('2026-W34');
+    expect(monday.weekPoints).toBe(10);
+    expect(monday.points).toBe(40);
+  });
+
+  it('resets a week that was missed entirely rather than carrying it', () => {
+    const record = advance(run(['2026-08-12']), play, '2026-09-30');
+    expect(record.weekPoints).toBe(10);
+    expect(record.points).toBe(20);
+  });
+
+  it('counts the second question of a day, which the streak does not', () => {
+    const first = advance(fresh(), play, '2026-08-12');
+    const second = advance(first, hit, '2026-08-12');
+    expect(second.streak).toBe(1);
+    expect(second.weekPoints).toBe(70);
+  });
+
+  it('pays a back-dated vote into the week it was cast in', () => {
+    // `today` is always the day the vote was cast, so an archived question pays
+    // into this week even when the record's last played day ran ahead.
+    const record = advance(on('2026-08-19', 3), play, '2026-08-17');
+    expect(record.weekKey).toBe('2026-W34');
+    expect(record.weekPoints).toBe(110);
+  });
+
+  it('treats a record from before the weekly board as a week that has turned', () => {
+    const legacy: UserRecord = { ...fresh(), points: 4000, totalPlayed: 200, weekKey: '' };
+    const next = advance(legacy, play, '2026-08-12');
+    expect(next.weekPoints).toBe(10);
+    expect(next.points).toBe(4010);
+  });
+
+  it('keys the week off the day it is handed, not the local clock', () => {
+    const original = process.env.TZ;
+    process.env.TZ = 'Pacific/Kiritimati';
+    try {
+      // 2026-08-16 is a Sunday: last day of W33 in UTC, already Monday locally.
+      expect(advance(fresh(), play, toDayKey(new Date('2026-08-16T11:00:00Z'))).weekKey).toBe(
+        '2026-W33'
+      );
+    } finally {
+      process.env.TZ = original;
+    }
   });
 });
 

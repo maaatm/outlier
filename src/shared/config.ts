@@ -46,6 +46,16 @@ export const MOD_QUEUE_PAGE_SIZE = 20;
 export const LEADERBOARD_SIZE = 10;
 export const LEADERBOARD_MIN_VOTES = 25;
 
+/** Rows on each tab of the player leaderboard, above the viewer's own row. */
+export const PLAYER_BOARD_SIZE = 10;
+
+/**
+ * How long a weekly board outlives the week it is for. Nine days rather than
+ * seven, so a board is still readable for a day or two after its week closes —
+ * and so old weeks expire themselves instead of needing a sweep job.
+ */
+export const WEEK_BOARD_TTL_SECONDS = 9 * 24 * 60 * 60;
+
 /** Buckets in the guess-distribution histogram: 0-9, 10-19, ... 90-100. */
 export const HISTOGRAM_BUCKETS = 10;
 
