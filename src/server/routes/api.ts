@@ -17,12 +17,14 @@ import type {
   ApiError,
   CommentRequest,
   CommentResponse,
+  DailyPointer,
   LeaderboardResponse,
   StateResponse,
   VoteRequest,
 } from '../../shared/types.js';
 import { toDayKey } from '../../shared/day.js';
 import { REPLAY_MODE } from '../../shared/config.js';
+import { getDailyQuestionId } from '../core/daily.js';
 import { isMenuPost } from '../core/menuPost.js';
 import { getQuestion, getQuestionIdForPost, toPublicQuestion } from '../core/questions.js';
 import { misjudgedLeaderboard } from '../core/stats.js';
@@ -168,3 +170,59 @@ api.get('/api/leaderboard', async (c) => {
 
 /** Today's UTC day, so the client never has to consult a local clock. */
 api.get('/api/today', (c) => c.json({ day: toDayKey() }));
+
+/**
+ * Where today's Daily is, so the menu can offer a way to it.
+ *
+ * **This route returns no tally.** It answers with a state and somewhere to go,
+ * and it never carries a count, a reveal, or the question text. Deciding
+ * `voted` reads `voted:{questionId}` for this user, which is a boolean about
+ * *them* rather than anything about the crowd — it is coerced to one here so
+ * nothing downstream can widen it back into a number.
+ *
+ * `from` is the postId the menu is open on, taken as a parameter rather than
+ * inferred: the pinned menu post carries no question, so there is no `post:`
+ * lookup to lean on.
+ */
+api.get('/api/daily', async (c) => {
+  const day = toDayKey();
+
+  const questionId = await getDailyQuestionId(day);
+  if (!questionId) return c.json<DailyPointer>({ day, state: 'none' });
+
+  const question = await getQuestion(questionId);
+  if (!question?.postId) return c.json<DailyPointer>({ day, state: 'none' });
+
+  // Standing on it already. Settled before the vote is read, because whether
+  // they answered changes nothing about a post they are looking at.
+  if (c.req.query('from') === question.postId) {
+    return c.json<DailyPointer>({ day, state: 'here', postId: question.postId });
+  }
+
+  const permalink = question.permalink || (await permalinkFor(question.postId));
+  // Nowhere to send them. A Daily whose post has gone reads the same as no
+  // Daily at all, because for the purpose of this one button it is.
+  if (!permalink) return c.json<DailyPointer>({ day, state: 'none' });
+
+  const userId = context.userId;
+  const voted = Boolean(userId && (await getStoredVote(questionId, userId)));
+
+  return c.json<DailyPointer>({
+    day,
+    state: voted ? 'voted' : 'playable',
+    postId: question.postId,
+    permalink,
+  });
+});
+
+/**
+ * The fallback for question records written before the permalink was cached on
+ * the hash. Costs a round trip, so it only runs for those.
+ */
+async function permalinkFor(postId: string): Promise<string> {
+  try {
+    return (await reddit.getPostById(postId as T3)).permalink;
+  } catch {
+    return '';
+  }
+}

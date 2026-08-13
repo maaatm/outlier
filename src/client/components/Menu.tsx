@@ -2,33 +2,31 @@
  * The main menu.
  *
  * Reached from the comment slide, which is the one place in the loop where the
- * player has finished the question and has nothing left to tap. Everything here
- * is a read — the rules, what they have banked, the 2x2, the questions the
- * subreddit misjudged most. Nothing on this screen can change a vote, and
- * nothing on it exposes a tally the player has not already earned.
+ * player has finished the question and has nothing left to tap. It is also the
+ * whole of the pinned menu post, where somebody may be meeting the game for the
+ * first time.
  *
- * Two levels and no more: a list of four rooms, and one room at a time. The
- * numbers and the badge copy come from `shared/`, so the menu cannot drift away
- * from what the game actually does.
+ * Everything in the list is a read — what they have banked, who is ahead, the
+ * questions the subreddit misjudged most. Nothing on this screen can change a
+ * vote, and nothing on it exposes a tally the player has not already earned.
+ *
+ * The one exception is the Daily action at the top, which is not a room: every
+ * entry below it opens in place, and that one leaves the post entirely. It sits
+ * above the rule for exactly that reason — a player should be able to tell which
+ * way a control goes before tapping it.
  */
 
-import { useState } from 'react';
+import { navigateTo } from '@devvit/web/client';
+import { useEffect, useState } from 'react';
 
-import { badgeFor, getBadge } from '../../shared/badges.js';
-import {
-  CROWD_SIZE,
-  HIT_THRESHOLD,
-  LEADERBOARD_MIN_VOTES,
-  MINORITY_THRESHOLD,
-  POINTS_BASE,
-} from '../../shared/config.js';
-import { BANDS } from '../../shared/points.js';
-import type { PlayerStats } from '../../shared/types.js';
+import { CROWD_SIZE, HIT_THRESHOLD, LEADERBOARD_MIN_VOTES } from '../../shared/config.js';
+import type { DailyPointer, PlayerStats } from '../../shared/types.js';
+import { fetchDaily } from '../api.js';
 import { Leaderboard } from './Leaderboard.js';
 import { StatBar } from './StatBar.js';
 import { WobbleRule } from './WobbleRule.js';
 
-type PanelId = 'play' | 'record' | 'outcomes' | 'misjudged';
+type PanelId = 'record' | 'board' | 'misjudged';
 
 type Entry = {
   id: PanelId;
@@ -38,9 +36,8 @@ type Entry = {
 };
 
 const ENTRIES: Entry[] = [
-  { id: 'play', label: 'How to play', blurb: 'two taps, under fifteen seconds' },
   { id: 'record', label: 'Your record', blurb: 'streak, points, and how often you read the room' },
-  { id: 'outcomes', label: 'The four outcomes', blurb: 'where the badge comes from' },
+  { id: 'board', label: 'Leaderboard', blurb: 'who has banked the most points' },
   { id: 'misjudged', label: 'Hardest to read', blurb: 'what the subreddit misjudged most' },
 ];
 
@@ -48,20 +45,49 @@ const ENTRIES: Entry[] = [
 const BOARD_ROWS = 5;
 
 /**
+ * Reddit hands back permalinks as paths, and `navigateTo` throws on anything it
+ * cannot parse as a whole URL, so the origin is applied at the last moment
+ * rather than stored on the wire as part of the permalink.
+ */
+const REDDIT_ORIGIN = 'https://www.reddit.com';
+
+/**
  * `onExit` is absent on the pinned menu post, where the menu *is* the post and
  * there is no question behind it to go back to. The button goes with it rather
  * than sitting there pointing at nothing.
+ *
+ * `postId` is the post the menu is open on, and is only used to ask the server
+ * whether that post is today's Daily. The menu post has no question on it, so
+ * the server cannot work it out from a `post:` lookup.
  */
 export function Menu({
   stats,
+  postId,
   onExit,
 }: {
   stats: PlayerStats;
+  postId?: string;
   onExit?: () => void;
 }): React.JSX.Element {
   const [panel, setPanel] = useState<PanelId | null>(null);
   const open = ENTRIES.find((entry) => entry.id === panel) ?? null;
   const showBack = open !== null || onExit !== undefined;
+
+  // Fetched here rather than in `Root`, which remounts on every trip into a
+  // room and back: one pointer per menu open, and no second flash of the
+  // disabled state on the way back to the list.
+  const [daily, setDaily] = useState<DailyPointer | null>(null);
+  useEffect(() => {
+    let live = true;
+    fetchDaily(postId)
+      .then((pointer) => live && setDaily(pointer))
+      // A pointer that never arrives leaves the button inert. Better than
+      // offering a trip to a post that may not be there.
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [postId]);
 
   return (
     <main className="app">
@@ -77,10 +103,9 @@ export function Menu({
         {/* Keyed so a page change remounts and cross-fades, and so a panel
             opened after a long one starts at the top rather than mid-scroll. */}
         <div className="menu__body fade-in" key={open ? open.id : 'root'}>
-          {open === null && <Root onOpen={setPanel} />}
-          {open?.id === 'play' && <HowToPlay title={open.label} />}
+          {open === null && <Root onOpen={setPanel} daily={daily} />}
           {open?.id === 'record' && <Record title={open.label} stats={stats} />}
-          {open?.id === 'outcomes' && <Outcomes title={open.label} />}
+          {open?.id === 'board' && <Board title={open.label} />}
           {open?.id === 'misjudged' && <Misjudged title={open.label} />}
         </div>
 
@@ -98,16 +123,27 @@ export function Menu({
   );
 }
 
-/** The list itself, under the wordmark. */
-function Root({ onOpen }: { onOpen: (id: PanelId) => void }): React.JSX.Element {
+/** The list itself, under the wordmark, with the one way out above it. */
+function Root({
+  onOpen,
+  daily,
+}: {
+  onOpen: (id: PanelId) => void;
+  daily: DailyPointer | null;
+}): React.JSX.Element {
   return (
     <div className="menu__root">
       <div>
         <h1 className="menu__wordmark">Outlier</h1>
+        {/* With the rules gone to the sidebar, this is the only thing in the app
+            that says what the game is. It has to name both things being scored
+            without turning into a rules page. */}
         <p className="menu__tagline">
           One question a day about ordinary behavior. Answer it, then guess how many
-          people out of {CROWD_SIZE} answered the same way.
+          people out of {CROWD_SIZE} answered the same way. You are scored on both &mdash;
+          how unusual your answer was, and how close the guess landed.
         </p>
+        <DailyAction daily={daily} />
         <WobbleRule salt={11} />
       </div>
 
@@ -122,6 +158,50 @@ function Root({ onOpen }: { onOpen: (id: PanelId) => void }): React.JSX.Element 
         ))}
       </ul>
     </div>
+  );
+}
+
+/**
+ * The trip out to today's Daily.
+ *
+ * Inert while the pointer is in flight rather than absent: this sits at the top
+ * of the screen, so a control that arrives a moment late shifts everything under
+ * it just as the reader settles on it.
+ *
+ * `none` is the one state that is not a button at all. There is nothing to press
+ * until midnight, and a disabled button invites a press.
+ */
+function DailyAction({ daily }: { daily: DailyPointer | null }): React.JSX.Element {
+  if (daily?.state === 'none') {
+    return (
+      <p className="notice notice--quiet menu__daily">
+        Tomorrow&rsquo;s question posts at midnight UTC.
+      </p>
+    );
+  }
+
+  if (daily?.state === 'here') {
+    return (
+      <button type="button" className="button menu__daily" disabled>
+        You&rsquo;re on today&rsquo;s question
+      </button>
+    );
+  }
+
+  const permalink = daily?.permalink;
+  const played = daily?.state === 'voted';
+
+  return (
+    <button
+      type="button"
+      // Answered already, so it still travels — it just stops being the thing to
+      // do next, and gives up the primary fill accordingly.
+      className={`button menu__daily${played ? '' : ' button--primary'}`}
+      disabled={!permalink}
+      onClick={() => permalink && navigateTo(new URL(permalink, REDDIT_ORIGIN).toString())}
+    >
+      {played ? "You've played today's" : "Today's question"}
+    </button>
   );
 }
 
@@ -148,59 +228,6 @@ function Panel({
       </div>
       <p className="notice notice--quiet">{note}</p>
     </>
-  );
-}
-
-function HowToPlay({ title }: { title: string }): React.JSX.Element {
-  return (
-    <Panel
-      title={title}
-      note={
-        <>
-          Every question counts &mdash; the Daily, an open question, or one from the
-          archive. One a day is all a streak needs. To ask the subreddit your own question,
-          use &ldquo;Submit a question&rdquo; in the subreddit menu &mdash; one a day.
-        </>
-      }
-    >
-      <ol className="steps">
-        <li>Tap the answer that is true for you. There are always exactly two.</li>
-        <li>Guess how many people out of {CROWD_SIZE} answered the same way.</li>
-        <li>Lock it in. The crowd splits, and you find out two things at once.</li>
-      </ol>
-
-      <div className="axes">
-        <div className="axis">
-          <p className="section__title">rarity</p>
-          <p className="axis__line">
-            Whether you took the minority side. Your side is the minority below{' '}
-            {MINORITY_THRESHOLD}% of the vote.
-          </p>
-        </div>
-        <div className="axis">
-          <p className="section__title">accuracy</p>
-          <p className="axis__line">
-            How far your guess sat from the real split. Within {HIT_THRESHOLD} points counts
-            as reading the room.
-          </p>
-        </div>
-      </div>
-
-      {/* Read off the same table the reveal pays from, so the rates here cannot
-          drift from the ones actually awarded. */}
-      <div className="axis">
-        <p className="section__title">points</p>
-        <p className="axis__line">{POINTS_BASE} a vote, and the closer you land the more.</p>
-        <ul className="bands">
-          {BANDS.filter((band) => band.bonus > 0).map((band) => (
-            <li key={band.id} className="band">
-              {band.label}
-              <span className="band__bonus">+{band.bonus}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </Panel>
   );
 }
 
@@ -248,44 +275,19 @@ function Record({ title, stats }: { title: string; stats: PlayerStats }): React.
   );
 }
 
-/**
- * The 2x2, built by asking the scoring code for each corner rather than by
- * restating it. Deliberately unaccented: four badges would put three meanings of
- * color on one screen, and the rule is two.
- */
-function Outcomes({ title }: { title: string }): React.JSX.Element {
-  const corners = [
-    { minority: false, hit: true },
-    { minority: false, hit: false },
-    { minority: true, hit: true },
-    { minority: true, hit: false },
-  ];
-
+/** An empty room with its door already hung. The board itself is the next change. */
+function Board({ title }: { title: string }): React.JSX.Element {
   return (
     <Panel
       title={title}
       note={
         <>
-          The two axes are independent, so being unusual and being right are scored
-          separately. Neither one is the good outcome.
+          Points are banked per vote, so every question pays &mdash; the Daily, an open
+          question, or one from the archive.
         </>
       }
     >
-      <div className="outcomes">
-        {corners.map(({ minority, hit }) => {
-          const badge = getBadge(badgeFor(minority, hit));
-          return (
-            <div key={badge.id} className="outcome">
-              <p className="outcome__axes">
-                {minority ? 'against the room' : 'with the room'} &middot;{' '}
-                {hit ? 'read it' : 'missed it'}
-              </p>
-              <p className="outcome__title">{badge.title}</p>
-              <p className="outcome__line">{badge.line}</p>
-            </div>
-          );
-        })}
-      </div>
+      <p className="notice notice--quiet">Nothing ranked yet.</p>
     </Panel>
   );
 }

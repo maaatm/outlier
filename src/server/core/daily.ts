@@ -122,7 +122,7 @@ export async function postDaily(day: string = toDayKey()): Promise<PostDailyResu
     await Promise.all([
       redis.set(keys.daily(day), resolution.questionId),
       markAsDaily(resolution.questionId, day),
-      linkQuestionToPost(resolution.questionId, post.id),
+      linkQuestionToPost(resolution.questionId, post.id, post.permalink),
     ]);
 
     return { status: 'created', day, questionId: resolution.questionId, postId: post.id };

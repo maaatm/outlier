@@ -149,7 +149,7 @@ All Redis, exactly as specced, plus three derived indexes.
 
 ```
 q:{questionId}         hash   text, labelA, labelB, authorId, authorName, source,
-                              createdAt, postId, lockedAt, dailyDate
+                              createdAt, postId, permalink, lockedAt, dailyDate
 daily:{YYYY-MM-DD}     string questionId
 daily:claims           hash   day -> "1"          (double-fire guard, see below)
 daily:summaries        hash   day -> "1"          (double-post guard for the sticky)
@@ -206,6 +206,8 @@ POST /api/vote                { postId, choice, guess } -> reveal
 POST /api/comment             posts the generated comment as this user
 POST /api/submit              create an open question + post
 GET  /api/leaderboard         most misjudged questions ever
+GET  /api/today               today's UTC day key
+GET  /api/daily?from={postId} where today's Daily is — a state and a permalink
 GET  /api/queue               mod-only
 POST /api/queue/:id/approve   mod-only
 POST /api/queue/:id/reject    mod-only
@@ -321,23 +323,34 @@ there carries **Menu** instead of nothing. The menu is a screen rather than a sh
 over one: same shell, same header, same card, and the card's contents are the only thing
 that changes.
 
-Four rooms, one open at a time, each with its fine print pinned to the bottom.
+Three rooms, one open at a time, each with its fine print pinned to the bottom — and one
+action above them that is not a room at all.
 
-| Room | What it holds |
+| Entry | What it holds |
 |---|---|
-| How to play | the three steps, then the two axes |
+| **Today's question** | leaves the post for today's Daily. Not a room |
 | Your record | streak, best, points, questions answered, read rate |
-| The four outcomes | the 2x2, asked of `badgeFor` corner by corner |
+| Leaderboard | who has banked the most points |
 | Hardest to read | the misjudged leaderboard, five rows |
 
-Every threshold and every line of badge copy is read from `src/shared/`, so the menu
-cannot drift from what the game actually scores. The 2x2 is deliberately unaccented:
-four badges in their own colours would put three meanings of colour on one screen, and
-the rule is two.
+The Daily action sits above the wobbled rule and the others below it, because every
+entry in the list opens in place and that one navigates away — a player should be able
+to tell which is which before tapping. It reads `GET /api/daily`, which answers with one
+of four states: `playable`, `voted`, `here` (you are already on today's Daily), or `none`
+(no Daily yet today). While the pointer is in flight the button renders disabled rather
+than absent; a control that arrives after the screen settles shifts everything under it.
 
-Nothing here is a leak. The leaderboard is average error on questions that are long
-since answered, and the counters are the player's own — the menu never touches a live
-tally. That is what makes it safe to hand out on its own, below.
+The game itself is explained in the subreddit description rather than in a room — see
+[docs/subreddit-copy.md](docs/subreddit-copy.md). What survives in the app is the menu
+root's three-sentence tagline, which has to name both things being scored without
+becoming a rules page. Every threshold the menu still quotes is read from `src/shared/`,
+so it cannot drift from what the game actually scores.
+
+Nothing here is a leak, including the Daily pointer. The misjudged board is average error
+on questions long since answered, the counters are the player's own, and `/api/daily`
+returns a state and a permalink — `voted` is a boolean about *you*, never a count. The
+menu never touches a live tally, which is what makes it safe to hand out on its own,
+below.
 
 The reveal's page index lives in `App` rather than inside the reveal, which is what makes
 the trip out to the menu and back land on the slide it left from.
@@ -345,8 +358,9 @@ the trip out to the menu and back land on the slide it left from.
 ### The pinned menu post
 
 **Outlier: pin the menu post** (mod menu) creates a custom post that opens straight onto
-the menu, and stickies it. It is the subreddit's front door: somebody arriving cold gets
-the rules and the four outcomes without having to find a question first.
+the menu, and stickies it. It is the subreddit's front door: somebody arriving cold reads
+the tagline, sees their record, and is one tap from today's question without having to go
+looking for it.
 
 The post carries no question, so `GET /api/state/:postId` answers it with a second shape.
 `StateResponse` is a discriminated union on `kind` rather than a question-shaped object
