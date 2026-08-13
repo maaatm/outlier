@@ -17,7 +17,11 @@ import { CROWD_SIZE } from '../../shared/config.js';
 import { currentSubredditName } from './daily.js';
 import { keys } from './keys.js';
 
-const TITLE = 'Outlier — how to play';
+/**
+ * Reddit does not allow a title to be edited after submission, so changing this
+ * only affects menu posts created from here on.
+ */
+const TITLE = 'Outlier';
 
 /** For old clients that cannot render the interactive post. */
 const FALLBACK = [
