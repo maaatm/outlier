@@ -19,7 +19,7 @@
  */
 
 import { navigateTo } from '@devvit/web/client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import {
   BLOB_SIZE,
@@ -39,6 +39,7 @@ import {
 } from '../../shared/items.js';
 import type { AvatarResponse, DailyPointer, PlayerStats } from '../../shared/types.js';
 import { fetchAvatar, fetchDaily, saveAvatar } from '../api.js';
+import { coalescingWriter } from '../coalesce.js';
 import { Blob } from './Blob.js';
 import { MisjudgedBoard } from './MisjudgedBoard.js';
 import { PlayerBoard } from './PlayerBoard.js';
@@ -184,17 +185,28 @@ function useAvatar(needed: boolean): {
     };
   }, [needed, avatar]);
 
+  /*
+   * One writer for the life of the menu, built on first render rather than in a
+   * `useMemo`, which is free to throw its result away. A second writer would be
+   * a second thing able to have a write in flight, and having only one is half
+   * of what it is for.
+   */
+  const write = useRef<((next: Equipped) => void) | null>(null);
+  write.current ??= coalescingWriter<Equipped, AvatarResponse>({
+    send: saveAvatar,
+    onLatest: setAvatar,
+    recover: () => fetchAvatar().catch(() => null),
+  });
+
   function equip(next: Equipped): void {
     if (avatar === null) return;
-    const previous = avatar;
 
-    // The tap is the whole interaction, so the grid marks the new pick now
-    // rather than a round trip later. A refused save puts the old pair back —
-    // the server decides what is worn, this only decides what is drawn.
-    setAvatar({ ...avatar, ...next });
-    saveAvatar(next)
-      .then(setAvatar)
-      .catch(() => setAvatar(previous));
+    // What is drawn is settled here and by nothing else. A press is instant, so
+    // the round trip it starts has nothing to add to the picture — it is only
+    // there to make the server agree, and `coalesce.ts` is what stops a slow
+    // answer to an old press from arriving as if it were news.
+    setAvatar((current) => (current ? { ...current, ...next } : current));
+    write.current?.(next);
   }
 
   return { avatar, equip };
