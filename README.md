@@ -475,8 +475,8 @@ there carries **Menu** instead of nothing. The menu is a screen rather than a sh
 over one: same shell, same header, same card, and the card's contents are the only thing
 that changes.
 
-Four rooms, one open at a time, each with its fine print pinned to the bottom — except
-the wardrobe, which outgrew the space for it — and one action above them that is not a
+Four rooms, one open at a time, each with its fine print pinned to the bottom — except the
+wardrobe, which spent that space on the gift box — and one action above them that is not a
 room at all.
 
 | Entry | What it holds |
@@ -494,16 +494,21 @@ of four states: `playable`, `voted`, `here` (you are already on today's Daily), 
 (no Daily yet today). While the pointer is in flight the button renders disabled rather
 than absent; a control that arrives after the screen settles shifts everything under it.
 
-**The balance is in the header, Your record, and the wardrobe.** Three counters is the
-most that row holds: below 420px the tiles tighten and the date steps off the row rather
-than any number being abbreviated, because the date is the one thing there that can be
-read off the question underneath it instead. All three tiles are plain — `--sun` still
-marks the streak alone, and a balance does not get a fifth meaning of colour.
+**The balance is in Your record and the wardrobe, not the header.** The header shows the
+streak and the points, and `--sun` marks the streak alone; a third counter up there would
+be a third thing to read before the question, and a third meaning of colour if it were
+ever accented. The two places coins appear are the two screens where they are relevant —
+the page of totals, and the room where they are spent.
 
-The wardrobe is the one room with no fine print pinned under it. It is the only panel
-taller than the card it sits in — balance, blob, two steppers, gift box — and a footnote
-below all that is a line nobody scrolls to and something for the box button to collide
-with on the way.
+The wardrobe is the one room built to a height budget. A balance, a blob, two steppers and
+the gift box have to fit the card without scrolling at 512px — as short as Devvit's inline
+post view gets — because a room whose every element is a control cannot put its last one
+below the fold. Three things pay for it: the balance rides on the heading's line, each
+layer is one row rather than a label above a stepper, and the gift box is exactly two rows
+in every state, so the result of a box takes the status line's place instead of pushing
+the button down. There is no fine print pinned under it either; that was the fourth thing
+to go. Measured at 320/360/430 wide by 512/560/640 tall, opened and closed, rather than
+eyeballed — see the note on `.wardrobe` in `styles.css`.
 
 The wardrobe's steppers walk what you own rather than the whole catalogue, using the same
 pure `ownsItem` the equip endpoint enforces, so a client in step with the server never

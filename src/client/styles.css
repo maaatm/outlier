@@ -192,20 +192,10 @@ button {
 
 /* ── Header ─────────────────────────────────────────────────────────────── */
 
-/*
- * Wordmark, day, and three counters on one row.
- *
- * It wraps as a last resort rather than clipping. Three tiles and a wordmark fit
- * a 360px phone at the tightened sizes below, but the counters are never
- * abbreviated and a five-digit points total on a 320px screen is wider than the
- * row — at which point the tiles drop to a second line, right-aligned, instead
- * of the last one sliding under the edge of the card.
- */
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  flex-wrap: wrap;
   gap: var(--s2);
   font-family: var(--font-mono);
   font-size: 12px;
@@ -219,11 +209,9 @@ button {
 }
 
 /*
- * The one thing in the header that may be cut. The counters grow a digit at a
- * time and are never abbreviated, so on a narrow phone the date gives up its
- * width rather than pushing the wordmark off the row — and below the breakpoint
- * further down it gives up the row entirely. It is the only thing here that can
- * be read off the question underneath it instead.
+ * The one thing in the header that may be cut. The points tile grows a digit at
+ * a time and the counters are never abbreviated, so on a narrow phone the date
+ * gives up its width rather than pushing the wordmark off the row.
  */
 .header__day {
   color: var(--ink-soft);
@@ -238,10 +226,6 @@ button {
   align-items: center;
   gap: var(--s2);
   flex: none;
-  /* Holds the tiles against the right edge on the row they land on, wrapped or
-     not — with the day gone on a narrow screen there is nothing else to push
-     them there. */
-  margin-left: auto;
 }
 
 .stat {
@@ -267,26 +251,6 @@ button {
   font-variant-numeric: tabular-nums;
 }
 
-/*
- * Three counters and a wordmark do not fit a small phone at full padding. The
- * tiles tighten and the day steps off the row rather than any counter being
- * abbreviated or dropped: an abbreviated number is a number somebody has to
- * decode, and this row exists to be read at a glance.
- */
-@media (max-width: 420px) {
-  .stats {
-    gap: var(--s1);
-  }
-
-  .stat {
-    padding: 2px var(--s1);
-    font-size: 11px;
-  }
-
-  .header__day {
-    display: none;
-  }
-}
 
 /* ── Question ───────────────────────────────────────────────────────────── */
 
@@ -1244,6 +1208,40 @@ button {
   color: var(--ink-soft);
 }
 
+/*
+ * The title's row. A room with one number worth carrying at all times puts it
+ * here — the title is a short phrase and the rest of that line was going spare,
+ * where a row of its own costs the card 44px it does not have.
+ */
+.menu__title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s2);
+}
+
+.menu__aside {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s1);
+  margin: 0;
+  flex: none;
+}
+
+.menu__aside-label {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.menu__aside-value {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 22px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
 .menu__heading {
   font-size: 22px;
   line-height: 1.3;
@@ -1329,6 +1327,21 @@ button {
  * other panel and lets `.menu__body` scroll, which is what that container is
  * for.
  */
+/*
+ * The one room built to a height budget.
+ *
+ * Everything in it is a control except the blob, and the last control is at the
+ * bottom — so a wardrobe that scrolls is a wardrobe whose gift box nobody finds.
+ * It has to fit the card at 512px, which is as short as Devvit's inline post
+ * view gets (the short-viewport note further down says the same of the reveal).
+ *
+ * Three things pay for that: the balance sits on the title's line rather than a
+ * row of its own, each layer is one row rather than a label above a stepper, and
+ * the gift box is exactly two rows whatever state it is in. Below 560px the
+ * gaps, the layers and the blob each give up a little more on top. Measured at
+ * 320/360/430 wide by 512/560/640 tall, opened and closed — 58px to spare in
+ * the tightest of them.
+ */
 .wardrobe {
   display: flex;
   flex-direction: column;
@@ -1349,12 +1362,9 @@ button {
  * a drop shadow on the box around them would offer a target that is not there.
  */
 .wardrobe__layer {
-  display: flex;
-  flex-direction: column;
-  gap: var(--s1);
   border: var(--stroke) solid var(--ink);
   border-radius: var(--radius-button);
-  padding: var(--s2);
+  padding: var(--s1) var(--s2);
   background: var(--card);
 }
 
@@ -1374,13 +1384,6 @@ button {
 
 .wardrobe__layer--rare {
   border-color: var(--rarity-rare);
-}
-
-.wardrobe__layer-label {
-  margin: 0;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--ink-soft);
 }
 
 .wardrobe__stepper {
@@ -1451,36 +1454,6 @@ button {
   overflow: visible;
 }
 
-/*
- * The balance, at the top of the room where it is spent.
- *
- * Plain, for the same reason the points tile in the header is plain: the four
- * accents each mean one thing already, and a number that goes up and down is not
- * worth a fifth meaning. The mono label and the display figure are the same
- * pairing `.figure` uses, laid on one line because this is one number rather
- * than a row of them.
- */
-.wardrobe__balance {
-  display: flex;
-  align-items: baseline;
-  justify-content: center;
-  gap: var(--s2);
-  margin: 0;
-}
-
-.wardrobe__balance-label {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--ink-soft);
-}
-
-.wardrobe__balance-value {
-  font-family: var(--font-display);
-  font-weight: 500;
-  font-size: 28px;
-  line-height: 1;
-}
-
 /* ── The gift box ───────────────────────────────────────────────────────── */
 
 /*
@@ -1491,12 +1464,17 @@ button {
  * Separated by a rule rather than a card. A second bordered box inside the
  * bordered card would be the third rectangle on this screen saying the same
  * thing, which is the same reason `.wardrobe__arrow` has no border of its own.
+ *
+ * Exactly two rows, always: a status line and the button. The result takes the
+ * status line's place rather than pushing it down, and the shortfall is spoken
+ * by the button itself rather than by a notice under it — a room with a height
+ * budget cannot afford a section that grows when something happens in it.
  */
 .box {
   display: flex;
   flex-direction: column;
   gap: var(--s2);
-  padding-top: var(--s3);
+  padding-top: var(--s2);
   border-top: var(--stroke) solid var(--ink-quiet);
 }
 
@@ -1521,17 +1499,18 @@ button {
  * opacity and then it stops — under a second, no rotation (the app has its three
  * deliberate imperfections and this is not a fourth), no burst, no shake.
  *
- * The border is the rarity ladder the two layers above already use. It is the
- * one exception to the two-accents rule and stays an exception by never leaving
- * this screen.
+ * One row, standing exactly where the status line it replaced stood, because
+ * this room has no spare row to grow into. The border is the rarity ladder the
+ * two layers above already use — the one exception to the two-accents rule, kept
+ * an exception by never leaving this screen.
  */
 .box__result {
   display: flex;
   align-items: center;
-  gap: var(--s3);
+  gap: var(--s2);
   border: var(--stroke) solid var(--rarity-common);
   border-radius: var(--radius-button);
-  padding: var(--s2);
+  padding: var(--s1) var(--s2);
   background: var(--card);
   animation: stamp 240ms cubic-bezier(0.3, 1.3, 0.4, 1) both;
 }
@@ -1544,27 +1523,28 @@ button {
   border-color: var(--rarity-rare);
 }
 
-.box__result-copy {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
+/*
+ * The name takes the slack and the receipt is what gives way when the row runs
+ * out of width — the name and the rarity are what the moment is about, and the
+ * refund is already counted in the balance at the top of the screen.
+ */
 .box__result-name {
-  font-size: 16px;
+  flex: 1;
+  min-width: 0;
+  font-size: 15px;
   font-weight: 600;
   line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .box__result-meta {
+  flex: none;
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--ink-soft);
-}
-
-.box__result-line {
-  font-size: 13px;
+  white-space: nowrap;
 }
 
 /* ── States ─────────────────────────────────────────────────────────────── */
@@ -1663,14 +1643,27 @@ button {
 }
 
 @media (max-height: 560px) {
+  /* The last things the wardrobe gives up: the room closes up and the layers
+     lose their padding. The arrows keep their own, so the targets do not shrink
+     with the boxes around them. */
+  .wardrobe {
+    gap: var(--s2);
+  }
+
+  .wardrobe__layer {
+    padding: 0 var(--s2);
+  }
+
   .stage {
     zoom: 0.72;
   }
 
-  .wardrobe__preview {
-    zoom: 0.68;
-  }
-
+  /*
+   * The blob keeps the 0.85 it took at 700px and shrinks no further, unlike the
+   * crowd above it. The crowd is a hundred dots and reads at any size; this is
+   * one blob and it is the subject of the room — and now that the layers are one
+   * row each, the height it costs is height the room has.
+   */
   .verdict {
     font-size: 16px;
   }

@@ -338,17 +338,25 @@ function DailyAction({ daily }: { daily: DailyPointer | null }): React.JSX.Eleme
  */
 function Panel({
   title,
+  aside,
   note,
   children,
 }: {
   title: string;
+  /** One figure on the title's own line. The wardrobe's balance, and nothing
+   *  else so far — a room that has a single number worth carrying at all times
+   *  gets it here rather than spending a row of the card on it. */
+  aside?: React.ReactNode;
   note?: React.ReactNode;
   children: React.ReactNode;
 }): React.JSX.Element {
   return (
     <>
       <div className="menu__panel">
-        <h1 className="menu__heading">{title}</h1>
+        <div className="menu__title">
+          <h1 className="menu__heading">{title}</h1>
+          {aside}
+        </div>
         {children}
       </div>
       {note !== undefined && <p className="notice notice--quiet">{note}</p>}
@@ -457,30 +465,32 @@ function Wardrobe({
   onOpened: (box: BoxResponse) => void;
 }): React.JSX.Element {
   return (
-    <Panel title={TITLES.wardrobe}>
+    <Panel
+      title={TITLES.wardrobe}
+      /* The balance sits on the heading's line rather than on a row of its own.
+         This room has to fit a 512px card without scrolling — see the note on
+         `.wardrobe` in the stylesheet — and the title row was the one line here
+         with space going spare.
+
+         Absent rather than zero when signed out: a balance of nothing reads as
+         an account with nothing in it, and there is no account. */
+      aside={
+        avatar?.canSave ? (
+          <p className="menu__aside">
+            <span className="menu__aside-label">coins</span>
+            <span className="menu__aside-value">{avatar.coins}</span>
+          </p>
+        ) : undefined
+      }
+    >
       {/* The wrapper is unconditional so the room keeps its shape while the pair
-          is in flight — the centring hangs off it, and a panel that re-centres
-          the moment the blob arrives moves everything under the reader. */}
+          is in flight — a panel that re-lays-out the moment the blob arrives
+          moves everything under the reader. */}
       <div className="wardrobe">
         {avatar === null ? (
           <p className="notice notice--quiet">Loading.</p>
         ) : (
           <>
-            {/* The balance leads, because on this screen it is the constraint
-                everything below is read against. Plain, like the points tile:
-                no accent, since the four in this app each already mean
-                something else.
-
-                Absent rather than zero when signed out — a balance of nothing
-                reads as an account with nothing in it, and there is no
-                account. */}
-            {avatar.canSave && (
-              <p className="wardrobe__balance">
-                <span className="wardrobe__balance-label">coins</span>
-                <span className="wardrobe__balance-value">{avatar.coins}</span>
-              </p>
-            )}
-
             <div className="wardrobe__preview">
               <Blob
                 face={avatar.face}
@@ -531,10 +541,10 @@ function Wardrobe({
  * rather than beside the steppers — those now walk what you own, so this is the
  * only place left that can say how much there is to want.
  *
- * The reveal is a verdict arriving, not a slot machine: the item scales into
- * place in a quarter of a second and stops. No confetti, no shake, no
- * celebratory burst, and no colour beyond the rarity ladder this screen already
- * owns. Reduced motion cross-fades to the same final state.
+ * Two rows, always exactly two, because this room has a height budget and the
+ * bottom of it is a button that has to stay pressable without scrolling. The
+ * result takes the status row's place rather than pushing it down, and the
+ * shortfall is spoken by the button itself rather than by a notice under it.
  */
 function GiftBox({
   avatar,
@@ -565,14 +575,16 @@ function GiftBox({
 
   return (
     <div className="box">
-      <div className="box__head">
-        <span className="box__label">gift box</span>
-        <span className="box__owned">
-          you own {avatar.owned.length} of {ITEMS.length}
-        </span>
-      </div>
-
-      {result && <BoxResult result={result} avatar={avatar} />}
+      {result ? (
+        <BoxResult result={result} avatar={avatar} />
+      ) : (
+        <div className="box__head">
+          <span className="box__label">gift box</span>
+          <span className="box__owned">
+            you own {avatar.owned.length} of {ITEMS.length}
+          </span>
+        </div>
+      )}
 
       <button
         type="button"
@@ -580,27 +592,26 @@ function GiftBox({
         disabled={!affordable || opening}
         onClick={() => void open()}
       >
-        {opening ? 'Opening...' : `Open a box · ${BOX_PRICE}`}
+        {opening
+          ? 'Opening...'
+          : affordable
+            ? `Open a box · ${BOX_PRICE}`
+            : `${BOX_PRICE - avatar.coins} more coins`}
       </button>
 
-      {!affordable && (
-        <p className="notice notice--quiet">
-          {BOX_PRICE - avatar.coins} more. Playing pays daily, asking a question pays more.
-        </p>
-      )}
       {error && <p className="notice notice--quiet">{error}</p>}
     </div>
   );
 }
 
 /**
- * What came out.
+ * What came out, on one line.
  *
  * The item is drawn on the player's own blob rather than alone, because an
  * accessory is a change to a silhouette and a silhouette needs the head it
- * breaks. Rarity is the word beside the name and the colour of this card's
- * border — the same three-step ladder the layers use, which lives on this screen
- * and no other.
+ * breaks. Rarity is the word beside the name and the colour of the row's border
+ * — the same three-step ladder the layers use, which lives on this screen and no
+ * other.
  *
  * Keyed on the item and the balance together, so opening two of the same
  * duplicate in a row still replays the moment rather than sitting still.
@@ -632,19 +643,15 @@ function BoxResult({
       <Blob
         face={item.kind === 'face' ? item.id : avatar.face}
         accessory={item.kind === 'accessory' ? item.id : avatar.accessory}
-        size={BLOB_SIZE.panel}
+        size={BLOB_SIZE.inline}
       />
-      <div className="box__result-copy">
-        <span className="box__result-name">{item.name}</span>
-        <span className="box__result-meta">
-          {item.rarity} &middot; {item.kind}
-        </span>
-        <span className="box__result-line">
-          {result.duplicate
-            ? `You had it already — ${result.refunded} back.`
-            : 'New. Step to it above to put it on.'}
-        </span>
-      </div>
+      <span className="box__result-name">{item.name}</span>
+      <span className="box__result-meta">
+        {/* The receipt is the last thing and the first thing to be cut when the
+            row runs out of width: the name and the rarity are what the moment is
+            about, and the refund is already in the balance above. */}
+        {item.rarity} &middot; {result.duplicate ? `+${result.refunded} back` : 'new'}
+      </span>
     </div>
   );
 }
@@ -678,7 +685,6 @@ function Layer({
 
   return (
     <div className={`wardrobe__layer wardrobe__layer--${item.rarity}`}>
-      <p className="wardrobe__layer-label">{kind}</p>
       <div className="wardrobe__stepper">
         <button
           type="button"
@@ -690,12 +696,18 @@ function Layer({
           <Chevron back />
         </button>
 
-        {/* Announced as one string on change, so a reader hears "Wink, rare, 7
-            of 8 owned" rather than three separate updates racing each other. */}
+        {/* Announced as one string on change, so a reader hears "Wink, face,
+            rare, 7 of 8" rather than four separate updates racing each other.
+
+            Which layer this is used to be a line of its own above the stepper.
+            It moved into the meta because the room has a height budget and that
+            line was a whole row per layer to carry one word — and the word is
+            the least of what this line says. */}
         <span className="wardrobe__pick" aria-live="polite">
           <span className="wardrobe__name">{item.name}</span>
           <span className="wardrobe__meta">
-            {item.rarity} &middot; {itemIndex(items, current) + 1} of {items.length} owned
+            {kind} &middot; {item.rarity} &middot; {itemIndex(items, current) + 1} of{' '}
+            {items.length}
           </span>
         </span>
 
