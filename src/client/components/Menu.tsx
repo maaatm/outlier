@@ -47,7 +47,7 @@ import type {
   DailyPointer,
   PlayerStats,
 } from '../../shared/types.js';
-import { fetchAvatar, fetchDaily, openBox, saveAvatar } from '../api.js';
+import { fetchAvatar, fetchDaily, openBox, saveAvatar, saveShowBlob } from '../api.js';
 import { coalescingWriter } from '../coalesce.js';
 import { Blob } from './Blob.js';
 import { MisjudgedBoard } from './MisjudgedBoard.js';
@@ -129,7 +129,7 @@ export function Menu({
     };
   }, [postId]);
 
-  const { avatar, equip, absorb } = useAvatar(panel === 'record' || panel === 'wardrobe');
+  const { avatar, equip, absorb, show } = useAvatar(panel === 'record' || panel === 'wardrobe');
 
   return (
     <main className="app">
@@ -146,7 +146,7 @@ export function Menu({
             opened after a long one starts at the top rather than mid-scroll. */}
         <div className="menu__body fade-in" key={panel ?? 'root'}>
           {panel === null && <Root onOpen={setPanel} daily={daily} />}
-          {panel === 'record' && <Record stats={stats} avatar={avatar} />}
+          {panel === 'record' && <Record stats={stats} avatar={avatar} onShow={show} />}
           {panel === 'wardrobe' && (
             <Wardrobe avatar={avatar} onEquip={equip} onOpened={absorb} />
           )}
@@ -181,6 +181,7 @@ function useAvatar(needed: boolean): {
   avatar: AvatarResponse | null;
   equip: (next: Equipped) => void;
   absorb: (box: BoxResponse) => void;
+  show: (showBlob: boolean) => void;
 } {
   const [avatar, setAvatar] = useState<AvatarResponse | null>(null);
 
@@ -240,7 +241,27 @@ function useAvatar(needed: boolean): {
     );
   }
 
-  return { avatar, equip, absorb };
+  /**
+   * Show the blob to other players, or stop.
+   *
+   * Its own write rather than a field on the coalescing one above. That writer
+   * exists because a stepper can be pressed faster than a round trip completes;
+   * a switch cannot be, and folding this into it would mean a slow answer about
+   * an accessory could arrive carrying a stale opinion about this.
+   *
+   * Optimistic, like equipping: the press is the answer, and the request is only
+   * there to make the server agree. If it does not, the switch goes back —
+   * silently, because the state it goes back to *is* the truth and a player who
+   * sees it flip has been told.
+   */
+  function show(showBlob: boolean): void {
+    setAvatar((current) => (current ? { ...current, showBlob } : current));
+    saveShowBlob(showBlob).catch(() => {
+      setAvatar((current) => (current ? { ...current, showBlob: !showBlob } : current));
+    });
+  }
+
+  return { avatar, equip, absorb, show };
 }
 
 /** The list itself, under the wordmark, with the one way out above it. */
@@ -368,16 +389,19 @@ function Panel({
  * Banked state, read off the same counters the header shows — and the blob those
  * counters belong to.
  *
- * The blob is here to say whose record this is, and nothing more: the way to
- * change it is its own room on the menu, so this one stays what it has always
- * been, a page of totals with nothing on it to press.
+ * The blob is here to say whose record this is. The one thing on this page that
+ * can be pressed sits beside it, and it is not about what the blob looks like —
+ * that is the wardrobe's job — but about who else gets to see it. It belongs
+ * here for the same reason the blob does: this is the page about you.
  */
 function Record({
   stats,
   avatar,
+  onShow,
 }: {
   stats: PlayerStats;
   avatar: AvatarResponse | null;
+  onShow: (showBlob: boolean) => void;
 }): React.JSX.Element {
   const rate =
     stats.totalPlayed > 0 ? Math.round((stats.totalHits / stats.totalPlayed) * 100) : 0;
@@ -394,12 +418,17 @@ function Record({
         </>
       }
     >
-      <Blob
-        face={avatar?.face}
-        accessory={avatar?.accessory}
-        size={BLOB_SIZE.panel}
-        label="Your blob"
-      />
+      <div className="record__blob">
+        <Blob
+          face={avatar?.face}
+          accessory={avatar?.accessory}
+          size={BLOB_SIZE.panel}
+          label="Your blob"
+        />
+        {avatar?.canSave && (
+          <ShowBlob showBlob={avatar.showBlob} onShow={onShow} />
+        )}
+      </div>
 
       {/* Four figures rather than three, in pairs: the coin balance belongs
           beside the totals it is earned alongside, and a fourth tile in a
@@ -434,6 +463,49 @@ function Record({
         <p className="axis__line">Nothing banked yet. Answer anything and the counters start.</p>
       )}
     </Panel>
+  );
+}
+
+/**
+ * Whether your blob stands in other people's crowds.
+ *
+ * One line of plain copy, because the thing it decides is not obvious from the
+ * label and is worth being unambiguous about: turning it off is retroactive. It
+ * is a filter applied every time a crowd is drawn rather than a flag stamped on
+ * a vote, so switching it off takes the blob out of questions answered months
+ * ago as well as the next one.
+ *
+ * A switch rather than two buttons, because this is a setting being read as
+ * often as it is changed, and a setting should show its state without being
+ * pressed.
+ */
+function ShowBlob({
+  showBlob,
+  onShow,
+}: {
+  showBlob: boolean;
+  onShow: (showBlob: boolean) => void;
+}): React.JSX.Element {
+  return (
+    <div className="show-blob">
+      <button
+        type="button"
+        className="switch"
+        role="switch"
+        aria-checked={showBlob}
+        onClick={() => onShow(!showBlob)}
+      >
+        <span className="switch__track" aria-hidden="true">
+          <span className="switch__knob" />
+        </span>
+        <span className="switch__label">Show my blob to other players</span>
+      </button>
+      <p className="show-blob__note">
+        Other players see your blob in the crowd on questions you have both answered, on the
+        side you picked. Turn it off and it comes out of every crowd, including the ones it
+        is already in.
+      </p>
+    </div>
   );
 }
 

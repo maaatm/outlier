@@ -6,52 +6,37 @@
  * would be free and the game would have no second axis. Nothing here returns a
  * `Tally` except through `buildReveal`, and `buildReveal` is only ever reached
  * by way of the `voted:` hash.
+ *
+ * A second thing now travels on the same shape and is worth stating next to it:
+ * **the reveal carries other people's answers.** Up to ten players appear in
+ * the crowd on the side they actually chose, read from this question's `voted:`
+ * hash. That is deliberately the narrowest disclosure that makes the feature
+ * work — it happens only for players whose stored preference allows it, checked
+ * at render time so revoking it is retroactive, and only for a viewer who has
+ * already voted and therefore already holds the tally those ten answers are a
+ * part of. Nothing about who else answered exists anywhere but here. See
+ * `core/cameos.ts` for the three rules and the shape that enforces them.
  */
 
 import { redis } from '@devvit/web/server';
 
 import { buildComment } from '../../shared/comment.js';
-import { HISTOGRAM_BUCKETS, PROVISIONAL_VOTE_FLOOR, REPLAY_MODE } from '../../shared/config.js';
+import {
+  HISTOGRAM_BUCKETS,
+  PROVISIONAL_VOTE_FLOOR,
+  RECENT_VOTER_CAP,
+  REPLAY_MODE,
+} from '../../shared/config.js';
 import { awardFor } from '../../shared/points.js';
 import { scoreVote } from '../../shared/scoring.js';
 import type { Choice, PlayerStats, Reveal, Tally } from '../../shared/types.js';
+import { type StoredVote, decodeVote, encodeVote } from '../../shared/vote.js';
+import { readBlobVisibility } from './avatars.js';
+import { readCameos } from './cameos.js';
 import { keys, voteFields } from './keys.js';
 import { type QuestionRecord, toPublicQuestion } from './questions.js';
 
-/** What a player's stored vote decodes to. */
-export type StoredVote = {
-  choice: Choice;
-  guess: number;
-  /**
-   * `|guess - actual|` at the moment of voting, which is what the points were
-   * paid on. Absent on votes stored before points existed, and under
-   * REPLAY_MODE, where nothing is stored at all.
-   */
-  error?: number;
-};
-
-/** `"a:45"`, and `"a:45:21"` once the vote has been scored. */
-function encodeVote(choice: Choice, guess: number, error?: number): string {
-  const head = `${choice}:${guess}`;
-  return error === undefined ? head : `${head}:${error}`;
-}
-
-function decodeVote(raw: string | undefined | null): StoredVote | null {
-  if (!raw) return null;
-  const [choice, guessText, errorText] = raw.split(':');
-  if (choice !== 'a' && choice !== 'b') return null;
-  const guess = Number(guessText);
-  if (!Number.isInteger(guess) || guess < 0 || guess > 100) return null;
-
-  const vote: StoredVote = { choice, guess };
-  // A two-field value is an older vote, not a broken one: it still renders, and
-  // its award is derived from the live tally instead.
-  const error = Number(errorText);
-  if (errorText !== undefined && Number.isInteger(error) && error >= 0 && error <= 100) {
-    vote.error = error;
-  }
-  return vote;
-}
+export type { StoredVote };
 
 export function bucketFor(guess: number): number {
   return Math.min(HISTOGRAM_BUCKETS - 1, Math.floor(guess / (100 / HISTOGRAM_BUCKETS)));
@@ -96,6 +81,12 @@ async function hasCommented(questionId: string, userId: string): Promise<boolean
  * than a fossil of the moment they voted. The streak and the points are banked
  * at vote time and are not recomputed here — a day already counted stays
  * counted, and points already paid stay paid.
+ *
+ * The cameos are recomputed the same way and for a second reason: an opt-out is
+ * only retroactive if nothing about who was in the crowd was ever written down.
+ * They join the existing fan-out rather than following it — this screen is the
+ * one moment in the app worth spending on, and paying for it in serial round
+ * trips is the one way to spend it badly.
  */
 export async function buildReveal(
   question: QuestionRecord,
@@ -103,10 +94,12 @@ export async function buildReveal(
   userId: string,
   stats: PlayerStats
 ): Promise<Reveal> {
-  const [tally, histogram, commented] = await Promise.all([
+  const [tally, histogram, commented, cameos, visibility] = await Promise.all([
     readTally(question.id),
     readHistogram(question.id),
     hasCommented(question.id, userId),
+    readCameos(question.id, userId),
+    readBlobVisibility(userId),
   ]);
 
   const score = scoreVote(tally, vote.choice, vote.guess);
@@ -130,6 +123,11 @@ export async function buildReveal(
     stats,
     commentPreview: '',
     commented,
+    cameos,
+    // The first reveal where their own blob was eligible to appear is the
+    // screen this belongs on, and it is this one — they voted, so they are in
+    // the window already. Anything later would be telling them after the fact.
+    blobNotice: !visibility.told,
   };
 
   // Generated last: the comment quotes the numbers above it.
@@ -179,9 +177,30 @@ export async function castVote(
   await Promise.all([
     tallyVote(questionId, choice, guess),
     redis.zAdd(keys.guesses(questionId), { member: userId, score: guess }),
+    rememberVoter(questionId, userId),
   ]);
 
   return finishVote(questionId, userId, choice, guess);
+}
+
+/**
+ * Keep this voter in the question's recent window, for the reveal's cameos.
+ *
+ * It sits on the same branch as `guesses:` — after the claim, beside the write
+ * that records the guess — so the vote path gains one more parallel write
+ * rather than one more round trip, and so it is not written under REPLAY_MODE.
+ * That is the correct behaviour rather than an oversight: with the flag on
+ * nothing is written to `voted:` either, so there would be no side to draw a
+ * cameo on. The feature is simply absent in a replay subreddit, and correct the
+ * moment the flag flips. No branch here checks it.
+ *
+ * The trim follows the add rather than running beside it. Racing them would let
+ * a `zAdd` land after the trim and leave the window one member over the cap
+ * until somebody else voted — harmless, and avoidable for nothing.
+ */
+async function rememberVoter(questionId: string, userId: string): Promise<void> {
+  await redis.zAdd(keys.recent(questionId), { member: userId, score: Date.now() });
+  await redis.zRemRangeByRank(keys.recent(questionId), 0, -(RECENT_VOTER_CAP + 1));
 }
 
 /** The counters every vote moves, whether or not the voter is remembered. */

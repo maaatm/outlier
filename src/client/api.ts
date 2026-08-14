@@ -104,6 +104,21 @@ export function saveAvatar(equipped: AvatarRequest): Promise<AvatarResponse> {
 }
 
 /**
+ * Decide whether your blob may stand in other players' crowds.
+ *
+ * The same endpoint as the wardrobe's, carrying only this — the reveal's
+ * first-run notice is one of the two callers and it has no idea what the player
+ * is wearing. A settings endpoint for one boolean would have been the third
+ * thing to keep in step with the other two.
+ */
+export function saveShowBlob(showBlob: boolean): Promise<AvatarResponse> {
+  return request<AvatarResponse>('/api/avatar', {
+    method: 'POST',
+    body: JSON.stringify({ showBlob }),
+  });
+}
+
+/**
  * Open a gift box.
  *
  * No arguments, because there is nothing about this the client gets to decide:

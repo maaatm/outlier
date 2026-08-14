@@ -105,6 +105,10 @@ describe('the generated comment', () => {
     provisional: false,
     commentPreview: '',
     commented: false,
+    // The comment quotes the numbers on the reveal and nothing else. Neither of
+    // these reaches it, and the assertions below are what say so.
+    cameos: [],
+    blobNotice: false,
     award: { base: 10, bonus: 0, total: 10, band: 'cold' },
     stats: {
       streak: 12,
