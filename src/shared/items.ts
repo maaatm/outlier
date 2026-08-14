@@ -47,9 +47,10 @@
 export type ItemKind = 'face' | 'accessory';
 
 /**
- * How hard an item is to come by. Carried by a word and by outline weight in the
- * wardrobe, and by nothing else — a five-colour rarity ladder would blow the
- * two-accents-per-screen budget on the wardrobe alone.
+ * How hard an item is to come by. Shown in the wardrobe as the colour of a
+ * layer's border and as the word beside the count — the colours are their own
+ * tokens, kept clear of the four the rest of the app assigns meanings to, and
+ * they appear on that screen and no other.
  */
 export type Rarity = 'common' | 'uncommon' | 'rare';
 

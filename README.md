@@ -331,12 +331,20 @@ more. A hat would fail that test; the accessory is what changed to pass it.
 Everything is authored against one viewBox with the dot at a known place, and the
 accessory's room is *inside* it — the element is `size` wide and half again as tall. That
 is deliberate: `.slide` and `.menu__body` are scroll containers and clip on both axes, so
-art that paints outside its own box loses an edge there. Rarity is carried by a word and
-by outline weight in the wardrobe, and by no colour at all.
+art that paints outside its own box loses an edge there. Rarity is carried by the colour
+of a layer's border in the wardrobe and by the word beside the count.
 
 **Color** is semantic. Each accent means exactly one thing and no screen shows more than
 two at once: `--signal` you, `--rare` minority, `--hit` accurate, `--sun` streak and
 nothing else. Dark mode moves the neutrals only; the accents hold in both.
+
+The rarity ladder — `--rarity-common`, `--rarity-uncommon`, `--rarity-rare` — is the one
+exception, and is kept an exception by being confined to the wardrobe's two layer borders,
+where it never shares a screen with any of the four above. Its hues are chosen out of the
+gaps those four leave: blue, red, green and yellow are spoken for, which rules out the
+grey/green/blue ladder other games have trained players to expect, so the ladder is slate,
+cyan and violet instead. Colour is the second channel, not the only one — the rarity is
+also written next to the count.
 
 **Type.** Gabarito for display and big numbers, Instrument Sans for body and UI, DM Mono
 for metadata. All three are bundled as subsetted woff2 in `src/client/fonts` and served

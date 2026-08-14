@@ -385,9 +385,10 @@ function Record({
  * at the top redrawing is the whole receipt — this is a two-tap game and the
  * wardrobe should not be the heaviest screen in it.
  *
- * Rarity is a word on the layer and the weight of the layer's outline, and no
- * colour at all: the screen is allowed two accents with one meaning each, and a
- * rarity ladder would spend five of them here on its own.
+ * Rarity is the colour of the layer's border and the word beside the count. The
+ * colours are their own tokens rather than any of the four the rest of the app
+ * assigns meanings to, and they appear on this screen and no other — see the
+ * note on the ladder in `styles.css`.
  */
 function Wardrobe({
   avatar,

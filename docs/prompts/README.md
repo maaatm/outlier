@@ -64,6 +64,20 @@ is if they tap share themselves. Prompt 05 handles this with a first-run notice 
 than a silent default, so nobody's first encounter with the feature is discovering it
 already happened.
 
+**Rarity is a colour after all.** Prompt 03 says rarity gets a word and outline weight and
+no colour, and prompt 04 repeats it. Reversed during 03: the wardrobe's two layer borders
+take a dedicated three-step ladder — `--rarity-common`, `--rarity-uncommon`,
+`--rarity-rare` — and the outline weight goes back to `--stroke` for all three.
+
+The two-accents-per-screen rule is not suspended, it is routed around. The ladder is not
+one of the four accents and carries none of their meanings; it appears on the wardrobe and
+on no other screen, so it never shares one with `--signal`, `--rare`, `--hit` or `--sun`.
+Its hues come out of the gaps those four leave, which is why it is slate/cyan/violet rather
+than the grey/green/blue ladder other games use — two thirds of that would be borrowing a
+meaning the app has already spent. The rarity word stays, so colour is never the only
+channel. **Anything beyond the wardrobe still gets no colour meaning for rarity**; that is
+what keeps this a routed-around exception rather than a fifth accent.
+
 **Coin rates**, all of them coins and none of them points — `points` remains the
 leaderboard score and is never spent or decremented:
 

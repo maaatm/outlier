@@ -67,6 +67,26 @@
   --hit: #00a676; /* accurate guess */
   --sun: #ffc53d; /* streak only, never anything else */
 
+  /*
+   * The rarity ladder, and the one place the app spends colour on something
+   * other than the four meanings above. It appears on the wardrobe's two layer
+   * borders and nowhere else, so it never shares a screen with any of them.
+   *
+   * The hues are picked out of the gaps the four accents leave. Blue, red, green
+   * and yellow are taken and their meanings are load-bearing, which rules out
+   * the ladder a player would expect from other games — grey, green, blue —
+   * because two thirds of it would be borrowing a meaning. Slate stays a
+   * neutral so `common` reads as unmarked; cyan and violet sit in the two widest
+   * gaps left, at roughly 190 and 260 degrees.
+   *
+   * Colour is the second channel here, not the only one: the rarity is also
+   * written next to the count, which is what anybody who cannot separate these
+   * three reads instead.
+   */
+  --rarity-common: #8b93a1;
+  --rarity-uncommon: #0f9bbd;
+  --rarity-rare: #8b5cf6;
+
   /* The opposing camp: ink, held back. */
   --ink-quiet: rgba(21, 24, 29, 0.15);
   --ink-soft: rgba(21, 24, 29, 0.55);
@@ -1295,16 +1315,21 @@ button {
 }
 
 /*
- * Rarity, in outline weight and in the word beside the count. It gets no colour:
- * the screen is allowed two accents with one meaning each, and a rarity ladder
- * would spend the budget here and nowhere else.
+ * Rarity, in the border colour and in the word beside the count. The weight
+ * stays at `--stroke` for all three: a border that is both a different colour
+ * and a different thickness makes the rarer layer look like a different kind of
+ * control rather than the same control holding something scarcer.
  */
+.wardrobe__layer--common {
+  border-color: var(--rarity-common);
+}
+
 .wardrobe__layer--uncommon {
-  border-width: 3px;
+  border-color: var(--rarity-uncommon);
 }
 
 .wardrobe__layer--rare {
-  border-width: 4px;
+  border-color: var(--rarity-rare);
 }
 
 .wardrobe__layer-label {
