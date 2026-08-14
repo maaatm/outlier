@@ -14,7 +14,7 @@
  * `points` is never read or written here, or anywhere else in the economy.
  */
 
-import { redis } from '@devvit/web/server';
+import { reddit, redis } from '@devvit/web/server';
 
 import { submissionAward } from '../../shared/coins.js';
 import { toDayKey } from '../../shared/day.js';
@@ -36,6 +36,42 @@ export async function creditCoins(userId: string, amount: number): Promise<numbe
   if (!userId) return 0;
   if (amount <= 0) return readCoins(userId);
   return redis.hIncrBy(keys.user(userId), userFields.coins, amount);
+}
+
+export type GrantOutcome =
+  | { status: 'granted'; userId: string; username: string; coins: number }
+  | { status: 'unknown'; username: string };
+
+/**
+ * Put coins in somebody's account by name. Moderators only — see the route.
+ *
+ * A testing and moderation affordance rather than part of the economy: the four
+ * ways to earn are the economy, and this is the way to stand up a balance
+ * without playing for a fortnight to get one. It is deliberately the only path
+ * that creates coins out of nothing, and it is deliberately not reachable by a
+ * player.
+ *
+ * The username has to be resolved to a `t2_` id, because a display name is not
+ * an identity and every key in this app is keyed by id. A name Reddit does not
+ * know is reported back rather than thrown: a typo in a form field is a typo,
+ * not a server error.
+ *
+ * Granting to somebody who has never played writes a `user:` hash holding only a
+ * balance. That is a valid record — `getUser` fills the rest with zeros — and it
+ * puts them on no leaderboard, because the boards are written from points.
+ */
+export async function grantCoins(username: string, amount: number): Promise<GrantOutcome> {
+  const name = username.trim().replace(/^\/?u\//i, '');
+
+  const user = await reddit.getUserByUsername(name).catch(() => undefined);
+  if (!user) return { status: 'unknown', username: name };
+
+  return {
+    status: 'granted',
+    userId: user.id,
+    username: user.username,
+    coins: await creditCoins(user.id, amount),
+  };
 }
 
 /**

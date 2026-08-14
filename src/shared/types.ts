@@ -88,9 +88,10 @@ export type PlayerStats = {
    * The spendable balance. A different ledger from `points` and never the same
    * number: this one goes down when a box is opened.
    *
-   * It rides on the stats because "Your record" is where a player reads their
-   * own totals. It is deliberately *not* rendered in the header `StatBar`,
-   * which shows the streak and the points and nothing else.
+   * Read in three places, all of them plain: the header counters, "Your record",
+   * and the top of the wardrobe where it is spent. No accent anywhere — `--sun`
+   * still marks the streak alone, and a balance is not a fifth meaning of
+   * colour.
    */
   coins: number;
   totalPlayed: number;

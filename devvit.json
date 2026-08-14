@@ -66,13 +66,21 @@
         "location": "subreddit",
         "forUserType": "moderator",
         "endpoint": "/internal/menu/post-leaderboard"
+      },
+      {
+        "label": "Outlier: grant coins",
+        "description": "Put coins in an account for testing the wardrobe",
+        "location": "subreddit",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/grant-coins"
       }
     ]
   },
 
   "forms": {
     "submitQuestion": "/internal/forms/submit-question",
-    "reviewQueue": "/internal/forms/review-queue"
+    "reviewQueue": "/internal/forms/review-queue",
+    "grantCoins": "/internal/forms/grant-coins"
   },
 
   "scheduler": {

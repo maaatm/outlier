@@ -330,6 +330,11 @@ function DailyAction({ daily }: { daily: DailyPointer | null }): React.JSX.Eleme
  * from the top, and one quiet footnote pinned to the bottom of the card. The
  * footnote is where the fine print goes — the rule that would clutter the
  * substance above it but that somebody will eventually want.
+ *
+ * The wardrobe is the one room without one. It is the only panel taller than the
+ * card it sits in — a balance, a blob, two steppers and the box — and fine print
+ * under all of that is a line nobody scrolls to and something for the box button
+ * to collide with on the way.
  */
 function Panel({
   title,
@@ -337,7 +342,7 @@ function Panel({
   children,
 }: {
   title: string;
-  note: React.ReactNode;
+  note?: React.ReactNode;
   children: React.ReactNode;
 }): React.JSX.Element {
   return (
@@ -346,7 +351,7 @@ function Panel({
         <h1 className="menu__heading">{title}</h1>
         {children}
       </div>
-      <p className="notice notice--quiet">{note}</p>
+      {note !== undefined && <p className="notice notice--quiet">{note}</p>}
     </>
   );
 }
@@ -391,9 +396,7 @@ function Record({
       {/* Four figures rather than three, in pairs: the coin balance belongs
           beside the totals it is earned alongside, and a fourth tile in a
           three-up grid would sit on a row of its own looking like an
-          afterthought. It is deliberately not in the header — that shows the
-          streak and the points, and a third counter up there would be a third
-          thing to read before the question. */}
+          afterthought. */}
       <div className="figures figures--pairs">
         <div className="figure">
           <span className="figure__label">streak</span>
@@ -454,17 +457,7 @@ function Wardrobe({
   onOpened: (box: BoxResponse) => void;
 }): React.JSX.Element {
   return (
-    <Panel
-      title={TITLES.wardrobe}
-      note={
-        <>
-          Every change is worn straight away &mdash; there is nothing to save. An accessory
-          is drawn to break the outline of the dot rather than sit inside it, because that
-          is what still reads when you are one of a hundred. Boxes are earned, never bought:
-          coins come from playing, asking, and being promoted.
-        </>
-      }
-    >
+    <Panel title={TITLES.wardrobe}>
       {/* The wrapper is unconditional so the room keeps its shape while the pair
           is in flight — the centring hangs off it, and a panel that re-centres
           the moment the blob arrives moves everything under the reader. */}

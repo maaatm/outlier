@@ -156,6 +156,13 @@ and is tested against a seeded generator over tens of thousands of boxes, which 
 only way an assertion about a guarantee is a fact rather than a coin flip that passed
 today.
 
+**Granting coins for testing.** The four rates are slow on purpose, which makes the
+wardrobe hard to try out. `Outlier: grant coins` is a moderator-only menu item that adds
+to any account's balance by username — the only path that creates coins out of nothing,
+deliberately unreachable by a player, and mod-checked on the form endpoint as well as on
+the menu item. Points and both leaderboards are untouched by it. The form's fields are
+prefilled with the account and amount it was first needed for.
+
 **On real money.** Everything here is earned-only, which keeps it a progression loop.
 Devvit does ship a payments module, and the moment a randomised box can be bought with
 real money this stops being a game mechanic and becomes a regulated one — several
@@ -468,8 +475,9 @@ there carries **Menu** instead of nothing. The menu is a screen rather than a sh
 over one: same shell, same header, same card, and the card's contents are the only thing
 that changes.
 
-Four rooms, one open at a time, each with its fine print pinned to the bottom — and one
-action above them that is not a room at all.
+Four rooms, one open at a time, each with its fine print pinned to the bottom — except
+the wardrobe, which outgrew the space for it — and one action above them that is not a
+room at all.
 
 | Entry | What it holds |
 |---|---|
@@ -486,11 +494,16 @@ of four states: `playable`, `voted`, `here` (you are already on today's Daily), 
 (no Daily yet today). While the pointer is in flight the button renders disabled rather
 than absent; a control that arrives after the screen settles shifts everything under it.
 
-**The balance is in Your record and the wardrobe, not the header.** The header shows the
-streak and the points, and `--sun` marks the streak alone; a third counter up there would
-be a third thing to read before the question, and a third meaning of colour if it were
-ever accented. The two places coins appear are the two screens where they are relevant —
-the page of totals, and the room where they are spent.
+**The balance is in the header, Your record, and the wardrobe.** Three counters is the
+most that row holds: below 420px the tiles tighten and the date steps off the row rather
+than any number being abbreviated, because the date is the one thing there that can be
+read off the question underneath it instead. All three tiles are plain — `--sun` still
+marks the streak alone, and a balance does not get a fifth meaning of colour.
+
+The wardrobe is the one room with no fine print pinned under it. It is the only panel
+taller than the card it sits in — balance, blob, two steppers, gift box — and a footnote
+below all that is a line nobody scrolls to and something for the box button to collide
+with on the way.
 
 The wardrobe's steppers walk what you own rather than the whole catalogue, using the same
 pure `ownsItem` the equip endpoint enforces, so a client in step with the server never

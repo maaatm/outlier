@@ -153,6 +153,54 @@ menuRoutes.post('/internal/menu/pin-menu-post', async (c) => {
   });
 });
 
+/**
+ * "Grant coins" — put a balance in an account without playing for one.
+ *
+ * Moderators only, re-checked here rather than trusted from the menu item's
+ * `forUserType`, which hides a button and gates nothing. It exists for testing:
+ * the four ways to earn are slow on purpose, and a wardrobe with no coins behind
+ * it cannot be tried out.
+ *
+ * The fields are prefilled with the account and the amount this was first needed
+ * for, because a form whose defaults are the common case is one tap.
+ */
+menuRoutes.post('/internal/menu/grant-coins', async (c) => {
+  if (!(await isModerator())) {
+    return c.json<UiResponse>({ showToast: 'Moderators only.' });
+  }
+
+  return c.json<UiResponse>({
+    showForm: {
+      name: 'grantCoins',
+      form: {
+        title: 'Grant coins',
+        description:
+          'Adds to a balance. Coins are spent on gift boxes in the wardrobe; points and ' +
+          'the leaderboards are untouched.',
+        acceptLabel: 'Grant',
+        cancelLabel: 'Cancel',
+        fields: [
+          {
+            type: 'string',
+            name: 'username',
+            label: 'Username',
+            helpText: 'Without the u/.',
+            defaultValue: 'spottylawyer',
+            required: true,
+          },
+          {
+            type: 'number',
+            name: 'amount',
+            label: 'Coins',
+            defaultValue: 3000,
+            required: true,
+          },
+        ],
+      },
+    },
+  });
+});
+
 /** "Post the misjudged leaderboard" — the recurring event post. */
 menuRoutes.post('/internal/menu/post-leaderboard', async (c) => {
   if (!(await isModerator())) {

@@ -192,10 +192,20 @@ button {
 
 /* ── Header ─────────────────────────────────────────────────────────────── */
 
+/*
+ * Wordmark, day, and three counters on one row.
+ *
+ * It wraps as a last resort rather than clipping. Three tiles and a wordmark fit
+ * a 360px phone at the tightened sizes below, but the counters are never
+ * abbreviated and a five-digit points total on a 320px screen is wider than the
+ * row — at which point the tiles drop to a second line, right-aligned, instead
+ * of the last one sliding under the edge of the card.
+ */
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: var(--s2);
   font-family: var(--font-mono);
   font-size: 12px;
@@ -209,9 +219,11 @@ button {
 }
 
 /*
- * The one thing in the header that may be cut. The points tile grows a digit at
- * a time and the counters are never abbreviated, so on a narrow phone the date
- * gives up its width rather than pushing the wordmark off the row.
+ * The one thing in the header that may be cut. The counters grow a digit at a
+ * time and are never abbreviated, so on a narrow phone the date gives up its
+ * width rather than pushing the wordmark off the row — and below the breakpoint
+ * further down it gives up the row entirely. It is the only thing here that can
+ * be read off the question underneath it instead.
  */
 .header__day {
   color: var(--ink-soft);
@@ -226,6 +238,10 @@ button {
   align-items: center;
   gap: var(--s2);
   flex: none;
+  /* Holds the tiles against the right edge on the row they land on, wrapped or
+     not — with the day gone on a narrow screen there is nothing else to push
+     them there. */
+  margin-left: auto;
 }
 
 .stat {
@@ -249,6 +265,27 @@ button {
 .stat__count {
   font-weight: 500;
   font-variant-numeric: tabular-nums;
+}
+
+/*
+ * Three counters and a wordmark do not fit a small phone at full padding. The
+ * tiles tighten and the day steps off the row rather than any counter being
+ * abbreviated or dropped: an abbreviated number is a number somebody has to
+ * decode, and this row exists to be read at a glance.
+ */
+@media (max-width: 420px) {
+  .stats {
+    gap: var(--s1);
+  }
+
+  .stat {
+    padding: 2px var(--s1);
+    font-size: 11px;
+  }
+
+  .header__day {
+    display: none;
+  }
 }
 
 /* ── Question ───────────────────────────────────────────────────────────── */
@@ -1283,22 +1320,19 @@ button {
 }
 
 /*
- * The one room whose contents are the subject rather than a list to read, so it
- * takes the slack under the heading and centres in it — every other panel hangs
- * from the top because what is in it starts there and runs on.
+ * The wardrobe used to take the slack under the heading and centre in it, back
+ * when it held a blob and two steppers and had slack to take. With a balance
+ * above and the gift box below, it is taller than the card on a phone — and a
+ * flex child told to fill a box it no longer fits inside is squashed to that
+ * box while its contents carry on past it, which is how the box button came to
+ * sit on top of the footnote under it. So it hangs from the top like every
+ * other panel and lets `.menu__body` scroll, which is what that container is
+ * for.
  */
-.menu__panel:has(.wardrobe) {
-  flex: 1;
-  min-height: 0;
-}
-
 .wardrobe {
   display: flex;
   flex-direction: column;
-  justify-content: center;
   gap: var(--s3);
-  flex: 1;
-  min-height: 0;
 }
 
 /* The blob being made, and the only thing on this screen that is not a control. */
