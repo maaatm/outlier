@@ -23,6 +23,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import {
   BLOB_SIZE,
+  BOX_PRICE,
   CROWD_SIZE,
   HIT_THRESHOLD,
   LEADERBOARD_MIN_VOTES,
@@ -31,14 +32,22 @@ import {
   ACCESSORIES,
   type Equipped,
   FACES,
+  ITEMS,
   type Item,
+  findItem,
   itemIndex,
+  ownedItems,
   resolveAccessory,
   resolveFace,
   stepItem,
 } from '../../shared/items.js';
-import type { AvatarResponse, DailyPointer, PlayerStats } from '../../shared/types.js';
-import { fetchAvatar, fetchDaily, saveAvatar } from '../api.js';
+import type {
+  AvatarResponse,
+  BoxResponse,
+  DailyPointer,
+  PlayerStats,
+} from '../../shared/types.js';
+import { fetchAvatar, fetchDaily, openBox, saveAvatar } from '../api.js';
 import { coalescingWriter } from '../coalesce.js';
 import { Blob } from './Blob.js';
 import { MisjudgedBoard } from './MisjudgedBoard.js';
@@ -120,7 +129,7 @@ export function Menu({
     };
   }, [postId]);
 
-  const { avatar, equip } = useAvatar(panel === 'record' || panel === 'wardrobe');
+  const { avatar, equip, absorb } = useAvatar(panel === 'record' || panel === 'wardrobe');
 
   return (
     <main className="app">
@@ -138,7 +147,9 @@ export function Menu({
         <div className="menu__body fade-in" key={panel ?? 'root'}>
           {panel === null && <Root onOpen={setPanel} daily={daily} />}
           {panel === 'record' && <Record stats={stats} avatar={avatar} />}
-          {panel === 'wardrobe' && <Wardrobe avatar={avatar} onEquip={equip} />}
+          {panel === 'wardrobe' && (
+            <Wardrobe avatar={avatar} onEquip={equip} onOpened={absorb} />
+          )}
           {panel === 'board' && <Board />}
           {panel === 'misjudged' && <Misjudged />}
         </div>
@@ -169,6 +180,7 @@ export function Menu({
 function useAvatar(needed: boolean): {
   avatar: AvatarResponse | null;
   equip: (next: Equipped) => void;
+  absorb: (box: BoxResponse) => void;
 } {
   const [avatar, setAvatar] = useState<AvatarResponse | null>(null);
 
@@ -209,7 +221,26 @@ function useAvatar(needed: boolean): {
     write.current?.(next);
   }
 
-  return { avatar, equip };
+  /**
+   * Fold a box result into what is held, rather than refetching it.
+   *
+   * The response already carries both halves of what changed — the balance and,
+   * on a new item, one more thing owned — so a second round trip would only be
+   * a chance for the screen to flicker back to what it already knows.
+   */
+  function absorb(box: BoxResponse): void {
+    setAvatar((current) =>
+      current === null
+        ? current
+        : {
+            ...current,
+            coins: box.coins,
+            owned: current.owned.includes(box.item) ? current.owned : [...current.owned, box.item],
+          }
+    );
+  }
+
+  return { avatar, equip, absorb };
 }
 
 /** The list itself, under the wordmark, with the one way out above it. */
@@ -345,7 +376,8 @@ function Record({
         <>
           streak counts days you answered something, not questions &mdash; a second one the
           same day pays points but does not move it. Miss a day and it goes back to zero;
-          best keeps the number it reached. The day turns over at midnight UTC.
+          best keeps the number it reached. The day turns over at midnight UTC. Points are
+          the score and are never spent; coins are, in the wardrobe.
         </>
       }
     >
@@ -356,7 +388,13 @@ function Record({
         label="Your blob"
       />
 
-      <div className="figures">
+      {/* Four figures rather than three, in pairs: the coin balance belongs
+          beside the totals it is earned alongside, and a fourth tile in a
+          three-up grid would sit on a row of its own looking like an
+          afterthought. It is deliberately not in the header — that shows the
+          streak and the points, and a third counter up there would be a third
+          thing to read before the question. */}
+      <div className="figures figures--pairs">
         <div className="figure">
           <span className="figure__label">streak</span>
           <span className="figure__value">{stats.streak}</span>
@@ -368,6 +406,10 @@ function Record({
         <div className="figure">
           <span className="figure__label">points</span>
           <span className="figure__value">{stats.points}</span>
+        </div>
+        <div className="figure">
+          <span className="figure__label">coins</span>
+          <span className="figure__value">{stats.coins}</span>
         </div>
       </div>
 
@@ -405,9 +447,11 @@ function Record({
 function Wardrobe({
   avatar,
   onEquip,
+  onOpened,
 }: {
   avatar: AvatarResponse | null;
   onEquip: (next: Equipped) => void;
+  onOpened: (box: BoxResponse) => void;
 }): React.JSX.Element {
   return (
     <Panel
@@ -416,7 +460,8 @@ function Wardrobe({
         <>
           Every change is worn straight away &mdash; there is nothing to save. An accessory
           is drawn to break the outline of the dot rather than sit inside it, because that
-          is what still reads when you are one of a hundred.
+          is what still reads when you are one of a hundred. Boxes are earned, never bought:
+          coins come from playing, asking, and being promoted.
         </>
       }
     >
@@ -428,6 +473,21 @@ function Wardrobe({
           <p className="notice notice--quiet">Loading.</p>
         ) : (
           <>
+            {/* The balance leads, because on this screen it is the constraint
+                everything below is read against. Plain, like the points tile:
+                no accent, since the four in this app each already mean
+                something else.
+
+                Absent rather than zero when signed out — a balance of nothing
+                reads as an account with nothing in it, and there is no
+                account. */}
+            {avatar.canSave && (
+              <p className="wardrobe__balance">
+                <span className="wardrobe__balance-label">coins</span>
+                <span className="wardrobe__balance-value">{avatar.coins}</span>
+              </p>
+            )}
+
             <div className="wardrobe__preview">
               <Blob
                 face={avatar.face}
@@ -443,20 +503,26 @@ function Wardrobe({
               <p className="notice notice--quiet">Sign in to change your blob.</p>
             )}
 
+            {/* The steppers walk what this player owns and nothing else, using
+                the same rule the equip endpoint enforces. A ring that includes
+                items the server will refuse is a ring where most steps do
+                nothing. */}
             <Layer
               kind="face"
-              items={FACES}
+              items={ownedItems(FACES, avatar.owned)}
               current={avatar.face}
               locked={!avatar.canSave}
               onPick={(id) => onEquip({ face: id, accessory: avatar.accessory })}
             />
             <Layer
               kind="accessory"
-              items={ACCESSORIES}
+              items={ownedItems(ACCESSORIES, avatar.owned)}
               current={avatar.accessory}
               locked={!avatar.canSave}
               onPick={(id) => onEquip({ face: avatar.face, accessory: id })}
             />
+
+            {avatar.canSave && <GiftBox avatar={avatar} onOpened={onOpened} />}
           </>
         )}
       </div>
@@ -465,11 +531,139 @@ function Wardrobe({
 }
 
 /**
+ * The box, and the one moment in this room.
+ *
+ * It sits under the layers because it is what fills them: the reader sees what
+ * they have, then the way to have more. The count of the catalogue lives here
+ * rather than beside the steppers — those now walk what you own, so this is the
+ * only place left that can say how much there is to want.
+ *
+ * The reveal is a verdict arriving, not a slot machine: the item scales into
+ * place in a quarter of a second and stops. No confetti, no shake, no
+ * celebratory burst, and no colour beyond the rarity ladder this screen already
+ * owns. Reduced motion cross-fades to the same final state.
+ */
+function GiftBox({
+  avatar,
+  onOpened,
+}: {
+  avatar: AvatarResponse;
+  onOpened: (box: BoxResponse) => void;
+}): React.JSX.Element {
+  const [opening, setOpening] = useState(false);
+  const [result, setResult] = useState<BoxResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const affordable = avatar.coins >= BOX_PRICE;
+
+  async function open(): Promise<void> {
+    setOpening(true);
+    setError(null);
+    try {
+      const box = await openBox();
+      setResult(box);
+      onOpened(box);
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : 'The box would not open.');
+    } finally {
+      setOpening(false);
+    }
+  }
+
+  return (
+    <div className="box">
+      <div className="box__head">
+        <span className="box__label">gift box</span>
+        <span className="box__owned">
+          you own {avatar.owned.length} of {ITEMS.length}
+        </span>
+      </div>
+
+      {result && <BoxResult result={result} avatar={avatar} />}
+
+      <button
+        type="button"
+        className={`button box__open${affordable ? ' button--primary' : ''}`}
+        disabled={!affordable || opening}
+        onClick={() => void open()}
+      >
+        {opening ? 'Opening...' : `Open a box · ${BOX_PRICE}`}
+      </button>
+
+      {!affordable && (
+        <p className="notice notice--quiet">
+          {BOX_PRICE - avatar.coins} more. Playing pays daily, asking a question pays more.
+        </p>
+      )}
+      {error && <p className="notice notice--quiet">{error}</p>}
+    </div>
+  );
+}
+
+/**
+ * What came out.
+ *
+ * The item is drawn on the player's own blob rather than alone, because an
+ * accessory is a change to a silhouette and a silhouette needs the head it
+ * breaks. Rarity is the word beside the name and the colour of this card's
+ * border — the same three-step ladder the layers use, which lives on this screen
+ * and no other.
+ *
+ * Keyed on the item and the balance together, so opening two of the same
+ * duplicate in a row still replays the moment rather than sitting still.
+ */
+function BoxResult({
+  result,
+  avatar,
+}: {
+  result: BoxResponse;
+  avatar: AvatarResponse;
+}): React.JSX.Element {
+  // An id the catalogue no longer has is not a crash: it is a box opened across
+  // a deploy that removed an item, and the receipt still has to render.
+  const item = findItem(result.item);
+  if (!item) {
+    return (
+      <p className="notice notice--quiet" key={`${result.item}:${result.coins}`}>
+        Something arrived, but the wardrobe does not recognise it.
+      </p>
+    );
+  }
+
+  return (
+    <div
+      className={`box__result box__result--${item.rarity}`}
+      key={`${result.item}:${result.coins}`}
+      role="status"
+    >
+      <Blob
+        face={item.kind === 'face' ? item.id : avatar.face}
+        accessory={item.kind === 'accessory' ? item.id : avatar.accessory}
+        size={BLOB_SIZE.panel}
+      />
+      <div className="box__result-copy">
+        <span className="box__result-name">{item.name}</span>
+        <span className="box__result-meta">
+          {item.rarity} &middot; {item.kind}
+        </span>
+        <span className="box__result-line">
+          {result.duplicate
+            ? `You had it already — ${result.refunded} back.`
+            : 'New. Step to it above to put it on.'}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/**
  * One layer, and the two arrows that walk it.
  *
  * The count is spelled out beside the rarity because the arrows alone say
  * nothing about how far there is to go, and a ring with no end needs some other
- * way to tell you that you have seen all of it.
+ * way to tell you that you have seen all of it. It counts what you *own* now, so
+ * it grows as boxes are opened — how big the catalogue is is the box's line to
+ * deliver, once, rather than a reproach attached to both steppers.
  */
 function Layer({
   kind,
@@ -485,6 +679,9 @@ function Layer({
   onPick: (id: string) => void;
 }): React.JSX.Element {
   const item = items[itemIndex(items, current)]!;
+  // One item is a ring with nowhere to go. The arrows say so rather than
+  // offering a press that lands back where it started.
+  const stuck = locked || items.length < 2;
 
   return (
     <div className={`wardrobe__layer wardrobe__layer--${item.rarity}`}>
@@ -494,18 +691,18 @@ function Layer({
           type="button"
           className="wardrobe__arrow"
           aria-label={`Previous ${kind}`}
-          disabled={locked}
+          disabled={stuck}
           onClick={() => onPick(stepItem(items, current, -1).id)}
         >
           <Chevron back />
         </button>
 
         {/* Announced as one string on change, so a reader hears "Wink, rare, 7
-            of 8" rather than three separate updates racing each other. */}
+            of 8 owned" rather than three separate updates racing each other. */}
         <span className="wardrobe__pick" aria-live="polite">
           <span className="wardrobe__name">{item.name}</span>
           <span className="wardrobe__meta">
-            {item.rarity} &middot; {itemIndex(items, current) + 1} of {items.length}
+            {item.rarity} &middot; {itemIndex(items, current) + 1} of {items.length} owned
           </span>
         </span>
 
@@ -513,7 +710,7 @@ function Layer({
           type="button"
           className="wardrobe__arrow"
           aria-label={`Next ${kind}`}
-          disabled={locked}
+          disabled={stuck}
           onClick={() => onPick(stepItem(items, current, 1).id)}
         >
           <Chevron back={false} />

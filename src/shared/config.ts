@@ -18,6 +18,75 @@ export const POINTS_BASE = 10;
 /** Your side is the minority when it holds less than this share of the vote. */
 export const MINORITY_THRESHOLD = 35;
 
+/*
+ * ── The coin economy ──────────────────────────────────────────────────────
+ *
+ * Coins are not points. `points` is the leaderboard score: cumulative, never
+ * decremented, never spent — a score that can be spent stops being a score,
+ * because a player who buys three boxes drops fifty places and the board
+ * quietly becomes a ranking of who bought the least. `coins` is the spendable
+ * balance, and it is the only one of the two that ever goes down.
+ *
+ * Both live on the `user:{userId}` hash. Nothing in the economy reads, writes
+ * or decrements `points`.
+ */
+
+/** The first vote of a UTC day. Turning up is what this one pays for. */
+export const COINS_FIRST_VOTE = 5;
+
+/** Paid on every `STREAK_BONUS_EVERY`th consecutive day — days 7, 14, 21. */
+export const COINS_STREAK_BONUS = 20;
+export const STREAK_BONUS_EVERY = 7;
+
+/** Paid when a question is posted, whatever becomes of it afterwards. */
+export const COINS_SUBMISSION = 10;
+
+/** Paid to the *author* when their question takes the Daily slot. */
+export const COINS_PROMOTION = 30;
+
+/**
+ * How many submissions in a UTC day still pay coins. Submission itself is
+ * uncapped — this caps only the reward, so a flood costs the farmer nothing
+ * but earns them nothing either. `Infinity` disables it.
+ */
+export const COIN_ELIGIBLE_SUBMISSIONS_PER_DAY = Infinity;
+
+/**
+ * What a gift box costs.
+ *
+ * Showing up pays 5 a day plus 20 every seventh, which averages a little under
+ * 8 — so a box is about four days of turning up, or three questions asked. Slow
+ * enough that the fourteen rollable items are a season rather than an evening,
+ * fast enough that a player who plays every day is never more than a few days
+ * from the next one.
+ */
+export const BOX_PRICE = 30;
+
+/**
+ * What a repeat pays back, as a share of the price.
+ *
+ * Without it a player holding most of the catalogue opens boxes for nothing and
+ * stops opening them. With it, the last few items cost more per new item rather
+ * than costing everything.
+ */
+export const DUPLICATE_REFUND_FRACTION = 0.4;
+
+/**
+ * A rare is guaranteed within this many boxes. Cheap to carry — one counter on
+ * the user hash — and it turns the worst case from "I opened twelve and got
+ * nothing" into a bounded promise.
+ */
+export const BOX_PITY_ROLLS = 8;
+
+/**
+ * The odds a box lands in each rarity band, before pity.
+ *
+ * The band is drawn first and the item uniformly inside it, so these numbers
+ * mean what they say however many items each band happens to hold — adding
+ * three commons later must not quietly make rares rarer.
+ */
+export const BOX_RARITY_ODDS = { common: 60, uncommon: 30, rare: 10 } as const;
+
 /** The crowd is always drawn as this many dots, whatever the real vote count. */
 export const CROWD_SIZE = 100;
 
@@ -35,8 +104,16 @@ export const CROWD_SIZE = 100;
  */
 export const BLOB_SIZE = { crowd: 18, inline: 24, panel: 40, wardrobe: 72 } as const;
 
-/** One submission per user per 24h, enforced server-side with a TTL. */
-export const SUBMISSION_COOLDOWN_SECONDS = 24 * 60 * 60;
+/**
+ * How long an identical submission from the same player is refused.
+ *
+ * This is duplicate protection, not a rate limit: submission is uncapped, and a
+ * player with two different questions may post both inside the window. It exists
+ * because nothing in `submitOpenQuestion` is idempotent — a client retrying a
+ * request that timed out halfway would otherwise create a second post and be
+ * paid a second time.
+ */
+export const SUBMISSION_DEDUPE_SECONDS = 60;
 
 /** Question text bounds, enforced on both sides of the wire. */
 export const QUESTION_MIN_LENGTH = 10;

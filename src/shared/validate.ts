@@ -78,6 +78,31 @@ export function validateSubmission(
   return OK;
 }
 
+/**
+ * A short, stable key for "this exact submission".
+ *
+ * Used as the field of the dedupe guard in `core/submit.ts`, which refuses an
+ * identical submission from the same player inside a short window. It is a hash
+ * rather than the text itself because the text is up to 120 characters of
+ * arbitrary user input and this ends up in a Redis hash field.
+ *
+ * FNV-1a: not a cryptographic hash and not trying to be. A collision would
+ * refuse one submission that happened to collide with another the same player
+ * made in the last minute, which is a shrug rather than a bug — and the input is
+ * normalized and lowercased first, so the near-misses that matter (a retry with
+ * different spacing or capitalisation) collapse to the same key deliberately.
+ */
+export function submissionFingerprint(text: string, labelA: string, labelB: string): string {
+  const subject = [text, labelA, labelB].map(normalizeQuestionText).join('\n').toLowerCase();
+
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < subject.length; i++) {
+    hash ^= subject.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(36);
+}
+
 /** Guidance shown directly in the submission form. Same words as docs/writing-questions.md. */
 export const SUBMISSION_GUIDANCE =
   'A question works when people cannot predict the split. ' +

@@ -13,8 +13,11 @@ import {
   VIEW_WIDTH,
   blobHeight,
   blobStroke,
+  findItem,
   getItem,
   itemIndex,
+  ownedItems,
+  ownsItem,
   packAvatar,
   resolveAccessory,
   resolveFace,
@@ -83,6 +86,61 @@ describe('looking an item up', () => {
 
   it('does not know an id that is not in the catalogue', () => {
     expect(getItem('sombrero', 'accessory')).toBeUndefined();
+  });
+});
+
+/*
+ * The rule the equip endpoint enforces and the wardrobe's steppers walk. It is
+ * pure and shared for exactly that reason: two implementations of "may I wear
+ * this" would eventually disagree, and the disagreement would be a screen
+ * offering something the server refuses.
+ */
+describe('owning an item', () => {
+  const horn = ACCESSORIES.find((item) => item.id === 'horn')!;
+
+  it('lets everyone wear the starters, owned or not', () => {
+    // They are never written to an inventory, so an empty one still has them.
+    expect(ownsItem([], STARTER_FACE)).toBe(true);
+    expect(ownsItem([], STARTER_ACCESSORY)).toBe(true);
+  });
+
+  it('refuses anything else that is not in the inventory', () => {
+    expect(ownsItem([], horn)).toBe(false);
+    expect(ownsItem(['wink'], horn)).toBe(false);
+    expect(ownsItem([horn.id], horn)).toBe(true);
+  });
+
+  it('narrows a layer to what can actually be put on', () => {
+    const owned = [STARTER_FACE.id, STARTER_ACCESSORY.id, horn.id];
+    expect(ownedItems(ACCESSORIES, owned)).toEqual([STARTER_ACCESSORY, horn]);
+    // The starter is there even though nothing granted it.
+    expect(ownedItems(FACES, owned)).toEqual([STARTER_FACE]);
+  });
+
+  it('keeps the catalogue order, so the ring does not reshuffle on a grant', () => {
+    const owned = ITEMS.map((item) => item.id);
+    expect(ownedItems(FACES, owned)).toEqual([...FACES]);
+    expect(ownedItems(ACCESSORIES, owned)).toEqual([...ACCESSORIES]);
+  });
+
+  it('never returns an empty layer, however empty the inventory', () => {
+    // The wardrobe indexes into whatever comes back, and a player who owns
+    // nothing still owns the pair they are wearing.
+    expect(ownedItems(FACES, []).length).toBeGreaterThan(0);
+    expect(ownedItems(ACCESSORIES, []).length).toBeGreaterThan(0);
+  });
+});
+
+describe('finding an item without knowing its kind', () => {
+  it('finds one in either list', () => {
+    // What a box result arrives as: an id, and which list it came from is the
+    // answer rather than part of the question.
+    expect(findItem(STARTER_FACE.id)).toBe(STARTER_FACE);
+    expect(findItem('horn')?.kind).toBe('accessory');
+  });
+
+  it('comes back empty for an id the catalogue does not have', () => {
+    expect(findItem('sombrero')).toBeUndefined();
   });
 });
 

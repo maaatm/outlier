@@ -53,6 +53,11 @@ vi.mock('@devvit/web/server', () => {
         for (const [field, value] of Object.entries(values)) hash(key).set(field, String(value));
       },
       hMGet: async (key: string, fields: string[]) => fields.map((f) => hash(key).get(f) ?? null),
+      hIncrBy: async (key: string, field: string, by: number) => {
+        const next = (Number(hash(key).get(field) ?? 0) || 0) + by;
+        hash(key).set(field, String(next));
+        return next;
+      },
       zAdd: async (key: string, ...members: { member: string; score: number }[]) => {
         for (const entry of members) zset(key).set(entry.member, entry.score);
         return members.length;
@@ -98,7 +103,7 @@ vi.mock('@devvit/web/server', () => {
 const { boardKey, readPlayerBoard } = await import('../src/server/core/leaderboard.js');
 const { recordPlay } = await import('../src/server/core/users.js');
 const { keys } = await import('../src/server/core/keys.js');
-const { WEEK_BOARD_TTL_SECONDS } = await import('../src/shared/config.js');
+const { COINS_FIRST_VOTE, WEEK_BOARD_TTL_SECONDS } = await import('../src/shared/config.js');
 
 /**
  * A Monday, so a week's worth of days after it stays inside one week key. Kept
@@ -140,6 +145,49 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+});
+
+/*
+ * The two ledgers, written end to end rather than folded in memory. `advance`
+ * is where the rule lives and `streaks.test.ts` is where it is proved; what is
+ * left to check here is that the write path keeps them apart on the way to
+ * Redis — and that a board, which is built out of points, never moves when a
+ * balance does.
+ */
+describe('coins beside points', () => {
+  const stored = (name: string, field: string): number =>
+    Number(store.hashes.get(keys.user(`t2_${name}`))?.get(field) ?? 0);
+
+  it('banks coins on the first vote of a day and points on every vote', async () => {
+    await play('ada', 60);
+    expect(stored('ada', 'coins')).toBe(COINS_FIRST_VOTE);
+    expect(stored('ada', 'points')).toBe(60);
+
+    // A second question the same day pays points again and coins not at all.
+    await play('ada', 10);
+    expect(stored('ada', 'coins')).toBe(COINS_FIRST_VOTE);
+    expect(stored('ada', 'points')).toBe(70);
+  });
+
+  it('leaves the balance out of both boards', async () => {
+    await play('ada', 60);
+    const all = await readPlayerBoard('all', 't2_ada');
+    // The board ranks on points. A balance that had leaked into it would show
+    // up here as five extra.
+    expect(all.rows[0]?.points).toBe(60);
+    expect(all.you?.points).toBe(60);
+  });
+
+  it('does not let a vote overwrite coins spent while it was in flight', async () => {
+    // The reason the credit is an increment rather than an assignment: a box
+    // debits between the read at the top of `recordPlay` and the write at the
+    // bottom, and an assignment would hand back what the box just took.
+    await play('ada', 60);
+    store.hashes.get(keys.user('t2_ada'))!.set('coins', '0');
+
+    await play('ada', 60, '2026-08-18');
+    expect(stored('ada', 'coins')).toBe(COINS_FIRST_VOTE);
+  });
 });
 
 describe('writing the boards', () => {

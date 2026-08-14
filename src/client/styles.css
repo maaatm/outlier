@@ -730,6 +730,16 @@ button {
   gap: var(--s2);
 }
 
+/*
+ * Four figures, in pairs. Three is the shape everywhere else — the reveal's
+ * you-said/it-was/off-by is a sentence and has to stay on one line — but a
+ * fourth tile dropped into a three-up grid sits alone on a second row looking
+ * like a mistake. Two by two is a block.
+ */
+.figures--pairs {
+  grid-template-columns: repeat(2, 1fr);
+}
+
 .figure {
   border: var(--stroke) solid var(--ink);
   border-radius: var(--radius-button);
@@ -1407,6 +1417,122 @@ button {
   overflow: visible;
 }
 
+/*
+ * The balance, at the top of the room where it is spent.
+ *
+ * Plain, for the same reason the points tile in the header is plain: the four
+ * accents each mean one thing already, and a number that goes up and down is not
+ * worth a fifth meaning. The mono label and the display figure are the same
+ * pairing `.figure` uses, laid on one line because this is one number rather
+ * than a row of them.
+ */
+.wardrobe__balance {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: var(--s2);
+  margin: 0;
+}
+
+.wardrobe__balance-label {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.wardrobe__balance-value {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 28px;
+  line-height: 1;
+}
+
+/* ── The gift box ───────────────────────────────────────────────────────── */
+
+/*
+ * The only sink for coins, and the only control in the app that spends
+ * anything. It sits under the two layers because the order of the room is:
+ * here is what you have on, here is what you own, here is how to own more.
+ *
+ * Separated by a rule rather than a card. A second bordered box inside the
+ * bordered card would be the third rectangle on this screen saying the same
+ * thing, which is the same reason `.wardrobe__arrow` has no border of its own.
+ */
+.box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  padding-top: var(--s3);
+  border-top: var(--stroke) solid var(--ink-quiet);
+}
+
+.box__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s2);
+}
+
+.box__label,
+.box__owned {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+/*
+ * What came out, and the one moment in this room.
+ *
+ * The badge stamp is the reference: a verdict arriving. 240ms of scale and
+ * opacity and then it stops — under a second, no rotation (the app has its three
+ * deliberate imperfections and this is not a fourth), no burst, no shake.
+ *
+ * The border is the rarity ladder the two layers above already use. It is the
+ * one exception to the two-accents rule and stays an exception by never leaving
+ * this screen.
+ */
+.box__result {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  border: var(--stroke) solid var(--rarity-common);
+  border-radius: var(--radius-button);
+  padding: var(--s2);
+  background: var(--card);
+  animation: stamp 240ms cubic-bezier(0.3, 1.3, 0.4, 1) both;
+}
+
+.box__result--uncommon {
+  border-color: var(--rarity-uncommon);
+}
+
+.box__result--rare {
+  border-color: var(--rarity-rare);
+}
+
+.box__result-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.box__result-name {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.box__result-meta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+
+.box__result-line {
+  font-size: 13px;
+}
+
 /* ── States ─────────────────────────────────────────────────────────────── */
 
 .notice {
@@ -1602,6 +1728,12 @@ button {
   }
 
   .reveal {
+    animation: fade 220ms linear both;
+  }
+
+  /* The box's one moment gets the same treatment as the reveal's: a cross-fade
+     to the state the stamp would have landed on. */
+  .box__result {
     animation: fade 220ms linear both;
   }
 }

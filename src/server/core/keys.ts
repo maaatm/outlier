@@ -74,11 +74,33 @@ export const keys = {
   /** hash: userId -> commentId. */
   commented: (questionId: string) => `commented:${questionId}`,
 
-  /** hash: streak, bestStreak, lastPlayedDay, points, totalPlayed, totalHits */
+  /**
+   * hash: streak, bestStreak, lastPlayedDay, points, totalPlayed, totalHits,
+   * weekPoints, weekKey, coins, pity, subDay, subCount
+   *
+   * Two ledgers on one hash. `points` is the leaderboard score and only ever
+   * increases; `coins` is the spendable balance and goes both ways. Crediting
+   * coins on a vote is therefore another field on an `hSet` that `recordPlay`
+   * was already issuing, rather than a second key and a second round trip.
+   *
+   * `pity` counts boxes since the last rare, `subDay`/`subCount` count today's
+   * submissions for the coin-eligibility cap. Both belong to one player and
+   * neither is worth a key of its own.
+   */
   user: (userId: string) => `user:${userId}`,
 
-  /** string with a 24h TTL. Presence means "already submitted today". */
-  submissionCooldown: (userId: string) => `sub:cooldown:${userId}`,
+  /**
+   * hash: submission fingerprint -> "1", TTL `SUBMISSION_DEDUPE_SECONDS`.
+   *
+   * Not a rate limit — the 24h submission cooldown this replaced is gone, and a
+   * player may post as many *different* questions as they like. This refuses an
+   * identical one, because nothing in `submitOpenQuestion` is idempotent and a
+   * retried timeout would otherwise be a second post and a second payment.
+   *
+   * One hash per player rather than a key per submission, so the TTL is set
+   * once on a key that already exists rather than on every entry.
+   */
+  submissionRecent: (userId: string) => `sub:recent:${userId}`,
 
   /** zset: questionId -> upvotes on the open post. */
   queuePending: 'queue:pending',
@@ -130,11 +152,31 @@ export const keys = {
    * Starter items are never in here: they are owned implicitly, and writing them
    * to every player's hash would be a row per person to say what is true of
    * everyone.
+   *
+   * Written by the gift box, and once by the migration in `readInventory` for
+   * anyone who equipped something while the catalogue was unlocked.
    */
   inventory: (userId: string) => `inv:${userId}`,
 
   /** string: index into the shuffled house pool. */
   poolCursor: 'pool:cursor',
+} as const;
+
+/**
+ * Field names on the `user:` hash that are written from more than one place.
+ *
+ * The totals are written only by `recordPlay`, which spells them out; these
+ * four are touched by the economy — from `users.ts`, `coins.ts` and `boxes.ts` —
+ * and a typo in one of those would be a silently separate field.
+ */
+export const userFields = {
+  coins: 'coins',
+  /** Boxes opened since the last rare. */
+  pity: 'pity',
+  /** The UTC day `subCount` belongs to. */
+  subDay: 'subDay',
+  /** Submissions made on `subDay`, for the coin-eligibility cap. */
+  subCount: 'subCount',
 } as const;
 
 /** Field names on the `votes:` hash, kept in one place to avoid typos. */

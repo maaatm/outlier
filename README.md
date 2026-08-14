@@ -44,7 +44,8 @@ immediately rather than a wait until midnight.
 ```
 data/questions.json     130 hand-written house questions
 docs/writing-questions.md   the moderator guide — the thing that decides if this is fun
-src/shared/             scoring, badges, day math, comment text — used by both sides
+src/shared/             scoring, badges, day math, coin rules, the box roll, the item
+                        catalogue, comment text — used by both sides
 src/server/core/        redis-facing logic, one concern per file
 src/server/routes/      hono routers: api, submit, queue, menu, forms, tasks
 src/client/             react app, flat sticker-book UI
@@ -77,7 +78,9 @@ logic. Thresholds live in `src/shared/config.ts`.
 - `streak` — consecutive UTC days on which the player submitted at least one vote. The
   habit metric. A missed day resets it to zero; `bestStreak` keeps the number it reached
   and is never reduced.
-- `points` — lifetime, banked per vote rather than per day.
+- `points` — lifetime, banked per vote rather than per day. The score, and never spent.
+- `coins` — the spendable balance, earned four ways and sunk into gift boxes. A second
+  ledger on the same record, not a second score. See below.
 
 **Every question counts** toward both: the Daily, an open question somebody submitted, or
 one played out of the archive. The day recorded is the day the vote was *cast*, not the
@@ -104,6 +107,64 @@ in `src/shared/points.ts` alongside its copy, the same way badges do.
 
 ---
 
+## Coins and the gift box
+
+**Coins are not points.** `points` is the leaderboard score: cumulative, never
+decremented, never spent. A score that can be spent stops being a score — a player who
+buys three boxes drops fifty places and the board quietly becomes a ranking of who bought
+the least. `coins` is a separate spendable balance, and it is the only figure on a player
+record that ever goes down.
+
+Nothing in the economy reads, writes or decrements `points`. That is asserted directly in
+`tests/streaks.test.ts`.
+
+Four ways to earn, all of them earned-only:
+
+| Event | Coins | Where it fires |
+|---|---|---|
+| First vote of the day | +5 | `advance()` in `core/users.ts` |
+| Every 7th consecutive day of streak | +20 | `advance()` in `core/users.ts` |
+| Question posted | +10 | `submitOpenQuestion` in `core/submit.ts` |
+| Question promoted to the Daily | +30 | `postDaily` in `core/daily.ts` |
+
+The first two hang off the day boundary `advance()` already turns the streak on, so they
+are one branch on a function that was already pure and already tested. The seven-day bonus
+is keyed on the streak the vote moved *to*, so it pays on the day the run reaches seven
+rather than the day after, and a run that reset to 1 counts toward the next one from
+there. Promotion pays the **author**, not the moderator who approved it and not whoever
+ran the job — the id comes off `q:{id}`, and the credit sits inside the `daily:claims`
+guard so a re-run of `post-daily` pays nobody a second time. A house question reaching the
+Daily slot pays nobody and does not error.
+
+**The box** is the only sink. `POST /api/box/open` — the server rolls, the client
+animates; a client-side roll is a client-side inventory. Four rules:
+
+- **Debit and grant are atomic.** The balance and the pity counter are read under a
+  `watch` on the user hash and written back inside the transaction, so a failure between
+  taking the coins and granting the item cannot eat one or give away the other. If
+  anything else moved that hash in between, `exec` comes back empty and nothing happened.
+- **Duplicates convert.** A repeat pays back `DUPLICATE_REFUND_FRACTION` of the price.
+  Without it a player holding most of the catalogue opens boxes for nothing and stops.
+- **Pity.** A rare is guaranteed within `BOX_PITY_ROLLS` boxes, on a counter that resets
+  when one lands — the worst case becomes a bounded promise rather than "I opened twelve
+  and got nothing".
+- **Starters are never rolled.** They are owned implicitly by everyone, so rolling one
+  would be a duplicate nobody ever bought.
+
+The roll itself is pure — `roll(catalogue, owned, pity, rng)` in `src/shared/roll.ts` —
+and is tested against a seeded generator over tens of thousands of boxes, which is the
+only way an assertion about a guarantee is a fact rather than a coin flip that passed
+today.
+
+**On real money.** Everything here is earned-only, which keeps it a progression loop.
+Devvit does ship a payments module, and the moment a randomised box can be bought with
+real money this stops being a game mechanic and becomes a regulated one — several
+jurisdictions treat paid loot boxes as gambling, with disclosure requirements attached.
+That is not a reason to avoid payments; it is a strong reason to keep the *random* box on
+the earned side and to sell only known items directly, if anything is ever sold.
+
+---
+
 ## Replay mode — turn this off before release
 
 `REPLAY_MODE` in `src/shared/config.ts` is currently **on**. It exists so the
@@ -119,6 +180,13 @@ banks points on every replay, so lifetime totals inflate too — and with them b
 player leaderboards, which are read off those totals. That is expected while the
 flag is on. Nothing compensates for it: the flag disables exactly one guard, and
 everything layered on top stays flag-agnostic so it is correct the moment it flips.
+
+The coins split in two under it, and the split is worth knowing. The **daily and streak
+awards do not inflate**: they hang off the day-boundary branch in `advance()`, which is a
+date comparison the flag does not touch — the one part of the economy that behaves
+correctly in dev. **Submission coins do inflate**, because nothing rate-limits submission
+any more; a dev subreddit will accumulate them quickly, and that is expected rather than
+broken. Nothing in the economy checks the flag.
 
 The server logs a warning on boot while it is on. Set it to `false` before this
 goes anywhere real.
@@ -166,8 +234,9 @@ hist:{questionId}      hash   bucket -> count     (derived from guesses)
 commented:{questionId} hash   userId -> commentId
 
 user:{userId}          hash   streak, bestStreak, lastPlayedDay, points,
-                              totalPlayed, totalHits, weekPoints, weekKey
-sub:cooldown:{userId}  string TTL 24h
+                              totalPlayed, totalHits, weekPoints, weekKey,
+                              coins, pity, subDay, subCount
+sub:recent:{userId}    hash   submission fingerprint -> "1", TTL 60s
 
 queue:pending          zset   questionId -> upvotes
 queue:approved         zset   questionId -> upvotes
@@ -206,9 +275,16 @@ Reddit API call on every vote.
 field, rather than a key per player, so a screen wanting ten players' blobs costs one
 `hMGet` and not ten round trips. An absent field is the starter pair, so nothing needs
 back-filling for a player who has never opened the wardrobe. `inv:` is what a player owns;
-starter items are never written to it, because they are owned implicitly by everyone.
-Nothing reads `inv:` yet — every item is currently unlocked — but it is written from the
-start so there is an inventory to lock against later rather than one to reconstruct.
+starter items are never written to it, because they are owned implicitly by everyone. It
+now gates: `POST /api/avatar` refuses an item outside it, and the wardrobe's steppers walk
+it rather than the whole catalogue.
+
+**Two ledgers, one hash.** `points` and `coins` sit on the same `user:` record and mean
+opposite things — see below. Crediting coins on a vote is therefore one more field moved
+on a write `recordPlay` was already making, rather than a second key and a second round
+trip. The totals are written by assignment because `recordPlay` is their only writer; the
+balance moves by `hIncrBy`, because a box opened in the same breath as a vote would
+otherwise be undone by a total read before the debit happened.
 
 `voted:{questionId}` is both the dedupe guard and the record of what to render on
 return. A player reopening a post they have answered always lands on the completed
@@ -236,8 +312,9 @@ POST /api/comment             posts the generated comment as this user
 POST /api/submit              create an open question + post
 GET  /api/leaderboard/questions  most misjudged questions ever
 GET  /api/leaderboard/players?range=week|all   players by points banked
-GET  /api/avatar              the pair you are wearing, and what you own
-POST /api/avatar              { face, accessory } -> the same shape
+GET  /api/avatar              the pair you are wearing, what you own, your balance
+POST /api/avatar              { face, accessory } -> the same shape; 403 if unowned
+POST /api/box/open            spend coins, roll an item -> { item, duplicate, refunded, coins }
 GET  /api/today               today's UTC day key
 GET  /api/daily?from={postId} where today's Daily is — a state and a permalink
 GET  /api/queue               mod-only
@@ -291,8 +368,20 @@ be a problem. There is no mod affordance wired to it yet.
 
 Anyone can submit an open question from the subreddit menu. It becomes its own playable
 post immediately, counts toward the streak and pays points like any other question,
-accumulates real vote data, and enters the promotion queue. One submission per user per
-24h, enforced server-side with a TTL.
+accumulates real vote data, enters the promotion queue, and pays its author coins.
+
+**Submission is uncapped.** The one-per-24h cooldown is gone — more questions is the goal
+for now. What replaced it is narrower on purpose: an identical submission from the same
+player inside `SUBMISSION_DEDUPE_SECONDS` (60) is refused, because nothing in
+`submitOpenQuestion` is idempotent and a client retrying a request that timed out after
+the post went up would otherwise create a second post and be paid twice. Two *different*
+questions a second apart are both fine.
+
+The consequence is stated where it lives, in `core/submit.ts`: uncapped submission plus
++10 coins each is an unbounded coin source whose side effect is a real Reddit post every
+time, so the pressure lands on the front page and the mod queue rather than only on the
+economy. `COIN_ELIGIBLE_SUBMISSIONS_PER_DAY` is the valve — `Infinity` by default, wired
+through so capping the *reward* (never the submission) is a one-line config change.
 
 Question text is validated and filtered before a post is created — length, a single
 trailing question mark, no links or usernames, and a content filter that turns away
@@ -379,13 +468,14 @@ there carries **Menu** instead of nothing. The menu is a screen rather than a sh
 over one: same shell, same header, same card, and the card's contents are the only thing
 that changes.
 
-Three rooms, one open at a time, each with its fine print pinned to the bottom — and one
+Four rooms, one open at a time, each with its fine print pinned to the bottom — and one
 action above them that is not a room at all.
 
 | Entry | What it holds |
 |---|---|
 | **Today's question** | leaves the post for today's Daily. Not a room |
-| Your record | streak, best, points, questions answered, read rate |
+| Your record | streak, best, points, coins, questions answered, read rate |
+| Wardrobe | your blob, your balance, the items you own, and the gift box |
 | Leaderboard | who has banked the most points, weekly or all time |
 | Hardest to read | the misjudged leaderboard, five rows |
 
@@ -395,6 +485,22 @@ to tell which is which before tapping. It reads `GET /api/daily`, which answers 
 of four states: `playable`, `voted`, `here` (you are already on today's Daily), or `none`
 (no Daily yet today). While the pointer is in flight the button renders disabled rather
 than absent; a control that arrives after the screen settles shifts everything under it.
+
+**The balance is in Your record and the wardrobe, not the header.** The header shows the
+streak and the points, and `--sun` marks the streak alone; a third counter up there would
+be a third thing to read before the question, and a third meaning of colour if it were
+ever accented. The two places coins appear are the two screens where they are relevant —
+the page of totals, and the room where they are spent.
+
+The wardrobe's steppers walk what you own rather than the whole catalogue, using the same
+pure `ownsItem` the equip endpoint enforces, so a client in step with the server never
+sees a refusal and one that is not cannot talk its way past it. The gift box sits under
+the two layers, because the order of that room is: what you have on, what you own, how to
+own more. Its reveal is one moment of 240ms — the badge stamp is the reference, a verdict
+arriving rather than a slot machine — with no confetti, no shake, no burst, and a
+cross-fade to the same final state under `prefers-reduced-motion`. Rarity there is the
+word beside the name and the same three-step ladder the layers already use, which is what
+keeps that ladder confined to one screen.
 
 **The leaderboard opens on the week, not on all time.** Points are banked per vote and
 nothing closes on a schedule, so on an all-time board the fastest climb is grinding the
@@ -472,5 +578,6 @@ question picker and a decision picker. Same two decisions, one extra tap.
 ## Not in v1
 
 More than two answer options, images in questions, cross-subreddit play, karma stakes,
-LLM-generated question text. Alt-account vote inflation is out of scope too — Devvit
+LLM-generated question text, real-money payments, and a shop selling specific items — the
+box is the only sink there is. Alt-account vote inflation is out of scope too — Devvit
 gives a stable `userId` and that is what the dedupe rests on.

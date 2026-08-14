@@ -1,5 +1,5 @@
 /**
- * Player records: the streak, the points, and the lifetime totals.
+ * Player records: the streak, the points, the coins, and the lifetime totals.
  *
  * The streak is the habit metric — consecutive UTC days on which the player
  * submitted at least one vote. Every question counts toward it: the Daily, an
@@ -15,6 +15,11 @@
  * `zIncrBy` on the board because the board score carries a tiebreak fraction
  * that increments cannot be trusted to add up — see `shared/board.ts`.
  *
+ * Coins are a second ledger and not a second score. The day's first vote pays
+ * them and every seventh consecutive day pays more, both hanging off the same
+ * day boundary the streak already turns on. Nothing here spends them and
+ * nothing here touches `points` on their behalf.
+ *
  * Day boundaries are UTC, matching the post schedule. Local time is never
  * consulted, on either side of the wire.
  */
@@ -22,10 +27,11 @@
 import { context, redis, reddit } from '@devvit/web/server';
 
 import { boardScore, daysSinceLaunch } from '../../shared/board.js';
+import { coinsForNewDay } from '../../shared/coins.js';
 import { WEEK_BOARD_TTL_SECONDS } from '../../shared/config.js';
 import { daysBetween, fromDayKey, toDayKey, toWeekKey } from '../../shared/day.js';
 import type { PlayerStats } from '../../shared/types.js';
-import { keys } from './keys.js';
+import { keys, userFields } from './keys.js';
 
 export type UserRecord = {
   streak: number;
@@ -38,6 +44,15 @@ export type UserRecord = {
   weekPoints: number;
   /** `YYYY-Www` the weekly total belongs to. Empty on a record that predates it. */
   weekKey: string;
+  /**
+   * The spendable balance. A different ledger from `points`, which is the score
+   * and is never spent — see the note in `shared/coins.ts`.
+   *
+   * The only field on this record that ever goes down, and it goes down
+   * somewhere else: `advance` can add to it and nothing here subtracts. A box is
+   * the one thing that debits, and it does so under a `watch` in `boxes.ts`.
+   */
+  coins: number;
 };
 
 export const EMPTY_USER: UserRecord = {
@@ -49,6 +64,7 @@ export const EMPTY_USER: UserRecord = {
   totalHits: 0,
   weekPoints: 0,
   weekKey: '',
+  coins: 0,
 };
 
 export async function getUser(userId: string): Promise<UserRecord> {
@@ -73,6 +89,9 @@ export async function getUser(userId: string): Promise<UserRecord> {
     // one rather than back-dating a lifetime total into this week.
     weekPoints: Number(raw.weekPoints ?? 0) || 0,
     weekKey: raw.weekKey ?? '',
+    // A record from before the economy has no balance, which is a balance of
+    // zero rather than anything to back-fill.
+    coins: Number(raw.coins ?? 0) || 0,
   };
 }
 
@@ -91,6 +110,7 @@ export function projectStats(record: UserRecord, today: string = toDayKey()): Pl
     streak: lapsed ? 0 : record.streak,
     bestStreak: record.bestStreak,
     points: record.points,
+    coins: record.coins,
     totalPlayed: record.totalPlayed,
     totalHits: record.totalHits,
     extendedToday: record.lastPlayedDay === today,
@@ -105,12 +125,30 @@ export type Play = {
 };
 
 /**
- * Fold one vote into a record. Pure, so both rules are testable without Redis.
+ * A record after one vote, plus what that vote paid in coins.
  *
- * Two rules, deliberately different: points and the lifetime totals move on
- * every vote, and the streak moves once per day.
+ * The coins are reported alongside rather than folded silently into `coins`,
+ * because the caller has something to say about them — and because a function
+ * that quietly moved a balance would be a worse place to put the rule than one
+ * that hands the number back.
  */
-export function advance(record: UserRecord, play: Play, today: string): UserRecord {
+export type Advanced = UserRecord & {
+  /** The day's first vote pays; the second one pays nothing. */
+  coinsEarned: number;
+};
+
+/**
+ * Fold one vote into a record. Pure, so every rule is testable without Redis.
+ *
+ * Three rules now, deliberately different: points and the lifetime totals move
+ * on every vote, the streak moves once per day, and the coins hang off that
+ * same day boundary — `record.lastPlayedDay === today` is the whole test, and it
+ * was already here.
+ *
+ * `points` is not touched by anything coin-related. It is the leaderboard score,
+ * it only ever increases, and a score that can be spent stops being a score.
+ */
+export function advance(record: UserRecord, play: Play, today: string): Advanced {
   // The week is derived from the day rather than passed in, so there is one
   // clock in this function and the weekly total cannot drift out of step with
   // the daily one.
@@ -127,9 +165,10 @@ export function advance(record: UserRecord, play: Play, today: string): UserReco
     weekPoints: (record.weekKey === weekKey ? record.weekPoints : 0) + play.points,
   };
 
-  // Already counted today. The second question of the day pays, but one day is
-  // one day however many questions are in it.
-  if (record.lastPlayedDay === today) return { ...record, ...banked };
+  // Already counted today. The second question of the day pays points, but one
+  // day is one day however many questions are in it — and the coins are a
+  // daily award, so they pay nothing the second time either.
+  if (record.lastPlayedDay === today) return { ...record, ...banked, coinsEarned: 0 };
 
   const gap = record.lastPlayedDay === '' ? Infinity : daysBetween(record.lastPlayedDay, today);
 
@@ -137,15 +176,22 @@ export function advance(record: UserRecord, play: Play, today: string): UserReco
   // that went backwards, since the caller always passes today — but if it
   // happens it must not rewind `lastPlayedDay`, or the next real day would read
   // as a gap and destroy a live streak.
-  if (gap < 0) return { ...record, ...banked };
+  if (gap < 0) return { ...record, ...banked, coinsEarned: 0 };
 
   const streak = gap === 1 ? record.streak + 1 : 1;
+
+  // Keyed on the streak this vote moved *to*, so the seven-day bonus pays on the
+  // day the run reaches seven rather than the day after — and a run that reset
+  // to 1 counts toward the next one from there.
+  const coinsEarned = coinsForNewDay(streak);
 
   return {
     ...banked,
     streak,
     bestStreak: Math.max(record.bestStreak, streak),
     lastPlayedDay: today,
+    coins: record.coins + coinsEarned,
+    coinsEarned,
   };
 }
 
@@ -176,6 +222,18 @@ export async function recordPlay(
     weekKey: next.weekKey,
   });
 
+  // Every total above is banked by assignment, because this function is the
+  // only writer of any of them. The balance is not: a box being opened in the
+  // same breath as a vote debits it between the read at the top of this
+  // function and the write here, and an assignment would hand back the coins
+  // the box just took. So it moves by increment, and the increment's own answer
+  // is the balance reported — which is also why nothing is written at all on
+  // the votes that pay nothing.
+  const coins =
+    next.coinsEarned > 0
+      ? await redis.hIncrBy(keys.user(userId), userFields.coins, next.coinsEarned)
+      : record.coins;
+
   await writeBoards(userId, next, record.weekKey !== next.weekKey, today);
   await rememberName(userId);
 
@@ -183,6 +241,7 @@ export async function recordPlay(
     streak: next.streak,
     bestStreak: next.bestStreak,
     points: next.points,
+    coins,
     totalPlayed: next.totalPlayed,
     totalHits: next.totalHits,
     extendedToday: next.lastPlayedDay === today,

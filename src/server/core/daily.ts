@@ -9,9 +9,10 @@
 import { context, redis, reddit } from '@devvit/web/server';
 import type { T3 } from '@devvit/web/shared';
 
-import { DAILY_FLAIR, PROVISIONAL_VOTE_FLOOR } from '../../shared/config.js';
+import { COINS_PROMOTION, DAILY_FLAIR, PROVISIONAL_VOTE_FLOOR } from '../../shared/config.js';
 import { previousDay, toDayKey } from '../../shared/day.js';
 import { percentAgreeing } from '../../shared/scoring.js';
+import { creditCoins } from './coins.js';
 import { keys } from './keys.js';
 import { questionAtCursor, poolSize } from './pool.js';
 import { getQuestion, linkQuestionToPost, markAsDaily, writeQuestion } from './questions.js';
@@ -20,8 +21,17 @@ import { readTally } from './votes.js';
 
 export type DailyResolution = {
   questionId: string;
-  /** Set when a community question took the slot, for the credit line. */
-  promotedFrom?: { authorName: string };
+  /**
+   * Set when a community question took the slot: the credit line reads the
+   * name, and the promotion award pays the id.
+   *
+   * The id comes off the `q:{id}` record rather than from resolving the name
+   * back through Reddit — the record already has it, and a display name is not
+   * an identity. Either half may be empty: a house question has neither, and a
+   * community question whose author lookup failed at submission has a payable
+   * id and nothing to credit.
+   */
+  promotedFrom?: { authorName: string; authorId: string };
 };
 
 /** Advance the house cursor and materialise the question record it points at. */
@@ -55,8 +65,11 @@ export async function resolveDailyQuestion(): Promise<DailyResolution> {
     if (question) {
       await retire(promoted);
       const resolution: DailyResolution = { questionId: promoted };
-      if (question.authorName) {
-        resolution.promotedFrom = { authorName: question.authorName };
+      if (question.authorName || question.authorId) {
+        resolution.promotedFrom = {
+          authorName: question.authorName,
+          authorId: question.authorId,
+        };
       }
       return resolution;
     }
@@ -99,7 +112,7 @@ export async function postDaily(day: string = toDayKey()): Promise<PostDailyResu
     const question = await getQuestion(resolution.questionId);
     if (!question) throw new Error(`daily ${day} resolved to a missing question`);
 
-    const credit = resolution.promotedFrom
+    const credit = resolution.promotedFrom?.authorName
       ? `Today's question comes from u/${resolution.promotedFrom.authorName}.`
       : '';
 
@@ -124,6 +137,22 @@ export async function postDaily(day: string = toDayKey()): Promise<PostDailyResu
       markAsDaily(resolution.questionId, day),
       linkQuestionToPost(resolution.questionId, post.id, post.permalink),
     ]);
+
+    /*
+     * The promotion award pays the author, not the moderator who approved it and
+     * not whoever ran the job.
+     *
+     * It sits inside the `daily:claims` guard, which is what makes it pay once:
+     * a re-run of `post-daily` for this day never reaches here, because either
+     * `daily:{day}` is already set or the claim is already taken. A house
+     * question has no `promotedFrom`, so nobody is paid and nothing errors.
+     *
+     * If the credit itself throws, the catch below releases the claim — but
+     * `daily:{day}` is set by now, so the next run returns `exists` and the
+     * author goes unpaid rather than being paid twice. That is the direction
+     * worth failing in.
+     */
+    await creditCoins(resolution.promotedFrom?.authorId ?? '', COINS_PROMOTION);
 
     return { status: 'created', day, questionId: resolution.questionId, postId: post.id };
   } catch (error) {

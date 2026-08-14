@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { COINS_FIRST_VOTE, COINS_STREAK_BONUS } from '../src/shared/config.js';
 import { addDays, daysBetween, fromDayKey, previousDay, toDayKey, toWeekKey } from '../src/shared/day.js';
 import { advance, projectStats, type Play, type UserRecord } from '../src/server/core/users.js';
 
@@ -16,6 +17,7 @@ const fresh = (): UserRecord => ({
   totalHits: 0,
   weekPoints: 0,
   weekKey: '',
+  coins: 0,
 });
 
 /** A player mid-run, with everything they have banked in the week of `day`. */
@@ -28,6 +30,7 @@ const on = (day: string, streak: number, bestStreak: number = streak): UserRecor
   totalHits: 0,
   weekPoints: 100,
   weekKey: toWeekKey(fromDayKey(day)),
+  coins: 40,
 });
 
 /** Answer one question a day, starting from nothing. */
@@ -349,6 +352,90 @@ describe('weekly points', () => {
       );
     } finally {
       process.env.TZ = original;
+    }
+  });
+});
+
+/*
+ * Coins are the second ledger and the only one that can be spent. They hang off
+ * the same day boundary the streak turns on, which is why they live in
+ * `advance` — the branch was already there and is already tested above.
+ *
+ * The rule these are all guarding: nothing here may move `points`. A score that
+ * can be spent stops being a score.
+ */
+describe('coins', () => {
+  it('pays the day rate on the first vote of a day', () => {
+    const next = advance(fresh(), play, '2026-04-01');
+    expect(next.coinsEarned).toBe(COINS_FIRST_VOTE);
+    expect(next.coins).toBe(COINS_FIRST_VOTE);
+  });
+
+  it('pays nothing for the second question of the same day', () => {
+    const first = advance(fresh(), play, '2026-04-01');
+    const second = advance(first, hit, '2026-04-01');
+    expect(second.coinsEarned).toBe(0);
+    expect(second.coins).toBe(COINS_FIRST_VOTE);
+    // The points did move, which is the difference between the two ledgers.
+    expect(second.points).toBe(70);
+  });
+
+  it('adds to the balance already banked rather than replacing it', () => {
+    const next = advance(on('2026-04-01', 3), play, '2026-04-02');
+    expect(next.coins).toBe(40 + COINS_FIRST_VOTE);
+  });
+
+  it('pays the bonus on the day the streak reaches seven, not the day after', () => {
+    const seventh = advance(on('2026-04-06', 6), play, '2026-04-07');
+    expect(seventh.streak).toBe(7);
+    expect(seventh.coinsEarned).toBe(COINS_FIRST_VOTE + COINS_STREAK_BONUS);
+
+    const eighth = advance(seventh, play, '2026-04-08');
+    expect(eighth.streak).toBe(8);
+    expect(eighth.coinsEarned).toBe(COINS_FIRST_VOTE);
+  });
+
+  it('pays it again on 14 and 21', () => {
+    const paid = (streak: number): number =>
+      advance(on('2026-04-01', streak - 1), play, '2026-04-02').coinsEarned;
+
+    for (const streak of [7, 14, 21]) {
+      expect(paid(streak)).toBe(COINS_FIRST_VOTE + COINS_STREAK_BONUS);
+    }
+    for (const streak of [1, 6, 8, 13, 15, 20, 22]) {
+      expect(paid(streak)).toBe(COINS_FIRST_VOTE);
+    }
+  });
+
+  it('starts counting again from one after a reset, bonus and all', () => {
+    // A run of 13 broken on the way to 14 does not pay a bonus on the next
+    // vote, and does pay one seven days after the restart.
+    const broken = advance(on('2026-04-01', 13), play, '2026-04-05');
+    expect(broken.streak).toBe(1);
+    expect(broken.coinsEarned).toBe(COINS_FIRST_VOTE);
+
+    const seventh = run(['2026-04-06', '2026-04-07', '2026-04-08', '2026-04-09', '2026-04-10'], broken);
+    const bonus = advance(seventh, play, '2026-04-11');
+    expect(bonus.streak).toBe(7);
+    expect(bonus.coinsEarned).toBe(COINS_FIRST_VOTE + COINS_STREAK_BONUS);
+  });
+
+  it('pays nothing on a back-dated vote, which did not open a day', () => {
+    const next = advance(on('2026-04-05', 9), hit, '2026-04-03');
+    expect(next.coinsEarned).toBe(0);
+    expect(next.coins).toBe(40);
+    expect(next.points).toBe(160);
+  });
+
+  it('never moves points, on any day that pays coins', () => {
+    // The explicit statement of the rule: whatever the coins do, the points are
+    // exactly what the vote paid and nothing else.
+    const cases: UserRecord[] = [fresh(), on('2026-04-06', 6), on('2026-04-13', 13)];
+    for (const record of cases) {
+      const next = advance(record, hit, '2026-04-14');
+      expect(next.points).toBe(record.points + hit.points);
+      expect(next.weekPoints).toBeLessThanOrEqual(next.points);
+      expect(next.coins).toBeGreaterThanOrEqual(record.coins);
     }
   });
 });

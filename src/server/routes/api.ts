@@ -17,6 +17,7 @@ import {
   STARTER_FACE,
   STARTER_PAIR,
   getItem,
+  ownsItem,
 } from '../../shared/items.js';
 import { awardFor } from '../../shared/points.js';
 import { isValidChoice, isValidGuess } from '../../shared/scoring.js';
@@ -25,6 +26,7 @@ import type {
   AvatarRequest,
   AvatarResponse,
   BoardRange,
+  BoxResponse,
   CommentRequest,
   CommentResponse,
   DailyPointer,
@@ -34,8 +36,10 @@ import type {
   VoteRequest,
 } from '../../shared/types.js';
 import { toDayKey } from '../../shared/day.js';
-import { REPLAY_MODE } from '../../shared/config.js';
-import { equipAvatar, ownsItem, readAvatar, readInventory } from '../core/avatars.js';
+import { BOX_PRICE, REPLAY_MODE } from '../../shared/config.js';
+import { equipAvatar, readAvatar, readInventory } from '../core/avatars.js';
+import { openBox } from '../core/boxes.js';
+import { readCoins } from '../core/coins.js';
 import { getDailyQuestionId } from '../core/daily.js';
 import { readPlayerBoard } from '../core/leaderboard.js';
 import { isMenuPost } from '../core/menuPost.js';
@@ -200,11 +204,15 @@ api.post('/api/comment', async (c) => {
 });
 
 /**
- * What this player is wearing, and what they own.
+ * What this player is wearing, what they own, and what they can spend.
  *
  * A signed-out reader gets the starter pair and no way to save one — the same
  * shape as `canVote` on the question state, so the client branches on a field
  * rather than on the shape of what came back.
+ *
+ * The balance rides along because the wardrobe is where it is spent. It is one
+ * more field on a response the screen already waits for, rather than a second
+ * fetch for a number that is three characters long.
  */
 api.get('/api/avatar', async (c) => {
   const userId = context.userId;
@@ -212,12 +220,17 @@ api.get('/api/avatar', async (c) => {
     return c.json<AvatarResponse>({
       ...STARTER_PAIR,
       owned: [STARTER_FACE.id, STARTER_ACCESSORY.id],
+      coins: 0,
       canSave: false,
     });
   }
 
-  const [equipped, owned] = await Promise.all([readAvatar(userId), readInventory(userId)]);
-  return c.json<AvatarResponse>({ ...equipped, owned, canSave: true });
+  const [equipped, owned, coins] = await Promise.all([
+    readAvatar(userId),
+    readInventory(userId),
+    readCoins(userId),
+  ]);
+  return c.json<AvatarResponse>({ ...equipped, owned, coins, canSave: true });
 });
 
 /**
@@ -225,10 +238,13 @@ api.get('/api/avatar', async (c) => {
  *
  * Both ids are checked against the catalogue **and against the slot they were
  * sent in**, so a face id in the accessory field is a 400 rather than a blob
- * wearing its own eyes as a hat. Ownership is checked too, through a helper that
- * currently says yes to everything: nothing is locked until the economy lands,
- * but an inventory the client can bypass is decoration, and the check belongs at
- * the call site from the beginning rather than being retrofitted onto it.
+ * wearing its own eyes as a hat.
+ *
+ * Ownership is now real: an item the player does not own is a 403, starters
+ * always pass, and the rule is the pure `ownsItem` the wardrobe uses to decide
+ * what its steppers walk — so a client in step with the server never sees this
+ * error, and a client that is not cannot talk its way past it. The inventory is
+ * read once and used for both the check and the response.
  */
 api.post('/api/avatar', async (c) => {
   const userId = context.userId;
@@ -245,21 +261,47 @@ api.post('/api/avatar', async (c) => {
     return c.json<ApiError>({ error: 'That is not something you can wear there.' }, 400);
   }
 
-  const [ownsFace, ownsAccessory] = await Promise.all([
-    ownsItem(userId, face),
-    ownsItem(userId, accessory),
-  ]);
-  if (!ownsFace || !ownsAccessory) {
+  const [owned, coins] = await Promise.all([readInventory(userId), readCoins(userId)]);
+  if (!ownsItem(owned, face) || !ownsItem(owned, accessory)) {
     return c.json<ApiError>({ error: 'You do not have that one yet.' }, 403);
   }
 
   const equipped: Equipped = { face: face.id, accessory: accessory.id };
   await equipAvatar(userId, equipped);
 
-  return c.json<AvatarResponse>({
-    ...equipped,
-    owned: await readInventory(userId),
-    canSave: true,
+  return c.json<AvatarResponse>({ ...equipped, owned, coins, canSave: true });
+});
+
+/**
+ * Open a gift box.
+ *
+ * The server rolls and the client animates. A client-side roll is a client-side
+ * inventory — see the header on `core/boxes.ts` for what makes the debit and the
+ * grant one operation.
+ *
+ * Nothing about a tally, a question or another player is reachable from here.
+ */
+api.post('/api/box/open', async (c) => {
+  const userId = context.userId;
+  if (!userId) return c.json<ApiError>({ error: 'Sign in to open a box.' }, 401);
+
+  const outcome = await openBox(userId);
+
+  if (outcome.status === 'poor') {
+    return c.json<ApiError>(
+      { error: `A box costs ${BOX_PRICE}. You have ${outcome.coins}.` },
+      402
+    );
+  }
+  if (outcome.status === 'busy') {
+    return c.json<ApiError>({ error: 'Something moved while that was opening. Try again.' }, 409);
+  }
+
+  return c.json<BoxResponse>({
+    item: outcome.item.id,
+    duplicate: outcome.duplicate,
+    refunded: outcome.refunded,
+    coins: outcome.coins,
   });
 });
 

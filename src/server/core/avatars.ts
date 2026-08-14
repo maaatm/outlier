@@ -1,5 +1,5 @@
 /**
- * Who is wearing what.
+ * Who is wearing what, and what they are allowed to wear.
  *
  *   avatars       hash  userId -> "faceId:accessoryId"
  *   inv:{userId}  hash  itemId -> "1"
@@ -9,17 +9,17 @@
  * not ten round trips — which is what makes putting other players' blobs on the
  * reveal affordable at all, on a screen already doing three reads.
  *
- * `inv:` is written here and gates nothing yet: every item is unlocked in this
- * change. It is written anyway because the next change puts items behind coins,
- * and back-filling an inventory for a population who have been equipping freely
- * is worse than writing one now.
+ * `inv:` now gates. Prompt 03 shipped it unlocked and wrote to it anyway, so
+ * that turning the economy on would be a change to one rule rather than a
+ * back-fill across a population who had been equipping freely. The rule itself
+ * is `ownsItem` in `shared/items.ts`, pure and shared with the client, so the
+ * wardrobe cannot offer something the equip endpoint will refuse.
  */
 
 import { redis } from '@devvit/web/server';
 
 import {
   type Equipped,
-  type Item,
   STARTER_ACCESSORY,
   STARTER_FACE,
   packAvatar,
@@ -37,41 +37,39 @@ export async function readAvatar(userId: string): Promise<Equipped> {
  *
  * The starters are added on the way out rather than stored, so a fresh player
  * has no `inv:` key at all and still owns the pair they are wearing.
+ *
+ * **The migration.** While the catalogue was unlocked anyone could equip
+ * anything, and the moment ownership started being enforced they would have been
+ * holding something they did not own — and been reset to the starter blob by the
+ * next read. So whatever is currently equipped is granted here, once, on the
+ * first read after this change. It matters only on the dev subreddit, and the
+ * alternative is a confusing bug report.
  */
 export async function readInventory(userId: string): Promise<string[]> {
-  const raw = await redis.hGetAll(keys.inventory(userId));
+  const [raw, equipped] = await Promise.all([
+    redis.hGetAll(keys.inventory(userId)),
+    readAvatar(userId),
+  ]);
+
   const owned = new Set([STARTER_FACE.id, STARTER_ACCESSORY.id, ...Object.keys(raw ?? {})]);
+
+  const granted = [equipped.face, equipped.accessory].filter((id) => !owned.has(id));
+  if (granted.length > 0) {
+    await redis.hSet(keys.inventory(userId), Object.fromEntries(granted.map((id) => [id, '1'])));
+    for (const id of granted) owned.add(id);
+  }
+
   return [...owned];
 }
 
 /**
- * Put a pair on, and record that this player has them.
+ * Put a pair on.
  *
- * The grant is redundant today — nothing checks ownership — but it is the write
- * that makes `ownsItem` mean something the moment it stops returning true.
+ * Equipping no longer grants. It did while nothing was locked, so that there
+ * would be an inventory to enforce against later; now that there is one, a
+ * write that grants what you just put on would be a way to own things by wearing
+ * them. Ownership comes from the gift box, and from the migration above.
  */
 export async function equipAvatar(userId: string, equipped: Equipped): Promise<void> {
-  const granted = [equipped.face, equipped.accessory].filter(
-    (id) => id !== STARTER_FACE.id && id !== STARTER_ACCESSORY.id
-  );
-
-  await Promise.all([
-    redis.hSet(keys.avatars, { [userId]: packAvatar(equipped) }),
-    granted.length > 0
-      ? redis.hSet(keys.inventory(userId), Object.fromEntries(granted.map((id) => [id, '1'])))
-      : Promise.resolve(),
-  ]);
-}
-
-/**
- * Whether a player may wear an item. True for everything, on purpose.
- *
- * Nothing is locked in this change — the point of shipping the catalogue before
- * the economy is to prove the art reads at every size before any of it is behind
- * a reward loop. The check exists anyway so that turning the economy on is a
- * change to this one function rather than a hunt for the call sites that should
- * have had it. An inventory the client can bypass is decoration.
- */
-export async function ownsItem(_userId: string, _item: Item): Promise<boolean> {
-  return true;
+  await redis.hSet(keys.avatars, { [userId]: packAvatar(equipped) });
 }

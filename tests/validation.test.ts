@@ -9,6 +9,7 @@ import { toPublicQuestion } from '../src/server/core/questions.js';
 import type { Question, Reveal } from '../src/shared/types.js';
 import {
   normalizeQuestionText,
+  submissionFingerprint,
   validateQuestionText,
   validateSubmission,
 } from '../src/shared/validate.js';
@@ -109,6 +110,7 @@ describe('the generated comment', () => {
       streak: 12,
       bestStreak: 19,
       points: 430,
+      coins: 65,
       totalPlayed: 30,
       totalHits: 11,
       extendedToday: true,
@@ -261,5 +263,40 @@ describe('the daily summary', () => {
     expect(
       buildDailySummary('Do you eat the crust?', 'Yes', 'No', { a: 2, b: 1, total: 3 })
     ).toContain('mostly noise');
+  });
+});
+
+/*
+ * The dedupe guard's key. It replaced the 24h cooldown, and the thing it has to
+ * get right is narrow: the same question twice is the same key, and two
+ * different questions are not.
+ */
+describe('the submission fingerprint', () => {
+  const ask = (text: string, a = 'Yes', b = 'No'): string => submissionFingerprint(text, a, b);
+
+  it('is the same for the same submission', () => {
+    expect(ask('Do you eat the pizza crust?')).toBe(ask('Do you eat the pizza crust?'));
+  });
+
+  it('collapses the differences a retry introduces', () => {
+    // A client re-sending after a timeout may well re-normalize the text on the
+    // way. Spacing and case are not a different question.
+    expect(ask('Do you eat the pizza crust?')).toBe(ask('  Do you   eat the pizza crust?  '));
+    expect(ask('Do you eat the pizza crust?')).toBe(ask('DO YOU EAT THE PIZZA CRUST?'));
+  });
+
+  it('separates two different questions', () => {
+    expect(ask('Do you eat the pizza crust?')).not.toBe(ask('Do you eat the apple core?'));
+  });
+
+  it('separates the same question asked with different answers', () => {
+    expect(ask('Do you eat the pizza crust?')).not.toBe(
+      ask('Do you eat the pizza crust?', 'Always', 'Never')
+    );
+  });
+
+  it('is short enough to be a hash field', () => {
+    const long = `Do you ${'really '.repeat(15)}eat the pizza crust?`;
+    expect(ask(long).length).toBeLessThanOrEqual(8);
   });
 });

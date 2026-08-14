@@ -19,7 +19,9 @@ submitRoutes.post('/api/submit', async (c) => {
     labelB: typeof body.labelB === 'string' ? body.labelB : 'No',
   });
 
-  if (outcome.status === 'cooldown') return c.json<ApiError>({ error: outcome.reason }, 429);
+  // 409 rather than 429: nothing is being rate limited. This is the same
+  // question arriving twice, which is a conflict with the one already posted.
+  if (outcome.status === 'duplicate') return c.json<ApiError>({ error: outcome.reason }, 409);
   if (outcome.status === 'rejected') return c.json<ApiError>({ error: outcome.reason }, 400);
 
   return c.json({
@@ -27,5 +29,6 @@ submitRoutes.post('/api/submit', async (c) => {
     questionId: outcome.questionId,
     postId: outcome.postId,
     permalink: outcome.permalink,
+    coins: outcome.coins,
   });
 });

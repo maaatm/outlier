@@ -5,6 +5,7 @@ import type {
   AvatarRequest,
   AvatarResponse,
   BoardRange,
+  BoxResponse,
   CommentResponse,
   DailyPointer,
   MisjudgedResponse,
@@ -100,6 +101,17 @@ export function saveAvatar(equipped: AvatarRequest): Promise<AvatarResponse> {
     method: 'POST',
     body: JSON.stringify(equipped),
   });
+}
+
+/**
+ * Open a gift box.
+ *
+ * No arguments, because there is nothing about this the client gets to decide:
+ * the price, the roll and the refund are all the server's, and this is the
+ * request that says "go". What comes back is the receipt.
+ */
+export function openBox(): Promise<BoxResponse> {
+  return request<BoxResponse>('/api/box/open', { method: 'POST' });
 }
 
 /**

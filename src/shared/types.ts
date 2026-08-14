@@ -82,8 +82,17 @@ export type PlayerStats = {
   streak: number;
   /** The longest `streak` ever reached. A missed day never reduces it. */
   bestStreak: number;
-  /** Lifetime points. */
+  /** Lifetime points. Never spent, never decremented — see `shared/coins.ts`. */
   points: number;
+  /**
+   * The spendable balance. A different ledger from `points` and never the same
+   * number: this one goes down when a box is opened.
+   *
+   * It rides on the stats because "Your record" is where a player reads their
+   * own totals. It is deliberately *not* rendered in the header `StatBar`,
+   * which shows the streak and the points and nothing else.
+   */
+  coins: number;
   totalPlayed: number;
   /** Votes inside `HIT_THRESHOLD`, which is what the read rate is made of. */
   totalHits: number;
@@ -258,18 +267,41 @@ export type DailyPointer = {
 /**
  * `GET /api/avatar` and what `POST /api/avatar` answers with.
  *
- * `owned` is the real inventory and nothing gates on it yet — every item is
- * unlocked in this change, so the wardrobe offers the whole catalogue. It is on
- * the wire from the start because the change that locks items needs the client
- * to already know what it holds.
+ * `owned` is the real inventory and it now gates: the wardrobe's steppers walk
+ * it rather than the whole catalogue, and `POST /api/avatar` refuses anything
+ * outside it. Starter items are never listed twice — they are in here because
+ * `readInventory` adds them on the way out, not because they are stored.
+ *
+ * `coins` rides along so the wardrobe can show the balance and price a box
+ * without a second fetch, on a response it already waits for.
  */
 export type AvatarResponse = Equipped & {
   owned: string[];
+  coins: number;
   /** Signed-out players get the starter pair and no way to change it. */
   canSave: boolean;
 };
 
 export type AvatarRequest = Equipped;
+
+/**
+ * `POST /api/box/open` — what one box gave you.
+ *
+ * The roll happens on the server and this is its receipt; the client animates
+ * the arrival and nothing more. A client-side roll is a client-side inventory.
+ *
+ * `item` is an id, resolved against the shared catalogue with `findItem`. There
+ * is no tally, no vote count, and nothing a tally could be derived from here.
+ */
+export type BoxResponse = {
+  item: string;
+  /** Already owned. The refund is what happened instead of a new item. */
+  duplicate: boolean;
+  /** Coins paid back for a duplicate, or 0. */
+  refunded: number;
+  /** The balance after the box was paid for and any refund applied. */
+  coins: number;
+};
 
 export type ApiError = {
   error: string;

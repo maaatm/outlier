@@ -13,7 +13,6 @@ import { currentSubredditName, postDaily } from '../core/daily.js';
 import { pinMenuPost } from '../core/menuPost.js';
 import { isModerator } from '../core/mod.js';
 import { listPending } from '../core/queue.js';
-import { checkCooldown } from '../core/submit.js';
 import { misjudgedLeaderboard, renderLeaderboardPost } from '../core/stats.js';
 
 export const menuRoutes = new Hono();
@@ -24,12 +23,9 @@ menuRoutes.post('/internal/menu/submit-question', async (c) => {
     return c.json<UiResponse>({ showToast: 'Sign in to submit a question.' });
   }
 
-  if (await checkCooldown(context.userId)) {
-    return c.json<UiResponse>({
-      showToast: 'One question per day. Yours is already in the queue.',
-    });
-  }
-
+  // Nothing is checked before the form opens any more. Submission is uncapped,
+  // and the only guard left — a repeat of the identical question — cannot be
+  // known until there is a question to compare.
   return c.json<UiResponse>({
     showForm: {
       name: 'submitQuestion',

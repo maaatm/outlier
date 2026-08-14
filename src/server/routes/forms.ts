@@ -31,9 +31,14 @@ formRoutes.post('/internal/forms/submit-question', async (c) => {
     return c.json<UiResponse>({ showToast: outcome.reason });
   }
 
+  // The coins are named only when they were actually paid. Past the eligibility
+  // cap — off by default — the question still posts and the toast simply says
+  // so, rather than announcing a reward of zero.
+  const paid = outcome.coins > 0 ? ` +${outcome.coins} coins.` : '';
+
   return c.json<UiResponse>({
     navigateTo: outcome.permalink,
-    showToast: { text: 'Posted. It is playable now.', appearance: 'success' },
+    showToast: { text: `Posted. It is playable now.${paid}`, appearance: 'success' },
   });
 });
 

@@ -10,6 +10,7 @@
 
 import pool from '../../../data/questions.json' with { type: 'json' };
 import { POOL_SHUFFLE_SEED } from '../../shared/config.js';
+import { makeRandom } from '../../shared/rng.js';
 
 export type HouseQuestion = {
   id: string;
@@ -19,18 +20,6 @@ export type HouseQuestion = {
 };
 
 export const HOUSE_QUESTIONS: HouseQuestion[] = pool.questions;
-
-/** mulberry32. Small, fast, and stable across engines — which is the point. */
-function makeRandom(seed: number): () => number {
-  let state = seed >>> 0;
-  return () => {
-    state = (state + 0x6d2b79f5) >>> 0;
-    let t = state;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
 
 /** Fisher-Yates against a seeded generator. Same seed, same order, always. */
 export function shuffledOrder(items: readonly HouseQuestion[], seed: number): HouseQuestion[] {
