@@ -560,24 +560,30 @@ function RevealView({
  * until now the only way your answer became public was if you tapped share and
  * posted the comment yourself. So it is said on the screen where it is
  * happening, at the moment it starts happening — they have just voted, so they
- * are in the window already — with the choice attached rather than filed in a
- * room they would have to go looking for afterwards. Nobody's first encounter
- * with this should be discovering that it already happened.
+ * are in the window already. Nobody's first encounter with this should be
+ * discovering that it already happened.
  *
- * Both buttons are an answer, and answering is the whole of what retires this:
- * nothing records having told anybody, only what they chose. A write that fails
- * therefore leaves the notice due to fire again, which is the right way round
- * for it to break.
+ * It is a notice and not a question. One control, the same X that closes
+ * anything, and the copy says where the switch lives — which keeps the reveal
+ * a reveal rather than a consent form on the way to one, and keeps the setting
+ * in the single place it can be changed from twice.
+ *
+ * Closing it *is* the write: nothing separately records having told anybody,
+ * only what they have chosen, and the default they are accepting by closing is
+ * on. See `showBlob` in `server/core/keys.ts`. A write that fails therefore
+ * leaves the notice due to fire again, which is the right way round for it to
+ * break — the alternative is a player who was told once, silently, and has no
+ * idea it happened.
  */
 function BlobNotice({ onAnswered }: { onAnswered: () => void }): React.JSX.Element {
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState(false);
 
-  async function answer(showBlob: boolean): Promise<void> {
+  async function dismiss(): Promise<void> {
     setSaving(true);
     setFailed(false);
     try {
-      await saveShowBlob(showBlob);
+      await saveShowBlob(true);
       onAnswered();
     } catch {
       setFailed(true);
@@ -591,28 +597,39 @@ function BlobNotice({ onAnswered }: { onAnswered: () => void }): React.JSX.Eleme
           crowd gives up height for every line of it. */}
       <p className="blob-notice__copy">
         Your blob can turn up in other players&rsquo; crowds now, on the side you answered.
-        Change that any time in Your record.
+        Turn that off any time in Your record.
       </p>
-      <div className="blob-notice__actions">
-        <button
-          type="button"
-          className="button button--quiet"
-          disabled={saving}
-          onClick={() => void answer(true)}
-        >
-          Fine by me
-        </button>
-        <button
-          type="button"
-          className="button button--quiet"
-          disabled={saving}
-          onClick={() => void answer(false)}
-        >
-          Keep me out
-        </button>
-      </div>
+      <button
+        type="button"
+        className="blob-notice__close"
+        aria-label="Got it"
+        disabled={saving}
+        onClick={() => void dismiss()}
+      >
+        <Cross />
+      </button>
       {failed && <p className="notice notice--quiet">That did not save. It will ask again.</p>}
     </div>
+  );
+}
+
+/**
+ * The X, drawn rather than typed, for the same reason the wardrobe's chevrons
+ * are: the bundled fonts are subsetted to the Latin ranges they need, so a
+ * multiplication sign or a dingbat would fall through to whatever the device
+ * happens to have.
+ */
+function Cross(): React.JSX.Element {
+  return (
+    <svg className="cross" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+      <path
+        d="M 4 4 L 12 12 M 12 4 L 4 12"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      />
+    </svg>
   );
 }
 

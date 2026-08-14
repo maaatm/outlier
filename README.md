@@ -234,8 +234,11 @@ straight about: before this, how you answered was yours unless *you* tapped shar
 posted the comment. The setting ships **on**, so three things are not optional.
 
 - **The notice is in place, not in a settings page.** The first reveal where a player's own
-  blob is eligible tells them so, on that screen, with both answers one tap away. Nobody's
-  first encounter with this should be discovering it already happened.
+  blob is eligible says so on that screen, and points at the switch in Your record. Nobody's
+  first encounter with this should be discovering it already happened. It is a notice rather
+  than a question — one X to close it — because a consent form on the way into the reveal
+  would cost the reveal more than it is worth; closing it is what records that they were
+  told, so it never fires twice.
 - **Turning it off is retroactive.** `showBlob` is read every time a crowd is drawn and is
   never captured at vote time, so switching it off takes a player out of every crowd they
   are in — including questions answered months ago. Absent means on *and* never asked, which
@@ -457,10 +460,12 @@ against eighty-one lands harder than "19%".
 - On the reveal, up to ten of the dots are real players drawn as their blobs, each in the
   camp they answered in. They are *of* the hundred rather than added to it — a cameo is one
   of the dots drawn larger, so the count on screen is still the count, and a camp never
-  holds more of them than it has dots. They take a 2×2 block at the front of their camp
-  with the pack flowing around them, they travel on the same clock as everyone else, and
-  they never take the top-left cell, which is yours. Tap or hover one for a name; the
-  caption slot under the crowd is where it goes
+  holds more of them than it has dots. Each takes a 2×2 block dropped somewhere in its
+  camp — scattered, not lined up at the front, which would read as a cast standing in
+  front of an audience — with the pack flowing around them. The scatter is seeded like
+  everything else in the crowd, so it holds still across renders. They travel on the same
+  clock as everyone else and never take the top-left cell, which is yours. Tap or hover one
+  for a name; the caption slot under the crowd is where it goes
 
 The blob inside a cameo's block is sized to *fit* it rather than to overflow it, which is
 what keeps the rest of the geometry honest: a block reaches exactly as far as the two cells

@@ -692,14 +692,16 @@ button {
  *
  * It sits under the caption on the crowd slide, once ever. Bordered rather than
  * accented — the reveal already spends both of the accents it is allowed, and
- * this is not a verdict, it is a thing being said.
+ * this is not a verdict, it is a thing being said. One control, in the corner,
+ * because it is a notice and not a question; the switch it points at lives in
+ * Your record.
  */
 .blob-notice {
-  display: flex;
-  flex-direction: column;
-  gap: var(--s2);
+  position: relative;
   margin-top: var(--s2);
   padding: var(--s2);
+  /* Room for the X, so a third line of copy runs under it rather than into it. */
+  padding-right: calc(var(--s3) + 20px);
   border: var(--stroke) solid var(--ink);
   border-radius: var(--radius-card);
   background: var(--card);
@@ -716,15 +718,40 @@ button {
   line-height: 1.35;
 }
 
-.blob-notice__actions {
+.blob-notice__close {
+  position: absolute;
+  top: var(--s1);
+  right: var(--s1);
   display: flex;
-  gap: var(--s2);
+  align-items: center;
+  justify-content: center;
+  /* Bigger than the glyph: a 16px X is not a target, and this one sits on a
+     phone in the corner of a small box. */
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-button);
+  background: none;
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: color 100ms ease-out;
 }
 
-.blob-notice__actions .button {
-  flex: 1;
-  padding: var(--s1) var(--s2);
-  font-size: 14px;
+.blob-notice__close:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .blob-notice__close:hover:not(:disabled) {
+    color: var(--ink);
+  }
+}
+
+.blob-notice__close:focus-visible {
+  outline: var(--stroke) solid var(--signal);
+  outline-offset: -2px;
 }
 
 /* ── Reveal ─────────────────────────────────────────────────────────────── */

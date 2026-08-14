@@ -16,11 +16,18 @@
  * Every dot used to occupy exactly one cell, and the row packing, the box
  * extent and the centring all leaned on that. A cameo is a player's blob rather
  * than a dot, and it takes a **2x2 block**: two cells wide, two cells tall,
- * pulled to the front of its camp so the pack flows around it.
+ * dropped somewhere in its camp with the pack flowing around it.
  *
- * The box maths survives that untouched, and it is worth saying why. A block
- * placed at column `c` reaches `c + 1 + DOT_RATIO`, which is exactly what a
- * plain dot in column `c + 1` reaches; the same holds downwards. A cameo can
+ * *Somewhere*, and not at the front. A row of blobs across the top of a camp
+ * reads as a separate population standing in front of the crowd — a cast list
+ * with an audience behind it. Scattered through the camp they read as what they
+ * are: some of these people are ones we know. The scatter is seeded rather than
+ * random, the same way the jitter is, so the crowd looks drawn instead of
+ * re-rolled on every paint.
+ *
+ * The box maths survives all of that untouched, and it is worth saying why. A
+ * block placed at column `c` reaches `c + 1 + DOT_RATIO`, which is exactly what
+ * a plain dot in column `c + 1` reaches; the same holds downwards. A cameo can
  * therefore never push past the extent of the cells it sits on, so `extent()`
  * still bounds the arrangement as long as the row count includes a block's
  * second row. Nothing about the margin, the centring or the cell fit had to
@@ -33,6 +40,7 @@
  */
 
 import { CROWD_SIZE } from '../shared/config.js';
+import { makeRandom } from '../shared/rng.js';
 
 export const PER_ROW = 10;
 /** Blank space between the two camps, in cells. */
@@ -53,6 +61,18 @@ export const SCATTER_SPREAD = 0.45;
 
 /** How many cells across a cameo's block is. Square, so this is both ways. */
 const CAMEO_CELLS = 2;
+
+/**
+ * The seed the cameo scatter draws against, and a salt so the two camps do not
+ * come out as the same arrangement at different sizes.
+ *
+ * Fixed, like every other seed in the crowd: the arrangement has to hold still
+ * across renders and across reloads, or hovering one blob would deal the whole
+ * crowd again. Which ten people are in it is already decided somewhere with a
+ * better claim to the question — the server, keyed on the question.
+ */
+const SCATTER_SEED = 0x0c0ffee;
+const OTHER_CAMP_SALT = 977;
 
 export type Placement = {
   x: number;
@@ -115,11 +135,17 @@ export function campLayout(withYou: number, yourCameos = 0, theirCameos = 0): La
   // yours; when the rounding leaves your side with no dots at all, index 0 is
   // the head of the other one and the anchor goes with it.
   const yoursIsEmpty = withYou <= 0;
-  const mine = packCamp(withYou, Math.min(yourCameos, cameoCapacity(withYou, true)), !yoursIsEmpty);
+  const mine = packCamp(
+    withYou,
+    Math.min(yourCameos, cameoCapacity(withYou, true)),
+    !yoursIsEmpty,
+    SCATTER_SEED
+  );
   const other = packCamp(
     theirs,
     Math.min(theirCameos, cameoCapacity(theirs, yoursIsEmpty)),
-    yoursIsEmpty
+    yoursIsEmpty,
+    SCATTER_SEED + OTHER_CAMP_SALT
   );
 
   // Nothing to separate when one camp took every dot.
@@ -141,69 +167,125 @@ export function campLayout(withYou: number, yourCameos = 0, theirCameos = 0): La
 }
 
 /**
- * One camp: the anchor, then the cameos, then everyone else.
+ * One camp: your dot, the blocks scattered through it, and the pack filling in
+ * around them.
  *
- * The grid is a set of taken cells rather than a row cursor, because a 2x2
- * block leaves holes beside and under it that the pack should flow into rather
- * than skip. Each cameo takes the first block that fits, scanning row-major,
- * and the plain dots take whatever is left in the same order — so the crowd
- * still fills from the top-left and still reads as one population.
+ * The grid is a set of taken cells rather than a row cursor, because a block
+ * leaves holes beside and under it that the pack should flow into rather than
+ * skip.
  *
- * The order of `places` is the order the caller's indices arrive in: the anchor
- * first, then the cameos, then the pack. That is what lets the render loop keep
- * using an index for its stagger and its jitter.
+ * How tall the camp is has to be settled *before* the blocks are placed, or
+ * they would all land in whatever rows existed when the first one was drawn —
+ * which is the front row again by another route. So the height is worked out
+ * from the cells the camp is going to need, and the blocks are then dropped
+ * anywhere inside it. Random placement can occasionally paint itself into a
+ * corner — four blocks can leave free cells with no 2x2 among them — so a
+ * failed deal grows the camp by a row and starts over. It converges in one step
+ * in practice and is bounded either way.
+ *
+ * `places` comes back in reading order, top-left first, and the caller's dot
+ * indices follow it. That keeps the travel's stagger sweeping across the crowd
+ * rather than picking the cameos out first, and it means which indices are
+ * cameos is answered by the `span` on each placement rather than by a second
+ * rule the caller has to keep in step.
  */
 function packCamp(
   dots: number,
   cameos: number,
-  hasAnchor: boolean
+  hasAnchor: boolean,
+  seed: number
 ): { places: Placement[]; rows: number } {
   if (dots <= 0) return { places: [], rows: 0 };
 
-  const taken = new Set<string>();
-  const key = (x: number, y: number): string => `${x},${y}`;
-  const free = (x: number, y: number): boolean => !taken.has(key(x, y));
+  const anchor = hasAnchor ? 1 : 0;
+  const loose = dots - anchor - cameos;
+  // Exact, not an estimate: a block covers four cells and the rest cover one.
+  const cells = anchor + loose + cameos * CAMEO_CELLS * CAMEO_CELLS;
 
-  const anchor: Placement[] = [];
-  if (hasAnchor) {
-    taken.add(key(0, 0));
-    anchor.push({ x: 0, y: 0, span: 1 });
+  let rows = Math.max(Math.ceil(cells / PER_ROW), cameos > 0 ? CAMEO_CELLS : 1);
+  let blocks = dealBlocks(cameos, rows, hasAnchor, seed);
+  while (blocks === null) {
+    rows++;
+    blocks = dealBlocks(cameos, rows, hasAnchor, seed);
   }
 
-  const blocks: Placement[] = [];
-  for (let placed = 0; placed < cameos; placed++) {
-    const at = firstBlock(free);
+  const taken = new Set<string>();
+  if (hasAnchor) taken.add(cellKey(0, 0));
+  for (const block of blocks) {
     for (let dx = 0; dx < CAMEO_CELLS; dx++) {
-      for (let dy = 0; dy < CAMEO_CELLS; dy++) taken.add(key(at.x + dx, at.y + dy));
+      for (let dy = 0; dy < CAMEO_CELLS; dy++) taken.add(cellKey(block.x + dx, block.y + dy));
+    }
+  }
+
+  const places: Placement[] = [...blocks];
+  if (hasAnchor) places.push({ x: 0, y: 0, span: 1 });
+
+  let placed = 0;
+  for (let row = 0; placed < loose; row++) {
+    for (let column = 0; column < PER_ROW && placed < loose; column++) {
+      if (taken.has(cellKey(column, row))) continue;
+      taken.add(cellKey(column, row));
+      places.push({ x: column, y: row, span: 1 });
+      placed++;
+    }
+  }
+
+  places.sort((one, two) => one.y - two.y || one.x - two.x);
+  return { places, rows: rowsOf(taken) };
+}
+
+/**
+ * Where the blocks go, or null if this deal could not seat them all.
+ *
+ * Every free block position is enumerated and one is drawn from it, rather than
+ * a position being guessed and retried — with ten blobs in a ten-column camp
+ * the free space runs out quickly enough that guessing would spend most of its
+ * time missing.
+ */
+function dealBlocks(
+  count: number,
+  rows: number,
+  hasAnchor: boolean,
+  seed: number
+): Placement[] | null {
+  if (count === 0) return [];
+  if (rows < CAMEO_CELLS) return null;
+
+  const random = makeRandom(seed);
+  const taken = new Set<string>();
+  if (hasAnchor) taken.add(cellKey(0, 0));
+
+  const blocks: Placement[] = [];
+  for (let placed = 0; placed < count; placed++) {
+    const open: { x: number; y: number }[] = [];
+    for (let row = 0; row <= rows - CAMEO_CELLS; row++) {
+      for (let column = 0; column <= PER_ROW - CAMEO_CELLS; column++) {
+        if (fits(taken, column, row)) open.push({ x: column, y: row });
+      }
+    }
+    if (open.length === 0) return null;
+
+    const at = open[Math.floor(random() * open.length)]!;
+    for (let dx = 0; dx < CAMEO_CELLS; dx++) {
+      for (let dy = 0; dy < CAMEO_CELLS; dy++) taken.add(cellKey(at.x + dx, at.y + dy));
     }
     blocks.push({ ...at, span: CAMEO_CELLS });
   }
 
-  const pack: Placement[] = [];
-  const remaining = dots - anchor.length - blocks.length;
-  for (let row = 0; pack.length < remaining; row++) {
-    for (let column = 0; column < PER_ROW && pack.length < remaining; column++) {
-      if (!free(column, row)) continue;
-      taken.add(key(column, row));
-      pack.push({ x: column, y: row, span: 1 });
-    }
-  }
-
-  return { places: [...anchor, ...blocks, ...pack], rows: rowsOf(taken) };
+  return blocks;
 }
 
-/** The first place a 2x2 block fits, scanning left to right and down. */
-function firstBlock(free: (x: number, y: number) => boolean): { x: number; y: number } {
-  for (let row = 0; ; row++) {
-    for (let column = 0; column <= PER_ROW - CAMEO_CELLS; column++) {
-      const fits =
-        free(column, row) &&
-        free(column + 1, row) &&
-        free(column, row + 1) &&
-        free(column + 1, row + 1);
-      if (fits) return { x: column, y: row };
+function fits(taken: Set<string>, x: number, y: number): boolean {
+  for (let dx = 0; dx < CAMEO_CELLS; dx++) {
+    for (let dy = 0; dy < CAMEO_CELLS; dy++) {
+      if (taken.has(cellKey(x + dx, y + dy))) return false;
     }
   }
+  return true;
+}
+
+function cellKey(x: number, y: number): string {
+  return `${x},${y}`;
 }
 
 /** How tall the camp ended up, counting a block's second row as occupied. */

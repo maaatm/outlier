@@ -115,19 +115,46 @@ describe('the camp layout, with cameos in it', () => {
     expect(places[0]).toEqual({ x: 0, y: 0, span: 1 });
   });
 
-  it('pulls the cameos to the front of their own camp', () => {
-    const withYou = 40;
-    const { places } = campLayout(withYou, 3, 3);
-
-    // Your camp: your dot, then yours, then the pack.
-    for (const index of [1, 2, 3]) expect(places[index]!.span).toBe(2);
-    expect(places[4]!.span).toBe(1);
-
-    // Theirs: the same, from the first index of the other camp.
-    for (const index of [withYou, withYou + 1, withYou + 2]) {
-      expect(places[index]!.span).toBe(2);
+  it('hands the places back in reading order, so the stagger sweeps', () => {
+    const { places } = campLayout(40, 3, 3);
+    for (let index = 1; index < places.length; index++) {
+      const step = [places[index - 1]!.y, places[index - 1]!.x];
+      const next = [places[index]!.y, places[index]!.x];
+      expect(next[0]! > step[0]! || (next[0] === step[0] && next[1]! > step[1]!)).toBe(true);
     }
-    expect(places[withYou + 3]!.span).toBe(1);
+  });
+
+  /*
+   * The reason the scatter exists. Lined up at the front of a camp the blobs
+   * read as a cast standing in front of an audience; spread through it they read
+   * as some of the crowd being people we know. So they have to actually be
+   * spread: not every cameo in the camp's first rows, and not every one of them
+   * in the same column band.
+   */
+  it('scatters them through the camp rather than lining them up at the front', () => {
+    const { places } = campLayout(70, 6, 0);
+    const blocks = places.filter((place) => place.span === 2);
+
+    expect(blocks).toHaveLength(6);
+    expect(new Set(blocks.map((block) => block.y)).size).toBeGreaterThan(1);
+    expect(Math.max(...blocks.map((block) => block.y))).toBeGreaterThan(2);
+  });
+
+  it('deals the same arrangement every time, so nothing reshuffles on a render', () => {
+    expect(campLayout(40, 4, 6)).toEqual(campLayout(40, 4, 6));
+    expect(campLayout(40, 4, 6)).not.toEqual(campLayout(41, 4, 6));
+  });
+
+  it('scatters the two camps differently', () => {
+    // Same camp size, same number of blobs: without a salt per camp the two
+    // would come out as the same pattern twice, which reads as a wallpaper.
+    const { places } = campLayout(50, 4, 4);
+    const yours = places.slice(0, 50).filter((place) => place.span === 2);
+    const theirs = places.slice(50).filter((place) => place.span === 2);
+    const shape = (blocks: Placement[]): string =>
+      blocks.map((block) => `${block.x},${block.y}`).join(' ');
+
+    expect(shape(yours)).not.toBe(shape(theirs.map((block) => ({ ...block, y: block.y - 5.7 }))));
   });
 
   it('measures a camp by the cells it uses, not by the people in it', () => {

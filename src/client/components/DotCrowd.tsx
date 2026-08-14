@@ -27,9 +27,10 @@
  * On the reveal, and nowhere else, up to ten of the dots are real players drawn
  * as their blobs, each standing in the camp they actually answered in. They are
  * *of* the hundred rather than added to it — a cameo is one of the dots drawn
- * larger, so the count on screen is still the count — and they are pulled to the
- * front of their camp with the pack flowing around them, so the difference in
- * size reads as "these are the ones we know" rather than as a second population.
+ * larger, so the count on screen is still the count — and they are scattered
+ * through their camp rather than lined up at the front of it, so the difference
+ * in size reads as "some of these people are ones we know" rather than as a cast
+ * standing in front of an audience.
  *
  * Three things they deliberately do not get. They do not travel on their own
  * clock: they leave the scatter with everybody else and grow into place over the
@@ -188,11 +189,11 @@ export function DotCrowd({
     []
   );
 
-  // Who is actually drawn, and where in the index order they sit. A camp can
-  // hold no more cameos than it has dots — see `cameoCapacity` — so a recent
-  // window that disagrees with the tally loses its overflow here rather than
-  // asking the layout for room that does not exist.
-  const drawn = useMemo(() => byIndex(cameos, withYou), [cameos, withYou]);
+  // Who is actually drawn. A camp can hold no more cameos than it has dots —
+  // see `cameoCapacity` — so a recent window that disagrees with the tally
+  // loses its overflow here rather than asking the layout for room that does
+  // not exist.
+  const drawn = useMemo(() => splitByCamp(cameos, withYou), [cameos, withYou]);
 
   const layout = useMemo(
     () =>
@@ -201,6 +202,11 @@ export function DotCrowd({
         : campLayout(withYou, drawn.yours.length, drawn.theirs.length),
     [withYou, scatter, drawn]
   );
+
+  // Which dot indices came out as blocks. Read off the layout rather than
+  // worked out again here: where the blocks landed is the layout's business,
+  // and a second rule for it here would be a second rule to keep in step.
+  const cameoAt = useMemo(() => assignCameos(layout, drawn, withYou), [layout, drawn, withYou]);
 
   const cell = cellFor(box, layout);
   const dot = cell * DOT_RATIO;
@@ -227,7 +233,7 @@ export function DotCrowd({
 
   function name(index: number | null): void {
     setAsked(index);
-    onName?.(index === null ? null : (drawn.at.get(index)?.name ?? null));
+    onName?.(index === null ? null : (cameoAt.get(index)?.name ?? null));
   }
 
   return (
@@ -239,7 +245,7 @@ export function DotCrowd({
           revealed
             ? `${withYou} of ${CROWD_SIZE} people answered ${yourLabel ?? 'the same as you'}, ` +
               `${CROWD_SIZE - (withYou ?? 0)} answered ${otherLabel ?? 'the other way'}.` +
-              namesSummary(drawn.at.size)
+              namesSummary(cameoAt.size)
             : preview
               ? `Your guess: ${preview.count} of ${CROWD_SIZE} answered ` +
                 `${yourLabel ?? 'the same as you'}, ${CROWD_SIZE - preview.count} ` +
@@ -255,7 +261,7 @@ export function DotCrowd({
 
             const settledHere = settled && revealed;
             const target = settledHere ? layout.places[index]! : scatter[index]!;
-            const cameo = settledHere ? drawn.at.get(index) : undefined;
+            const cameo = settledHere ? cameoAt.get(index) : undefined;
 
             // Your dot sits slightly proud of the pack.
             const proud = mine && revealed ? -cell * PROUD_CELLS : 0;
@@ -352,9 +358,9 @@ export function DotCrowd({
         to. Deliberately not folded into the label above: ten usernames read out
         in one breath is not a summary of anything.
       */}
-      {drawn.at.size > 0 && (
+      {cameoAt.size > 0 && (
         <ul className="visually-hidden">
-          {[...drawn.at.values()].map((cameo, index) => (
+          {[...cameoAt.values()].map((cameo, index) => (
             <li key={index}>
               u/{cameo.name} answered{' '}
               {cameo.withYou
@@ -368,36 +374,49 @@ export function DotCrowd({
   );
 }
 
+type ByCamp = { yours: CrowdCameo[]; theirs: CrowdCameo[] };
+
+/** The cameos each camp can actually hold, in the order they will be dealt. */
+function splitByCamp(cameos: readonly CrowdCameo[], withYou: number | null): ByCamp {
+  if (withYou === null) return { yours: [], theirs: [] };
+
+  return {
+    yours: cameos.filter((cameo) => cameo.withYou).slice(0, cameoCapacity(withYou, true)),
+    // Your own dot holds index 0 wherever it stands. Ordinarily that is the head
+    // of your camp; when the rounding leaves your side with no dots at all it is
+    // the head of theirs, and the cameos step around it either way.
+    theirs: cameos
+      .filter((cameo) => !cameo.withYou)
+      .slice(0, cameoCapacity(CROWD_SIZE - withYou, withYou === 0)),
+  };
+}
+
 /**
- * The cameos, split by camp and mapped onto the indices they are drawn at.
+ * Which dot index each cameo was dealt to.
  *
- * The index order is the one the layout packs in: your dot, then your camp's
- * cameos, then the rest of your camp, then the other camp's cameos, then the
- * rest of it. Keeping the two in step here — rather than having the layout hand
- * back the assignment — is what lets the render loop go on using a plain index
- * for its stagger, its jitter and its bob.
+ * The layout decides *where* the blocks landed and the placements come back in
+ * reading order, so walking them in order and handing out the camp's cameos as
+ * blocks turn up is the whole of it. The counts cannot disagree — both sides
+ * clamp with the same `cameoCapacity` — but a missing one is skipped rather
+ * than drawn as an empty block.
  */
-function byIndex(
-  cameos: readonly CrowdCameo[],
+function assignCameos(
+  layout: { places: { span: number }[] },
+  drawn: ByCamp,
   withYou: number | null
-): { yours: CrowdCameo[]; theirs: CrowdCameo[]; at: Map<number, CrowdCameo> } {
+): Map<number, CrowdCameo> {
   const at = new Map<number, CrowdCameo>();
-  if (withYou === null) return { yours: [], theirs: [], at };
+  if (withYou === null) return at;
 
-  const yours = cameos
-    .filter((cameo) => cameo.withYou)
-    .slice(0, cameoCapacity(withYou, true));
-  const theirs = cameos
-    .filter((cameo) => !cameo.withYou)
-    .slice(0, cameoCapacity(CROWD_SIZE - withYou, withYou === 0));
+  let mine = 0;
+  let other = 0;
+  layout.places.forEach((place, index) => {
+    if (place.span < 2) return;
+    const cameo = index < withYou ? drawn.yours[mine++] : drawn.theirs[other++];
+    if (cameo) at.set(index, cameo);
+  });
 
-  // Your dot holds index 0 wherever it stands. Ordinarily that is the head of
-  // your own camp; when the rounding leaves your side with no dots at all it is
-  // the head of theirs, and the cameos step around it either way.
-  yours.forEach((cameo, index) => at.set(1 + index, cameo));
-  theirs.forEach((cameo, index) => at.set(Math.max(withYou, 1) + index, cameo));
-
-  return { yours, theirs, at };
+  return at;
 }
 
 /** What the field's one-breath summary says about the blobs in it. */
