@@ -114,6 +114,25 @@ export const keys = {
    */
   names: 'users:names',
 
+  /**
+   * hash: userId -> "faceId:accessoryId". Everyone's equipped blob, in one key.
+   *
+   * Packed into a single field of a single shared hash rather than a key per
+   * player, so a screen wanting ten players' blobs pays one `hMGet` instead of
+   * ten round trips. Absent means the starter pair, so nothing has to be
+   * back-filled for players who have never opened the wardrobe.
+   */
+  avatars: 'avatars',
+
+  /**
+   * hash: itemId -> "1". What one player owns.
+   *
+   * Starter items are never in here: they are owned implicitly, and writing them
+   * to every player's hash would be a row per person to say what is true of
+   * everyone.
+   */
+  inventory: (userId: string) => `inv:${userId}`,
+
   /** string: index into the shuffled house pool. */
   poolCursor: 'pool:cursor',
 } as const;

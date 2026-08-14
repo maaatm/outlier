@@ -177,6 +177,9 @@ pool:cursor            string index into the shuffled house pool
 lb:points:{YYYY-Www}   zset   userId -> weekly points + tiebreak, TTL 9 days
 lb:points:all          zset   userId -> lifetime points + tiebreak
 users:names            hash   userId -> username
+
+avatars                hash   userId -> "faceId:accessoryId"
+inv:{userId}           hash   itemId -> "1"
 ```
 
 **Additions and why.** `hist:` and `stats:misjudged` are caches so the reveal and the
@@ -198,6 +201,14 @@ tiebreak fraction under the points (see `src/shared/board.ts`) and `zIncrBy` can
 trusted to carry that fraction across increments. `users:names` is the only place a
 voter's username is stored; it is written once per player, because the alternative is a
 Reddit API call on every vote.
+
+**Avatars.** `avatars` is one shared hash with the equipped pair packed into a single
+field, rather than a key per player, so a screen wanting ten players' blobs costs one
+`hMGet` and not ten round trips. An absent field is the starter pair, so nothing needs
+back-filling for a player who has never opened the wardrobe. `inv:` is what a player owns;
+starter items are never written to it, because they are owned implicitly by everyone.
+Nothing reads `inv:` yet — every item is currently unlocked — but it is written from the
+start so there is an inventory to lock against later rather than one to reconstruct.
 
 `voted:{questionId}` is both the dedupe guard and the record of what to render on
 return. A player reopening a post they have answered always lands on the completed
@@ -225,6 +236,8 @@ POST /api/comment             posts the generated comment as this user
 POST /api/submit              create an open question + post
 GET  /api/leaderboard/questions  most misjudged questions ever
 GET  /api/leaderboard/players?range=week|all   players by points banked
+GET  /api/avatar              the pair you are wearing, and what you own
+POST /api/avatar              { face, accessory } -> the same shape
 GET  /api/today               today's UTC day key
 GET  /api/daily?from={postId} where today's Daily is — a state and a permalink
 GET  /api/queue               mod-only
@@ -305,9 +318,33 @@ against eighty-one lands harder than "19%".
 - Eight dots carry faces, chosen by a fixed seed — a crowd where every face is drawn
   looks like a mascot sheet
 
+**Blobs** are the same drawing with more shape: a dot, a face, and an accessory. They
+appear in front of a community question's author line and in the player's own record,
+and the catalogue lives in `src/shared/items.ts` as inline SVG path data.
+
+The rule the catalogue is built on is that **an accessory breaks the circle's silhouette
+rather than decorating the inside of it** — a horn, a pair of ears, a halo, an antenna.
+A dot on a phone lands somewhere around 14–22px, where interior detail is a smudge and an
+outline is not, which is the same reason the crowd's faces are two dark spans and nothing
+more. A hat would fail that test; the accessory is what changed to pass it.
+
+Everything is authored against one viewBox with the dot at a known place, and the
+accessory's room is *inside* it — the element is `size` wide and half again as tall. That
+is deliberate: `.slide` and `.menu__body` are scroll containers and clip on both axes, so
+art that paints outside its own box loses an edge there. Rarity is carried by the colour
+of a layer's border in the wardrobe and by the word beside the count.
+
 **Color** is semantic. Each accent means exactly one thing and no screen shows more than
 two at once: `--signal` you, `--rare` minority, `--hit` accurate, `--sun` streak and
 nothing else. Dark mode moves the neutrals only; the accents hold in both.
+
+The rarity ladder — `--rarity-common`, `--rarity-uncommon`, `--rarity-rare` — is the one
+exception, and is kept an exception by being confined to the wardrobe's two layer borders,
+where it never shares a screen with any of the four above. Its hues are chosen out of the
+gaps those four leave: blue, red, green and yellow are spoken for, which rules out the
+grey/green/blue ladder other games have trained players to expect, so the ladder is slate,
+cyan and violet instead. Colour is the second channel, not the only one — the rarity is
+also written next to the count.
 
 **Type.** Gabarito for display and big numbers, Instrument Sans for body and UI, DM Mono
 for metadata. All three are bundled as subsetted woff2 in `src/client/fonts` and served

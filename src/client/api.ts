@@ -2,6 +2,8 @@
 
 import type {
   ApiError,
+  AvatarRequest,
+  AvatarResponse,
   BoardRange,
   CommentResponse,
   DailyPointer,
@@ -82,6 +84,22 @@ export function fetchMisjudged(): Promise<MisjudgedResponse> {
 /** Who has banked the most points. One read per tab, no cache behind it. */
 export function fetchPlayerBoard(range: BoardRange): Promise<PlayerBoardResponse> {
   return request<PlayerBoardResponse>(`/api/leaderboard/players?range=${range}`);
+}
+
+/** What this player is wearing, and everything they own. */
+export function fetchAvatar(): Promise<AvatarResponse> {
+  return request<AvatarResponse>('/api/avatar');
+}
+
+/**
+ * Put a pair on. The server re-checks both ids against the catalogue and the
+ * slot they arrived in, so this is a request rather than an instruction.
+ */
+export function saveAvatar(equipped: AvatarRequest): Promise<AvatarResponse> {
+  return request<AvatarResponse>('/api/avatar', {
+    method: 'POST',
+    body: JSON.stringify(equipped),
+  });
 }
 
 /**

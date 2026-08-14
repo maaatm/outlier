@@ -21,6 +21,20 @@ export const MINORITY_THRESHOLD = 35;
 /** The crowd is always drawn as this many dots, whatever the real vote count. */
 export const CROWD_SIZE = 100;
 
+/**
+ * The sizes a blob is drawn at, in pixels, and the only ones it is tuned for.
+ *
+ * `crowd` is where a dot lands on a phone once the crowd has measured itself,
+ * and is the size the accessory silhouettes have to survive; `inline` sits in
+ * front of a community question's author line; `panel` is the player's own
+ * record; `wardrobe` is the one the player is actually working on, which is the
+ * only screen where the blob is the subject rather than a label.
+ *
+ * A short list rather than a scale, because an item that reads at 18 and at 40
+ * reads everywhere in between.
+ */
+export const BLOB_SIZE = { crowd: 18, inline: 24, panel: 40, wardrobe: 72 } as const;
+
 /** One submission per user per 24h, enforced server-side with a TTL. */
 export const SUBMISSION_COOLDOWN_SECONDS = 24 * 60 * 60;
 

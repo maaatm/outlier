@@ -11,10 +11,19 @@ import type { T3 } from '@devvit/web/shared';
 import { Hono } from 'hono';
 
 import { buildComment, normalizeNote } from '../../shared/comment.js';
+import {
+  type Equipped,
+  STARTER_ACCESSORY,
+  STARTER_FACE,
+  STARTER_PAIR,
+  getItem,
+} from '../../shared/items.js';
 import { awardFor } from '../../shared/points.js';
 import { isValidChoice, isValidGuess } from '../../shared/scoring.js';
 import type {
   ApiError,
+  AvatarRequest,
+  AvatarResponse,
   BoardRange,
   CommentRequest,
   CommentResponse,
@@ -26,10 +35,16 @@ import type {
 } from '../../shared/types.js';
 import { toDayKey } from '../../shared/day.js';
 import { REPLAY_MODE } from '../../shared/config.js';
+import { equipAvatar, ownsItem, readAvatar, readInventory } from '../core/avatars.js';
 import { getDailyQuestionId } from '../core/daily.js';
 import { readPlayerBoard } from '../core/leaderboard.js';
 import { isMenuPost } from '../core/menuPost.js';
-import { getQuestion, getQuestionIdForPost, toPublicQuestion } from '../core/questions.js';
+import {
+  type QuestionRecord,
+  getQuestion,
+  getQuestionIdForPost,
+  toPublicQuestion,
+} from '../core/questions.js';
 import { misjudgedLeaderboard } from '../core/stats.js';
 import { EMPTY_USER, getUser, projectStats, recordPlay } from '../core/users.js';
 import { buildReveal, castVote, getStoredVote, recordComment } from '../core/votes.js';
@@ -60,7 +75,11 @@ api.get('/api/state/:postId', async (c) => {
   const question = await getQuestion(questionId);
   if (!question) return c.json<ApiError>({ error: 'That question is gone.' }, 404);
 
-  const vote = userId ? await getStoredVote(questionId, userId) : null;
+  // Two independent reads, so they go together rather than one after the other.
+  const [vote, authorAvatar] = await Promise.all([
+    userId ? getStoredVote(questionId, userId) : null,
+    authorAvatarFor(question),
+  ]);
 
   // The only path to a tally.
   const reveal = vote && userId ? await buildReveal(question, vote, userId, stats) : null;
@@ -71,8 +90,22 @@ api.get('/api/state/:postId', async (c) => {
     reveal,
     stats,
     canVote: Boolean(userId) && question.lockedAt === 0,
+    authorAvatar,
   });
 });
+
+/**
+ * The blob shown in front of `asked by u/…`.
+ *
+ * House questions have no author line, so they get nothing rather than the
+ * starter pair — the absence is what the client renders, not a default blob
+ * beside a name that is not there. A community question written before the
+ * author id was stored lands in the same place.
+ */
+async function authorAvatarFor(question: QuestionRecord): Promise<Equipped | null> {
+  if (question.source !== 'community' || !question.authorId) return null;
+  return readAvatar(question.authorId);
+}
 
 /** Lock in an answer and a guess. This is where the tally first becomes visible. */
 api.post('/api/vote', async (c) => {
@@ -164,6 +197,70 @@ api.post('/api/comment', async (c) => {
 
   await recordComment(questionId, userId, comment.id);
   return c.json<CommentResponse>({ ok: true, permalink: comment.permalink });
+});
+
+/**
+ * What this player is wearing, and what they own.
+ *
+ * A signed-out reader gets the starter pair and no way to save one — the same
+ * shape as `canVote` on the question state, so the client branches on a field
+ * rather than on the shape of what came back.
+ */
+api.get('/api/avatar', async (c) => {
+  const userId = context.userId;
+  if (!userId) {
+    return c.json<AvatarResponse>({
+      ...STARTER_PAIR,
+      owned: [STARTER_FACE.id, STARTER_ACCESSORY.id],
+      canSave: false,
+    });
+  }
+
+  const [equipped, owned] = await Promise.all([readAvatar(userId), readInventory(userId)]);
+  return c.json<AvatarResponse>({ ...equipped, owned, canSave: true });
+});
+
+/**
+ * Put a pair on.
+ *
+ * Both ids are checked against the catalogue **and against the slot they were
+ * sent in**, so a face id in the accessory field is a 400 rather than a blob
+ * wearing its own eyes as a hat. Ownership is checked too, through a helper that
+ * currently says yes to everything: nothing is locked until the economy lands,
+ * but an inventory the client can bypass is decoration, and the check belongs at
+ * the call site from the beginning rather than being retrofitted onto it.
+ */
+api.post('/api/avatar', async (c) => {
+  const userId = context.userId;
+  if (!userId) return c.json<ApiError>({ error: 'Sign in to change your blob.' }, 401);
+
+  const body = await c.req.json<Partial<AvatarRequest>>().catch(() => null);
+  if (!body || typeof body.face !== 'string' || typeof body.accessory !== 'string') {
+    return c.json<ApiError>({ error: 'Malformed request.' }, 400);
+  }
+
+  const face = getItem(body.face, 'face');
+  const accessory = getItem(body.accessory, 'accessory');
+  if (!face || !accessory) {
+    return c.json<ApiError>({ error: 'That is not something you can wear there.' }, 400);
+  }
+
+  const [ownsFace, ownsAccessory] = await Promise.all([
+    ownsItem(userId, face),
+    ownsItem(userId, accessory),
+  ]);
+  if (!ownsFace || !ownsAccessory) {
+    return c.json<ApiError>({ error: 'You do not have that one yet.' }, 403);
+  }
+
+  const equipped: Equipped = { face: face.id, accessory: accessory.id };
+  await equipAvatar(userId, equipped);
+
+  return c.json<AvatarResponse>({
+    ...equipped,
+    owned: await readInventory(userId),
+    canSave: true,
+  });
 });
 
 /** The most misjudged questions ever. Safe to read without having voted. */

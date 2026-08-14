@@ -1,6 +1,7 @@
 /** Wire types shared by the client and the server. */
 
 import type { BadgeId } from './badges.js';
+import type { Equipped } from './items.js';
 import type { Award } from './points.js';
 
 /** Which side of a question a player took. Always exactly two. */
@@ -109,6 +110,18 @@ export type QuestionState = {
   stats: PlayerStats;
   /** Signed-out users can read the question but cannot vote. */
   canVote: boolean;
+  /**
+   * The blob of whoever asked, for the author line.
+   *
+   * Null on house questions, which carry no author line at all. It rides on the
+   * state rather than costing the client a second fetch — one extra field on a
+   * response it already waits for, off a `authorId` already in hand.
+   *
+   * Here rather than on `Question` because the public question projection is
+   * deliberately narrow and this is presentation, not content. It carries no
+   * vote information of any kind.
+   */
+  authorAvatar: Equipped | null;
 };
 
 /**
@@ -241,6 +254,22 @@ export type DailyPointer = {
   /** Reddit path, not a URL. Absent when there is nowhere to go. */
   permalink?: string;
 };
+
+/**
+ * `GET /api/avatar` and what `POST /api/avatar` answers with.
+ *
+ * `owned` is the real inventory and nothing gates on it yet — every item is
+ * unlocked in this change, so the wardrobe offers the whole catalogue. It is on
+ * the wire from the start because the change that locks items needs the client
+ * to already know what it holds.
+ */
+export type AvatarResponse = Equipped & {
+  owned: string[];
+  /** Signed-out players get the starter pair and no way to change it. */
+  canSave: boolean;
+};
+
+export type AvatarRequest = Equipped;
 
 export type ApiError = {
   error: string;
