@@ -195,6 +195,13 @@ correctly in dev. **Submission coins do inflate**, because nothing rate-limits s
 any more; a dev subreddit will accumulate them quickly, and that is expected rather than
 broken. Nothing in the economy checks the flag.
 
+**The crowd's cameos are absent under it**, and that is the flag working rather than a
+bug. `recent:{questionId}` is written on the same branch as `guesses:`, which the flag
+skips, and nothing is written to `voted:` either — so there is no pool to draw from and no
+side to draw anyone on. Nothing in `core/cameos.ts` checks the flag; the feature simply has
+no data in a replay subreddit and is correct the moment the flag flips. Seeing cameos while
+developing means turning it off.
+
 The server logs a warning on boot while it is on. Set it to `false` before this
 goes anywhere real.
 
@@ -219,6 +226,28 @@ Related guarantees:
 - A vote on a closed question returns **423**. Nothing closes a question on a schedule —
   see below.
 
+### What the reveal says about other people
+
+Up to ten players appear in the reveal's crowd as their blobs, on the side they actually
+answered. That is a real widening of what the game discloses, and it is worth being
+straight about: before this, how you answered was yours unless *you* tapped share and
+posted the comment. The setting ships **on**, so three things are not optional.
+
+- **The notice is in place, not in a settings page.** The first reveal where a player's own
+  blob is eligible tells them so, on that screen, with both answers one tap away. Nobody's
+  first encounter with this should be discovering it already happened.
+- **Turning it off is retroactive.** `showBlob` is read every time a crowd is drawn and is
+  never captured at vote time, so switching it off takes a player out of every crowd they
+  are in — including questions answered months ago. Absent means on *and* never asked, which
+  is why there is no migration and no second field recording who has been told.
+- **Only voters are eligible, structurally.** The candidates come from `recent:{questionId}`,
+  which only `castVote` writes, so a signed-out reader and a player who has never answered
+  cannot be in the pool at all rather than being filtered out of it.
+
+None of this weakens the tally invariant. Cameos ride on `Reveal` and on nothing else, so
+they are behind the same `voted:{questionId}` gate — a viewer who has not answered cannot
+reach them, and a viewer who has already holds the tally those ten answers are part of.
+
 ---
 
 ## Data model
@@ -239,10 +268,11 @@ guesses:{questionId}   zset   userId -> guess     (the distribution record)
 voted:{questionId}     hash   userId -> "a:45:21" (dedupe guard + what to re-render)
 hist:{questionId}      hash   bucket -> count     (derived from guesses)
 commented:{questionId} hash   userId -> commentId
+recent:{questionId}    zset   userId -> voted at  (capped window, for the cameos)
 
 user:{userId}          hash   streak, bestStreak, lastPlayedDay, points,
                               totalPlayed, totalHits, weekPoints, weekKey,
-                              coins, pity, subDay, subCount
+                              coins, pity, subDay, subCount, showBlob
 sub:recent:{userId}    hash   submission fingerprint -> "1", TTL 60s
 
 queue:pending          zset   questionId -> upvotes
@@ -293,6 +323,15 @@ trip. The totals are written by assignment because `recordPlay` is their only wr
 balance moves by `hIncrBy`, because a box opened in the same breath as a vote would
 otherwise be undone by a total read before the debit happened.
 
+**The cameos.** `recent:` is a window, not a register: it is trimmed to
+`RECENT_VOTER_CAP` (30) on every write, because a question with ten thousand voters must
+not carry a ten-thousand-member zset for a feature that puts ten blobs on a screen. The
+ten are drawn from across that window by a seeded shuffle rather than taken off the end of
+it — the last ten people to answer are not a sample of the crowd, and on a 50/50 question
+a run of one answer would put every cameo in one camp. The seed is the question, so
+reopening a reveal shows the same faces rather than reshuffling them. Being in `recent:`
+is not permission to be drawn; that is `showBlob`, read at render time, below.
+
 `voted:{questionId}` is both the dedupe guard and the record of what to render on
 return. A player reopening a post they have answered always lands on the completed
 reveal — never a blank form, never a second vote. Its third field is the error the
@@ -319,8 +358,10 @@ POST /api/comment             posts the generated comment as this user
 POST /api/submit              create an open question + post
 GET  /api/leaderboard/questions  most misjudged questions ever
 GET  /api/leaderboard/players?range=week|all   players by points banked
-GET  /api/avatar              the pair you are wearing, what you own, your balance
-POST /api/avatar              { face, accessory } -> the same shape; 403 if unowned
+GET  /api/avatar              the pair you are wearing, what you own, your balance,
+                              and whether other players may see it
+POST /api/avatar              { face?, accessory?, showBlob? } -> the same shape;
+                              403 if unowned, 400 if it asks for nothing
 POST /api/box/open            spend coins, roll an item -> { item, duplicate, refunded, coins }
 GET  /api/today               today's UTC day key
 GET  /api/daily?from={postId} where today's Daily is — a state and a permalink
@@ -413,6 +454,19 @@ against eighty-one lands harder than "19%".
 - Your side takes the accent for your outcome; the opposing side is ink at 15%
 - Eight dots carry faces, chosen by a fixed seed — a crowd where every face is drawn
   looks like a mascot sheet
+- On the reveal, up to ten of the dots are real players drawn as their blobs, each in the
+  camp they answered in. They are *of* the hundred rather than added to it — a cameo is one
+  of the dots drawn larger, so the count on screen is still the count, and a camp never
+  holds more of them than it has dots. They take a 2×2 block at the front of their camp
+  with the pack flowing around them, they travel on the same clock as everyone else, and
+  they never take the top-left cell, which is yours. Tap or hover one for a name; the
+  caption slot under the crowd is where it goes
+
+The blob inside a cameo's block is sized to *fit* it rather than to overflow it, which is
+what keeps the rest of the geometry honest: a block reaches exactly as far as the two cells
+it sits on, so the box the crowd measures itself against needed no changes, no accessory
+paints outside the field, and nothing clips against the slide's scroll boundary. The
+packing lives in `src/client/crowdLayout.ts` and is tested there.
 
 **Blobs** are the same drawing with more shape: a dot, a face, and an accessory. They
 appear in front of a community question's author line and in the player's own record,
@@ -482,7 +536,7 @@ room at all.
 | Entry | What it holds |
 |---|---|
 | **Today's question** | leaves the post for today's Daily. Not a room |
-| Your record | streak, best, points, coins, questions answered, read rate |
+| Your record | streak, best, points, coins, questions answered, read rate, and whether other players see your blob |
 | Wardrobe | your blob, your balance, the items you own, and the gift box |
 | Leaderboard | who has banked the most points, weekly or all time |
 | Hardest to read | the misjudged leaderboard, five rows |
@@ -493,6 +547,11 @@ to tell which is which before tapping. It reads `GET /api/daily`, which answers 
 of four states: `playable`, `voted`, `here` (you are already on today's Daily), or `none`
 (no Daily yet today). While the pointer is in flight the button renders disabled rather
 than absent; a control that arrives after the screen settles shifts everything under it.
+
+**Your record holds the one setting in the app**, next to the blob it is about: whether
+other players see that blob in the crowd. It is not in the wardrobe, because the wardrobe
+is about what your blob looks like and this is about who it is shown to. One line of copy
+says what it does, including that turning it off is retroactive.
 
 **The balance is in Your record and the wardrobe, not the header.** The header shows the
 streak and the points, and `--sun` marks the streak alone; a third counter up there would

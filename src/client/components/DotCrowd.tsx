@@ -21,30 +21,50 @@
  * with a 6ms stagger and a light spring overshoot. Your dot lands last, ~150ms
  * behind the pack, with a small pop. Underneath all of that they bob gently and
  * out of step with each other, so the crowd reads as alive rather than parked.
+ *
+ * ## The cameos
+ *
+ * On the reveal, and nowhere else, up to ten of the dots are real players drawn
+ * as their blobs, each standing in the camp they actually answered in. They are
+ * *of* the hundred rather than added to it — a cameo is one of the dots drawn
+ * larger, so the count on screen is still the count — and they are pulled to the
+ * front of their camp with the pack flowing around them, so the difference in
+ * size reads as "these are the ones we know" rather than as a second population.
+ *
+ * Three things they deliberately do not get. They do not travel on their own
+ * clock: they leave the scatter with everybody else and grow into place over the
+ * same 600ms, because the reveal is one moment and not two. They do not take the
+ * top-left cell of your camp, which belongs to your dot. And they get no extra
+ * imperfection — the same seeded jitter as everyone else, and nothing more.
+ *
+ * A blob with no name is decoration, and ten names printed under ten blobs is a
+ * wall of text on the most carefully composed screen in the app. So a name is
+ * something you ask for: hover where a hover means something, tap where it does
+ * not, and the name appears in the caption slot the crowd already has. For a
+ * reader who can do neither, the field keeps its one-breath summary and the
+ * names follow it as a list.
  */
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import type { BadgeAccent } from '../../shared/badges.js';
 import { CROWD_SIZE } from '../../shared/config.js';
+import type { Equipped } from '../../shared/items.js';
 import type { GroupColors } from '../colors.js';
+import {
+  DOT_RATIO,
+  PER_ROW,
+  PROUD_CELLS,
+  REFERENCE_CELL,
+  SCATTER_SPREAD,
+  cameoBlob,
+  cameoCapacity,
+  campLayout,
+  cellFor,
+  scatterLayout,
+} from '../crowdLayout.js';
 import { facedDots, hashUnit, jitterFor, scatterFor } from '../jitter.js';
-
-const PER_ROW = 10;
-/** Blank space between the two camps, in cells. */
-const CAMP_GAP_CELLS = 0.7;
-
-/** A dot fills most of its cell; the remainder is the breathing room. */
-const DOT_RATIO = 0.9;
-/** The size everything was tuned against, so jitter scales with the cell. */
-const REFERENCE_CELL = 20;
-
-/** Jitter is ±2px at the reference cell, which is a constant in cells. */
-const JITTER_CELLS = 2 / REFERENCE_CELL;
-/** How far your dot sits proud of the pack, up and to the left. */
-const PROUD_CELLS = 0.16;
-/** How far a dot strays from its cell in the pre-reveal scatter. */
-const SCATTER_SPREAD = 0.45;
+import { Blob } from './Blob.js';
 
 const FACES = 8;
 const STAGGER_MS = 6;
@@ -54,6 +74,20 @@ const MINE_DELAY_MS = 150;
 /** Idle bob, in seconds. Each dot picks its own from a seeded hash. */
 const BOB_MIN = 1.9;
 const BOB_MAX = 3.4;
+
+/**
+ * One player in the crowd.
+ *
+ * Which camp they stand in arrives already decided, as a boolean about the
+ * viewer, rather than as the side they picked. The crowd draws two camps and has
+ * never known what either of them means; keeping it that way is what stops a
+ * component about dots from learning about votes.
+ */
+export type CrowdCameo = {
+  name: string;
+  avatar: Equipped;
+  withYou: boolean;
+};
 
 type Props = {
   /** How many of the hundred stand with you. Null before the reveal. */
@@ -76,81 +110,18 @@ type Props = {
    * the reveal is a verdict on a vote just cast, not a thing to replay.
    */
   animate?: boolean;
+  /**
+   * The players in this crowd. Only ever passed on the reveal: the pre-vote
+   * scatter is undifferentiated on purpose, and putting known faces in it would
+   * start hinting at a split nobody has earned yet.
+   */
+  cameos?: readonly CrowdCameo[];
+  /**
+   * Somebody has asked who one of them is, or stopped asking. The name goes
+   * wherever the caller already had room for one.
+   */
+  onName?: (name: string | null) => void;
 };
-
-type Placement = { x: number; y: number };
-
-/**
- * Where the dots rest, and the box that exactly holds them.
- *
- * The box is measured from the arrangement actually on screen rather than from
- * a worst case, so the crowd fills the space it is given and sits centered in
- * it — a fifty-fifty split needs ten rows, a fifty-five split needs eleven, and
- * the scatter before the reveal needs ten. Everything is in cells; the caller
- * multiplies by the measured cell size.
- */
-type Layout = {
-  places: Placement[];
-  width: number;
-  height: number;
-  /** Slack on every side, for what strays outside its cell. Kept symmetric so
-      the crowd stays centered in the box. */
-  margin: number;
-};
-
-/** How much room a run of `count` cells needs: the span, the dot, the slack. */
-function extent(count: number, margin: number): number {
-  return count - 1 + DOT_RATIO + margin * 2;
-}
-
-/**
- * Two blocks, ten to a row: your camp on top, theirs below, with a gap between.
- * The row counts carry the proportion on their own.
- */
-function campLayout(withYou: number): Layout {
-  const yourRows = Math.ceil(withYou / PER_ROW);
-  const otherRows = Math.ceil((CROWD_SIZE - withYou) / PER_ROW);
-  // Nothing to separate when one camp took every dot.
-  const gap = yourRows > 0 && otherRows > 0 ? CAMP_GAP_CELLS : 0;
-  const places: Placement[] = [];
-
-  for (let i = 0; i < CROWD_SIZE; i++) {
-    const mine = i < withYou;
-    const indexInCamp = mine ? i : i - withYou;
-    const row = Math.floor(indexInCamp / PER_ROW);
-    const column = indexInCamp % PER_ROW;
-    places.push({
-      x: column,
-      y: row + (mine ? 0 : yourRows + gap),
-    });
-  }
-
-  // Your dot is the top-left one, so its proud offset is what decides the slack.
-  const margin = JITTER_CELLS + PROUD_CELLS;
-  return {
-    places,
-    width: extent(PER_ROW, margin),
-    height: extent(yourRows + otherRows, margin) + gap,
-    margin,
-  };
-}
-
-/** The loose neutral scatter, which strays a good part of a cell either way. */
-function scatterLayout(places: Placement[]): Layout {
-  const margin = SCATTER_SPREAD + JITTER_CELLS;
-  return {
-    places,
-    width: extent(PER_ROW, margin),
-    height: extent(Math.ceil(CROWD_SIZE / PER_ROW), margin),
-    margin,
-  };
-}
-
-/** Largest cell that fits the whole layout into the measured box. */
-function cellFor(box: { width: number; height: number }, layout: Layout): number {
-  if (box.width <= 0 || box.height <= 0) return 0;
-  return Math.min(box.width / layout.width, box.height / layout.height);
-}
 
 export function DotCrowd({
   withYou,
@@ -160,6 +131,8 @@ export function DotCrowd({
   yourLabel,
   otherLabel,
   animate = true,
+  cameos = [],
+  onName,
 }: Props): React.JSX.Element {
   const revealed = withYou !== null;
   // The preview exists only before the reveal, and only once there is a pair of
@@ -214,15 +187,26 @@ export function DotCrowd({
       ),
     []
   );
+
+  // Who is actually drawn, and where in the index order they sit. A camp can
+  // hold no more cameos than it has dots — see `cameoCapacity` — so a recent
+  // window that disagrees with the tally loses its overflow here rather than
+  // asking the layout for room that does not exist.
+  const drawn = useMemo(() => byIndex(cameos, withYou), [cameos, withYou]);
+
   const layout = useMemo(
-    () => (withYou === null ? scatterLayout(scatter) : campLayout(withYou)),
-    [withYou, scatter]
+    () =>
+      withYou === null
+        ? scatterLayout(scatter)
+        : campLayout(withYou, drawn.yours.length, drawn.theirs.length),
+    [withYou, scatter, drawn]
   );
 
   const cell = cellFor(box, layout);
   const dot = cell * DOT_RATIO;
   const jitterScale = cell / REFERENCE_CELL;
   const inset = cell * layout.margin;
+  const blob = cameoBlob();
   /*
    * The field is the whole box, and the crowd is centered inside it by this
    * offset. Sizing the field to the crowd instead and letting flex center it
@@ -235,6 +219,17 @@ export function DotCrowd({
   const originX = (box.width - cell * layout.width) / 2;
   const originY = (box.height - cell * layout.height) / 2;
 
+  // Which blob is currently being asked about, by index rather than by name:
+  // two players are allowed to share a display name, and neither should light
+  // up when the other is pointed at.
+  const [asked, setAsked] = useState<number | null>(null);
+  const precise = usePreciseHover();
+
+  function name(index: number | null): void {
+    setAsked(index);
+    onName?.(index === null ? null : (drawn.at.get(index)?.name ?? null));
+  }
+
   return (
     <div className="crowd" ref={boxRef}>
       <div
@@ -243,7 +238,8 @@ export function DotCrowd({
         aria-label={
           revealed
             ? `${withYou} of ${CROWD_SIZE} people answered ${yourLabel ?? 'the same as you'}, ` +
-              `${CROWD_SIZE - (withYou ?? 0)} answered ${otherLabel ?? 'the other way'}.`
+              `${CROWD_SIZE - (withYou ?? 0)} answered ${otherLabel ?? 'the other way'}.` +
+              namesSummary(drawn.at.size)
             : preview
               ? `Your guess: ${preview.count} of ${CROWD_SIZE} answered ` +
                 `${yourLabel ?? 'the same as you'}, ${CROWD_SIZE - preview.count} ` +
@@ -257,13 +253,17 @@ export function DotCrowd({
             const mine = index === 0;
             const onYourSide = revealed && index < (withYou ?? 0);
 
-            const target = settled && revealed ? layout.places[index]! : scatter[index]!;
+            const settledHere = settled && revealed;
+            const target = settledHere ? layout.places[index]! : scatter[index]!;
+            const cameo = settledHere ? drawn.at.get(index) : undefined;
 
             // Your dot sits slightly proud of the pack.
             const proud = mine && revealed ? -cell * PROUD_CELLS : 0;
 
             const slotClasses = ['dot-slot'];
             if (mine && settled && revealed && animate) slotClasses.push('is-landed');
+            if (cameo) slotClasses.push('dot-slot--cameo');
+            if (cameo && asked === index) slotClasses.push('is-asked');
 
             const dotClasses = ['dot'];
             if (mine && revealed) dotClasses.push('dot--mine', `dot--${accent}`);
@@ -280,46 +280,151 @@ export function DotCrowd({
 
             const bob = BOB_MIN + hashUnit(index, 21) * (BOB_MAX - BOB_MIN);
 
+            // A cameo's blob is drawn to fit its block, so the whole shape —
+            // accessory included — stays inside the crowd's measured box. The
+            // block is wider than the drawing, so it is centred across it.
+            const centering = cameo ? blob.inset * cell : 0;
+
             return (
               <span
                 key={index}
                 className={slotClasses.join(' ')}
                 style={{
-                  width: dot,
-                  height: dot,
+                  width: cameo ? blob.width * cell : dot,
+                  height: cameo ? blob.height * cell : dot,
                   transform:
-                    `translate(${(originX + inset + target.x * cell + jitter.dx * jitterScale + proud).toFixed(2)}px, ` +
+                    `translate(${(originX + inset + target.x * cell + centering + jitter.dx * jitterScale + proud).toFixed(2)}px, ` +
                     `${(originY + inset + target.y * cell + jitter.dy * jitterScale + proud).toFixed(2)}px)`,
                   transitionDelay:
                     revealed && animate
                       ? `${index * STAGGER_MS + (mine ? MINE_DELAY_MS : 0)}ms`
                       : '0ms',
+                  rotate: cameo ? `${jitter.rotation.toFixed(2)}deg` : undefined,
                 }}
+                // A pointer affordance and nothing more: this sits inside a
+                // `role="img"`, which prunes its own subtree, so anything
+                // focusable in here would be a tab stop a screen reader could
+                // not see. The list under the field is where the names actually
+                // live.
+                onPointerEnter={precise && cameo ? () => name(index) : undefined}
+                onPointerLeave={precise && cameo ? () => name(null) : undefined}
+                onClick={cameo ? () => name(asked === index ? null : index) : undefined}
               >
-                <span
-                  className={dotClasses.join(' ')}
-                  style={{
-                    // The dot's own transition carries this, so a dot crossing
-                    // the boundary fades rather than flicks.
-                    backgroundColor: groupColor,
-                    rotate: `${jitter.rotation.toFixed(2)}deg`,
-                    // Out of step on purpose: a crowd bobbing in unison reads
-                    // as a machine, not as people.
-                    animationDuration: `${bob.toFixed(2)}s`,
-                    animationDelay: `${(hashUnit(index, 22) * -bob).toFixed(2)}s`,
-                  }}
-                >
-                  {faces.has(index) && (
-                    <>
-                      <span className="dot__eye dot__eye--left" />
-                      <span className="dot__eye dot__eye--right" />
-                    </>
-                  )}
-                </span>
+                {cameo ? (
+                  <Blob
+                    face={cameo.avatar.face}
+                    accessory={cameo.avatar.accessory}
+                    size={blob.width * cell}
+                    // Their camp's colour, not their own: a neutral blob
+                    // standing in an accented camp reads as being on the other
+                    // side, which is the one thing a cameo must never do.
+                    fill={cameo.withYou ? `var(--${accent})` : undefined}
+                  />
+                ) : (
+                  <span
+                    className={dotClasses.join(' ')}
+                    style={{
+                      // The dot's own transition carries this, so a dot crossing
+                      // the boundary fades rather than flicks.
+                      backgroundColor: groupColor,
+                      rotate: `${jitter.rotation.toFixed(2)}deg`,
+                      // Out of step on purpose: a crowd bobbing in unison reads
+                      // as a machine, not as people.
+                      animationDuration: `${bob.toFixed(2)}s`,
+                      animationDelay: `${(hashUnit(index, 22) * -bob).toFixed(2)}s`,
+                    }}
+                  >
+                    {faces.has(index) && (
+                      <>
+                        <span className="dot__eye dot__eye--left" />
+                        <span className="dot__eye dot__eye--right" />
+                      </>
+                    )}
+                  </span>
+                )}
               </span>
             );
           })}
       </div>
+
+      {/*
+        The names, one item each, for the reader the hover and the tap are no use
+        to. Deliberately not folded into the label above: ten usernames read out
+        in one breath is not a summary of anything.
+      */}
+      {drawn.at.size > 0 && (
+        <ul className="visually-hidden">
+          {[...drawn.at.values()].map((cameo, index) => (
+            <li key={index}>
+              u/{cameo.name} answered{' '}
+              {cameo.withYou
+                ? (yourLabel ?? 'the same as you')
+                : (otherLabel ?? 'the other way')}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
+}
+
+/**
+ * The cameos, split by camp and mapped onto the indices they are drawn at.
+ *
+ * The index order is the one the layout packs in: your dot, then your camp's
+ * cameos, then the rest of your camp, then the other camp's cameos, then the
+ * rest of it. Keeping the two in step here — rather than having the layout hand
+ * back the assignment — is what lets the render loop go on using a plain index
+ * for its stagger, its jitter and its bob.
+ */
+function byIndex(
+  cameos: readonly CrowdCameo[],
+  withYou: number | null
+): { yours: CrowdCameo[]; theirs: CrowdCameo[]; at: Map<number, CrowdCameo> } {
+  const at = new Map<number, CrowdCameo>();
+  if (withYou === null) return { yours: [], theirs: [], at };
+
+  const yours = cameos
+    .filter((cameo) => cameo.withYou)
+    .slice(0, cameoCapacity(withYou, true));
+  const theirs = cameos
+    .filter((cameo) => !cameo.withYou)
+    .slice(0, cameoCapacity(CROWD_SIZE - withYou, withYou === 0));
+
+  // Your dot holds index 0 wherever it stands. Ordinarily that is the head of
+  // your own camp; when the rounding leaves your side with no dots at all it is
+  // the head of theirs, and the cameos step around it either way.
+  yours.forEach((cameo, index) => at.set(1 + index, cameo));
+  theirs.forEach((cameo, index) => at.set(Math.max(withYou, 1) + index, cameo));
+
+  return { yours, theirs, at };
+}
+
+/** What the field's one-breath summary says about the blobs in it. */
+function namesSummary(count: number): string {
+  if (count === 0) return '';
+  return count === 1
+    ? ' One of the crowd is a player, named in the list that follows.'
+    : ` ${count} of the crowd are players, named in the list that follows.`;
+}
+
+/**
+ * Whether a hover means anything here.
+ *
+ * The same test the stylesheet makes before letting a button lift, and for the
+ * same reason: on a touch screen a hover is a tap that has not been taken back,
+ * so a name shown on hover would stick until something else was pressed.
+ */
+function usePreciseHover(): boolean {
+  const [precise, setPrecise] = useState(false);
+
+  useEffect(() => {
+    const query = window.matchMedia('(hover: hover) and (pointer: fine)');
+    const read = (): void => setPrecise(query.matches);
+    read();
+    query.addEventListener('change', read);
+    return () => query.removeEventListener('change', read);
+  }, []);
+
+  return precise;
 }

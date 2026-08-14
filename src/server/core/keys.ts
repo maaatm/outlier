@@ -71,6 +71,22 @@ export const keys = {
   /** hash: bucket index "0".."9" -> count. Derived from `guesses`. */
   histogram: (questionId: string) => `hist:${questionId}`,
 
+  /**
+   * zset: userId -> vote timestamp, trimmed to `RECENT_VOTER_CAP` on write.
+   *
+   * The pool the reveal's cameos are drawn from, and the reason it is a window
+   * rather than the whole electorate: a question with ten thousand voters must
+   * not carry a ten-thousand-member zset for a feature that puts ten blobs on a
+   * screen. Written next to `guesses:` on the vote path, so it costs one more
+   * parallel write and not another round trip — and, like `guesses:`, it is not
+   * written at all under REPLAY_MODE.
+   *
+   * Membership is not a permission. Whether a voter in here may actually be
+   * drawn is decided at render time against `showBlob`, so a player who opts
+   * out disappears from every crowd rather than from the next one.
+   */
+  recent: (questionId: string) => `recent:${questionId}`,
+
   /** hash: userId -> commentId. */
   commented: (questionId: string) => `commented:${questionId}`,
 
@@ -177,6 +193,16 @@ export const userFields = {
   subDay: 'subDay',
   /** Submissions made on `subDay`, for the coin-eligibility cap. */
   subCount: 'subCount',
+  /**
+   * `"1" | "0"` — may this player's blob appear in other players' crowds?
+   *
+   * Absent is a third state and it carries most of the weight: it means **on**,
+   * and it means **never told**. So the default is one `?? '1'` rather than a
+   * migration across everybody who was playing before cameos existed, and the
+   * first-run notice fires exactly while the field is missing. Either answer to
+   * that notice writes something here, which is what stops it firing twice.
+   */
+  showBlob: 'showBlob',
 } as const;
 
 /** Field names on the `votes:` hash, kept in one place to avoid typos. */

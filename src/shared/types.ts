@@ -39,6 +39,27 @@ export type Tally = {
   total: number;
 };
 
+/**
+ * One other player, in the crowd on the reveal.
+ *
+ * This is the only shape in the app that says how a *named* person answered a
+ * question, so where it can travel matters: it rides on `Reveal` and nowhere
+ * else, which puts it behind the same gate the tally is behind — see the header
+ * on `server/core/votes.ts`. A player appears here only if their stored
+ * preference says they may, checked at render time rather than at vote time, so
+ * turning it off empties every crowd they are in rather than only the next one.
+ *
+ * No userId. The reveal needs a name, a side, and a pair of items to draw with;
+ * anything more would be more than the screen has any use for.
+ */
+export type Cameo = {
+  /** Username, without the `u/`. Somebody the names hash has never seen is dropped. */
+  name: string;
+  /** The side they actually answered, read from `voted:{questionId}`. */
+  choice: Choice;
+  avatar: Equipped;
+};
+
 /** The result of one player's vote, computed server-side. */
 export type Reveal = {
   choice: Choice;
@@ -74,6 +95,18 @@ export type Reveal = {
   commentPreview: string;
   /** Set once this player has posted their comment. */
   commented: boolean;
+  /**
+   * Up to `CAMEO_COUNT` other players who answered this question, each on the
+   * side they chose. Empty when nobody else has answered yet — a fresh open
+   * question is the common case, not the edge one.
+   */
+  cameos: Cameo[];
+  /**
+   * This player has never been told their own blob can appear in other people's
+   * crowds. True exactly once: the first answer they give, either way, settles
+   * it. See `showBlob` on the user hash.
+   */
+  blobNotice: boolean;
 };
 
 /** The two counters in the header, plus what the menu reads off them. */
@@ -280,9 +313,23 @@ export type AvatarResponse = Equipped & {
   coins: number;
   /** Signed-out players get the starter pair and no way to change it. */
   canSave: boolean;
+  /**
+   * Whether this blob may appear in other players' crowds. Defaults to true,
+   * including for everyone who was already playing before it existed — see the
+   * note on `showBlob` in `server/core/keys.ts`.
+   */
+  showBlob: boolean;
 };
 
-export type AvatarRequest = Equipped;
+/**
+ * `POST /api/avatar`. Every field optional, and not out of laziness.
+ *
+ * The pair comes from the wardrobe, which knows what is equipped. `showBlob`
+ * comes from the reveal's first-run notice, which does not — and making it go
+ * and find out, so that it could send a pair back unchanged, would be a round
+ * trip spent to say nothing. A request carrying neither is refused.
+ */
+export type AvatarRequest = Partial<Equipped> & { showBlob?: boolean };
 
 /**
  * `POST /api/box/open` — what one box gave you.

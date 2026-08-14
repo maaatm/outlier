@@ -41,9 +41,20 @@ type Props = {
    * reason for it not to be.
    */
   label?: string | undefined;
+  /**
+   * What fills the head. Defaults to the wash `.dot` uses, which is what makes
+   * a blob and a dot the same drawing.
+   *
+   * The one caller that passes anything else is the reveal's crowd, where a
+   * cameo standing in the accented camp has to take the camp's colour — a
+   * neutral head in a coloured camp reads as being on the other side. It is
+   * still the screen's own accent rather than a colour of the blob's own; a
+   * blob does not get to mean anything by being a particular colour.
+   */
+  fill?: string | undefined;
 };
 
-export function Blob({ face, accessory, size, label }: Props): React.JSX.Element {
+export function Blob({ face, accessory, size, label, fill }: Props): React.JSX.Element {
   const faceItem = resolveFace(face);
   const accessoryItem = resolveAccessory(accessory);
 
@@ -78,7 +89,7 @@ export function Blob({ face, accessory, size, label }: Props): React.JSX.Element
         cx={BLOB_CIRCLE.cx}
         cy={BLOB_CIRCLE.cy}
         r={radius}
-        fill="var(--ink-quiet)"
+        fill={fill ?? 'var(--ink-quiet)'}
         stroke="var(--ink)"
         strokeWidth={stroke}
       />

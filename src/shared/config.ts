@@ -91,6 +91,19 @@ export const BOX_RARITY_ODDS = { common: 60, uncommon: 30, rare: 10 } as const;
 export const CROWD_SIZE = 100;
 
 /**
+ * How many of the crowd's dots are drawn as real players, and how many recent
+ * voters the reveal draws them from.
+ *
+ * The window is a small multiple of the count so that after the ineligible have
+ * been filtered out there are still ten to choose from. It is capped at all
+ * because a question with ten thousand voters must not grow a ten-thousand
+ * member zset for a feature that shows ten — and because a cameo is only
+ * interesting while it is recent.
+ */
+export const CAMEO_COUNT = 10;
+export const RECENT_VOTER_CAP = 30;
+
+/**
  * The sizes a blob is drawn at, in pixels, and the only ones it is tuned for.
  *
  * `crowd` is where a dot lands on a phone once the crowd has measured itself,

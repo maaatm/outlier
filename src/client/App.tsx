@@ -6,14 +6,14 @@
  */
 
 import { context } from '@devvit/web/client';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { getBadge } from '../shared/badges.js';
 import { BLOB_SIZE, CROWD_SIZE } from '../shared/config.js';
 import type { Equipped } from '../shared/items.js';
 import { getBand, type Award } from '../shared/points.js';
 import type { Choice, Question, QuestionState, Reveal, StateResponse } from '../shared/types.js';
-import { ApiFailure, castVote, fetchState } from './api.js';
+import { ApiFailure, castVote, fetchState, saveShowBlob } from './api.js';
 import { randomGroupColors } from './colors.js';
 import { BadgeStamp } from './components/BadgeStamp.js';
 import { Blob } from './components/Blob.js';
@@ -111,6 +111,16 @@ export function App(): React.JSX.Element {
         setJustVoted(true);
         setPhase({ name: 'ready', state: { ...state, reveal, stats: reveal.stats } });
       }}
+      // Held here rather than inside the notice, which unmounts on the way to
+      // the next slide and on the way out to the menu — and a first-run notice
+      // that comes back is not one.
+      onBlobNoticed={() => {
+        if (!state.reveal) return;
+        setPhase({
+          name: 'ready',
+          state: { ...state, reveal: { ...state.reveal, blobNotice: false } },
+        });
+      }}
     />
   );
 }
@@ -123,6 +133,7 @@ function Game({
   onSlide,
   onOpenMenu,
   onReveal,
+  onBlobNoticed,
 }: {
   postId: string;
   state: QuestionState;
@@ -131,6 +142,7 @@ function Game({
   onSlide: (slide: number) => void;
   onOpenMenu: () => void;
   onReveal: (reveal: Reveal) => void;
+  onBlobNoticed: () => void;
 }): React.JSX.Element {
   const { question, reveal, stats, canVote, authorAvatar } = state;
 
@@ -160,6 +172,7 @@ function Game({
             slide={slide}
             onSlide={onSlide}
             onOpenMenu={onOpenMenu}
+            onBlobNoticed={onBlobNoticed}
           />
         ) : (
           <PlayView
@@ -364,6 +377,7 @@ function RevealView({
   slide,
   onSlide,
   onOpenMenu,
+  onBlobNoticed,
 }: {
   postId: string;
   question: Question;
@@ -372,6 +386,7 @@ function RevealView({
   slide: number;
   onSlide: (slide: number) => void;
   onOpenMenu: () => void;
+  onBlobNoticed: () => void;
 }): React.JSX.Element {
   const accent = getBadge(reveal.badge).accent;
   const mine = reveal.choice === 'a' ? question.labelA : question.labelB;
@@ -383,6 +398,27 @@ function RevealView({
     `${reveal.dotsWithYou} ${mine} \u00b7 ${rest} ${theirs}`,
     votesCaption(reveal, question),
   ];
+
+  // Which camp each cameo stands in is decided here, where the viewer's own
+  // choice is known, so the crowd never has to learn what a choice is.
+  //
+  // Held across renders because pointing at a blob is a render: without this
+  // the crowd would be handed a new list on every hover and would re-pack a
+  // hundred dots to answer a question about one of them.
+  const cameos = useMemo(
+    () =>
+      reveal.cameos.map((cameo) => ({
+        name: cameo.name,
+        avatar: cameo.avatar,
+        withYou: cameo.choice === reveal.choice,
+      })),
+    [reveal.cameos, reveal.choice]
+  );
+
+  // Whoever is being pointed at, if anyone. The caption is already the line
+  // under the crowd that carries the small print about it, so a name goes
+  // there rather than into a label of its own.
+  const [named, setNamed] = useState<string | null>(null);
 
   const SLIDE_COUNT = 3;
 
@@ -397,6 +433,8 @@ function RevealView({
               yourLabel={mine}
               otherLabel={theirs}
               animate={animate}
+              cameos={cameos}
+              onName={setNamed}
             />
           </div>
           <p className="verdict">
@@ -406,7 +444,12 @@ function RevealView({
             </strong>{' '}
             are with you.
           </p>
-          <p className="crowd__caption">{captionBits.join(' \u00b7 ')}</p>
+          {/* One line, two jobs. The split and the sample size are what it says
+              at rest; a name takes the whole line while one is being asked for,
+              because the alternative is a second line that is empty most of the
+              time and moves everything under it when it is not. */}
+          <p className="crowd__caption">{named ? `u/${named}` : captionBits.join(' \u00b7 ')}</p>
+          {reveal.blobNotice && <BlobNotice onAnswered={onBlobNoticed} />}
         </div>
       )}
 
@@ -506,6 +549,69 @@ function RevealView({
           </button>
         )}
       </nav>
+    </div>
+  );
+}
+
+/**
+ * The first time this player's own blob could turn up in somebody else's crowd.
+ *
+ * The setting ships on, and that is a real change to what the game discloses:
+ * until now the only way your answer became public was if you tapped share and
+ * posted the comment yourself. So it is said on the screen where it is
+ * happening, at the moment it starts happening — they have just voted, so they
+ * are in the window already — with the choice attached rather than filed in a
+ * room they would have to go looking for afterwards. Nobody's first encounter
+ * with this should be discovering that it already happened.
+ *
+ * Both buttons are an answer, and answering is the whole of what retires this:
+ * nothing records having told anybody, only what they chose. A write that fails
+ * therefore leaves the notice due to fire again, which is the right way round
+ * for it to break.
+ */
+function BlobNotice({ onAnswered }: { onAnswered: () => void }): React.JSX.Element {
+  const [saving, setSaving] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  async function answer(showBlob: boolean): Promise<void> {
+    setSaving(true);
+    setFailed(false);
+    try {
+      await saveShowBlob(showBlob);
+      onAnswered();
+    } catch {
+      setFailed(true);
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="blob-notice" role="status">
+      {/* Short on purpose. This lands on somebody's first reveal, and the
+          crowd gives up height for every line of it. */}
+      <p className="blob-notice__copy">
+        Your blob can turn up in other players&rsquo; crowds now, on the side you answered.
+        Change that any time in Your record.
+      </p>
+      <div className="blob-notice__actions">
+        <button
+          type="button"
+          className="button button--quiet"
+          disabled={saving}
+          onClick={() => void answer(true)}
+        >
+          Fine by me
+        </button>
+        <button
+          type="button"
+          className="button button--quiet"
+          disabled={saving}
+          onClick={() => void answer(false)}
+        >
+          Keep me out
+        </button>
+      </div>
+      {failed && <p className="notice notice--quiet">That did not save. It will ask again.</p>}
     </div>
   );
 }

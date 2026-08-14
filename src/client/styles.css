@@ -647,12 +647,84 @@ button {
   }
 }
 
+/*
+ * A cameo: one of the hundred, drawn as a player's blob.
+ *
+ * The slot is the 2x2 block the layout gave it and the blob fills that slot, so
+ * the travel out of the scatter grows the drawing on the same clock as
+ * everything else — width and height are already transitioned above, and the
+ * viewBox does the rest. Nothing about the size is set here, because the layout
+ * is the only thing that knows how big a cell is.
+ *
+ * Above the pack so a neighbouring dot cannot sit on an accessory, below your
+ * own dot, which outranks everything on this screen.
+ */
+.dot-slot--cameo {
+  z-index: 1;
+  cursor: pointer;
+  /* A tap here asks a question; it should not also be a candidate for a
+     double-tap zoom on the way. */
+  touch-action: manipulation;
+}
+
+.dot-slot--cameo > .blob {
+  width: 100%;
+  height: 100%;
+  transition: translate 100ms ease-out;
+}
+
+/* The one being asked about lifts, the same two pixels every pressable thing in
+   the app lifts by. No colour: the crowd's colours mean sides. */
+.dot-slot--cameo.is-asked > .blob {
+  translate: -2px -2px;
+}
+
 .crowd__caption {
   margin: var(--s2) 0 0;
   font-family: var(--font-mono);
   font-size: 12px;
   color: var(--ink-soft);
   text-align: center;
+}
+
+/*
+ * The first-run notice about your own blob appearing in other people's crowds.
+ *
+ * It sits under the caption on the crowd slide, once ever. Bordered rather than
+ * accented — the reveal already spends both of the accents it is allowed, and
+ * this is not a verdict, it is a thing being said.
+ */
+.blob-notice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  margin-top: var(--s2);
+  padding: var(--s2);
+  border: var(--stroke) solid var(--ink);
+  border-radius: var(--radius-card);
+  background: var(--card);
+}
+
+/*
+ * Every line here is a line the crowd above gave up, on the one reveal a player
+ * is least able to afford it — their first. Hence the size, the tight leading,
+ * and copy that says the whole thing in two sentences.
+ */
+.blob-notice__copy {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.blob-notice__actions {
+  display: flex;
+  gap: var(--s2);
+}
+
+.blob-notice__actions .button {
+  flex: 1;
+  padding: var(--s1) var(--s2);
+  font-size: 14px;
 }
 
 /* ── Reveal ─────────────────────────────────────────────────────────────── */
@@ -1296,6 +1368,93 @@ button {
 .axis__line {
   margin: 0;
   font-size: 14px;
+}
+
+/*
+ * Your blob and the one decision attached to it, side by side.
+ *
+ * The blob keeps its size and the setting takes the rest of the row, because
+ * this room is a page of totals and the setting should read as a footnote to
+ * the drawing rather than as a control the page is built around.
+ */
+.record__blob {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s3);
+}
+
+.show-blob {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+  min-width: 0;
+}
+
+.show-blob__note {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--ink-soft);
+}
+
+/*
+ * A switch, built the way everything else here is: 2px of ink around a solid
+ * fill, and no gradient anywhere near it. The knob slides rather than fading, so
+ * the state is legible from the shape at a glance and not only from the colour —
+ * `--signal` means "you", which is exactly what this is about, and it is the
+ * only accent on the screen.
+ */
+.switch {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.switch__track {
+  flex: none;
+  position: relative;
+  width: 40px;
+  height: 24px;
+  border: var(--stroke) solid var(--ink);
+  border-radius: 999px;
+  background: var(--card);
+  transition: background-color 140ms ease-out;
+}
+
+.switch[aria-checked='true'] .switch__track {
+  background: var(--signal);
+}
+
+.switch__knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border: var(--stroke) solid var(--ink);
+  border-radius: 50%;
+  background: var(--card);
+  transition: translate 140ms cubic-bezier(0.22, 1.18, 0.36, 1);
+}
+
+.switch[aria-checked='true'] .switch__knob {
+  translate: 16px 0;
+}
+
+.switch:focus-visible {
+  outline: var(--stroke) solid var(--signal);
+  outline-offset: 3px;
+  border-radius: var(--radius-button);
 }
 
 /* ── Blobs and the wardrobe ─────────────────────────────────────────────── */
