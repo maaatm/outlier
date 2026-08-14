@@ -13,7 +13,6 @@ import { currentSubredditName, postDaily } from '../core/daily.js';
 import { pinMenuPost } from '../core/menuPost.js';
 import { isModerator } from '../core/mod.js';
 import { listPending } from '../core/queue.js';
-import { checkCooldown } from '../core/submit.js';
 import { misjudgedLeaderboard, renderLeaderboardPost } from '../core/stats.js';
 
 export const menuRoutes = new Hono();
@@ -24,12 +23,9 @@ menuRoutes.post('/internal/menu/submit-question', async (c) => {
     return c.json<UiResponse>({ showToast: 'Sign in to submit a question.' });
   }
 
-  if (await checkCooldown(context.userId)) {
-    return c.json<UiResponse>({
-      showToast: 'One question per day. Yours is already in the queue.',
-    });
-  }
-
+  // Nothing is checked before the form opens any more. Submission is uncapped,
+  // and the only guard left — a repeat of the identical question — cannot be
+  // known until there is a question to compare.
   return c.json<UiResponse>({
     showForm: {
       name: 'submitQuestion',
@@ -154,6 +150,54 @@ menuRoutes.post('/internal/menu/pin-menu-post', async (c) => {
     showToast: result.pinned
       ? { text: 'Menu post pinned.', appearance: 'success' }
       : 'Menu post created, but it could not be pinned — check the sticky slots.',
+  });
+});
+
+/**
+ * "Grant coins" — put a balance in an account without playing for one.
+ *
+ * Moderators only, re-checked here rather than trusted from the menu item's
+ * `forUserType`, which hides a button and gates nothing. It exists for testing:
+ * the four ways to earn are slow on purpose, and a wardrobe with no coins behind
+ * it cannot be tried out.
+ *
+ * The fields are prefilled with the account and the amount this was first needed
+ * for, because a form whose defaults are the common case is one tap.
+ */
+menuRoutes.post('/internal/menu/grant-coins', async (c) => {
+  if (!(await isModerator())) {
+    return c.json<UiResponse>({ showToast: 'Moderators only.' });
+  }
+
+  return c.json<UiResponse>({
+    showForm: {
+      name: 'grantCoins',
+      form: {
+        title: 'Grant coins',
+        description:
+          'Adds to a balance. Coins are spent on gift boxes in the wardrobe; points and ' +
+          'the leaderboards are untouched.',
+        acceptLabel: 'Grant',
+        cancelLabel: 'Cancel',
+        fields: [
+          {
+            type: 'string',
+            name: 'username',
+            label: 'Username',
+            helpText: 'Without the u/.',
+            defaultValue: 'spottylawyer',
+            required: true,
+          },
+          {
+            type: 'number',
+            name: 'amount',
+            label: 'Coins',
+            defaultValue: 3000,
+            required: true,
+          },
+        ],
+      },
+    },
   });
 });
 

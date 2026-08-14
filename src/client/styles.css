@@ -251,6 +251,7 @@ button {
   font-variant-numeric: tabular-nums;
 }
 
+
 /* ── Question ───────────────────────────────────────────────────────────── */
 
 .question {
@@ -730,6 +731,16 @@ button {
   gap: var(--s2);
 }
 
+/*
+ * Four figures, in pairs. Three is the shape everywhere else — the reveal's
+ * you-said/it-was/off-by is a sentence and has to stay on one line — but a
+ * fourth tile dropped into a three-up grid sits alone on a second row looking
+ * like a mistake. Two by two is a block.
+ */
+.figures--pairs {
+  grid-template-columns: repeat(2, 1fr);
+}
+
 .figure {
   border: var(--stroke) solid var(--ink);
   border-radius: var(--radius-button);
@@ -1197,6 +1208,40 @@ button {
   color: var(--ink-soft);
 }
 
+/*
+ * The title's row. A room with one number worth carrying at all times puts it
+ * here — the title is a short phrase and the rest of that line was going spare,
+ * where a row of its own costs the card 44px it does not have.
+ */
+.menu__title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s2);
+}
+
+.menu__aside {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s1);
+  margin: 0;
+  flex: none;
+}
+
+.menu__aside-label {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.menu__aside-value {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 22px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
 .menu__heading {
   font-size: 22px;
   line-height: 1.3;
@@ -1273,22 +1318,34 @@ button {
 }
 
 /*
- * The one room whose contents are the subject rather than a list to read, so it
- * takes the slack under the heading and centres in it — every other panel hangs
- * from the top because what is in it starts there and runs on.
+ * The wardrobe used to take the slack under the heading and centre in it, back
+ * when it held a blob and two steppers and had slack to take. With a balance
+ * above and the gift box below, it is taller than the card on a phone — and a
+ * flex child told to fill a box it no longer fits inside is squashed to that
+ * box while its contents carry on past it, which is how the box button came to
+ * sit on top of the footnote under it. So it hangs from the top like every
+ * other panel and lets `.menu__body` scroll, which is what that container is
+ * for.
  */
-.menu__panel:has(.wardrobe) {
-  flex: 1;
-  min-height: 0;
-}
-
+/*
+ * The one room built to a height budget.
+ *
+ * Everything in it is a control except the blob, and the last control is at the
+ * bottom — so a wardrobe that scrolls is a wardrobe whose gift box nobody finds.
+ * It has to fit the card at 512px, which is as short as Devvit's inline post
+ * view gets (the short-viewport note further down says the same of the reveal).
+ *
+ * Three things pay for that: the balance sits on the title's line rather than a
+ * row of its own, each layer is one row rather than a label above a stepper, and
+ * the gift box is exactly two rows whatever state it is in. Below 560px the
+ * gaps, the layers and the blob each give up a little more on top. Measured at
+ * 320/360/430 wide by 512/560/640 tall, opened and closed — 58px to spare in
+ * the tightest of them.
+ */
 .wardrobe {
   display: flex;
   flex-direction: column;
-  justify-content: center;
   gap: var(--s3);
-  flex: 1;
-  min-height: 0;
 }
 
 /* The blob being made, and the only thing on this screen that is not a control. */
@@ -1305,12 +1362,9 @@ button {
  * a drop shadow on the box around them would offer a target that is not there.
  */
 .wardrobe__layer {
-  display: flex;
-  flex-direction: column;
-  gap: var(--s1);
   border: var(--stroke) solid var(--ink);
   border-radius: var(--radius-button);
-  padding: var(--s2);
+  padding: var(--s1) var(--s2);
   background: var(--card);
 }
 
@@ -1330,13 +1384,6 @@ button {
 
 .wardrobe__layer--rare {
   border-color: var(--rarity-rare);
-}
-
-.wardrobe__layer-label {
-  margin: 0;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--ink-soft);
 }
 
 .wardrobe__stepper {
@@ -1405,6 +1452,99 @@ button {
 .chevron {
   display: block;
   overflow: visible;
+}
+
+/* ── The gift box ───────────────────────────────────────────────────────── */
+
+/*
+ * The only sink for coins, and the only control in the app that spends
+ * anything. It sits under the two layers because the order of the room is:
+ * here is what you have on, here is what you own, here is how to own more.
+ *
+ * Separated by a rule rather than a card. A second bordered box inside the
+ * bordered card would be the third rectangle on this screen saying the same
+ * thing, which is the same reason `.wardrobe__arrow` has no border of its own.
+ *
+ * Exactly two rows, always: a status line and the button. The result takes the
+ * status line's place rather than pushing it down, and the shortfall is spoken
+ * by the button itself rather than by a notice under it — a room with a height
+ * budget cannot afford a section that grows when something happens in it.
+ */
+.box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  padding-top: var(--s2);
+  border-top: var(--stroke) solid var(--ink-quiet);
+}
+
+.box__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s2);
+}
+
+.box__label,
+.box__owned {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+/*
+ * What came out, and the one moment in this room.
+ *
+ * The badge stamp is the reference: a verdict arriving. 240ms of scale and
+ * opacity and then it stops — under a second, no rotation (the app has its three
+ * deliberate imperfections and this is not a fourth), no burst, no shake.
+ *
+ * One row, standing exactly where the status line it replaced stood, because
+ * this room has no spare row to grow into. The border is the rarity ladder the
+ * two layers above already use — the one exception to the two-accents rule, kept
+ * an exception by never leaving this screen.
+ */
+.box__result {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  border: var(--stroke) solid var(--rarity-common);
+  border-radius: var(--radius-button);
+  padding: var(--s1) var(--s2);
+  background: var(--card);
+  animation: stamp 240ms cubic-bezier(0.3, 1.3, 0.4, 1) both;
+}
+
+.box__result--uncommon {
+  border-color: var(--rarity-uncommon);
+}
+
+.box__result--rare {
+  border-color: var(--rarity-rare);
+}
+
+/*
+ * The name takes the slack and the receipt is what gives way when the row runs
+ * out of width — the name and the rarity are what the moment is about, and the
+ * refund is already counted in the balance at the top of the screen.
+ */
+.box__result-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.box__result-meta {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-soft);
+  white-space: nowrap;
 }
 
 /* ── States ─────────────────────────────────────────────────────────────── */
@@ -1503,14 +1643,27 @@ button {
 }
 
 @media (max-height: 560px) {
+  /* The last things the wardrobe gives up: the room closes up and the layers
+     lose their padding. The arrows keep their own, so the targets do not shrink
+     with the boxes around them. */
+  .wardrobe {
+    gap: var(--s2);
+  }
+
+  .wardrobe__layer {
+    padding: 0 var(--s2);
+  }
+
   .stage {
     zoom: 0.72;
   }
 
-  .wardrobe__preview {
-    zoom: 0.68;
-  }
-
+  /*
+   * The blob keeps the 0.85 it took at 700px and shrinks no further, unlike the
+   * crowd above it. The crowd is a hundred dots and reads at any size; this is
+   * one blob and it is the subject of the room — and now that the layers are one
+   * row each, the height it costs is height the room has.
+   */
   .verdict {
     font-size: 16px;
   }
@@ -1602,6 +1755,12 @@ button {
   }
 
   .reveal {
+    animation: fade 220ms linear both;
+  }
+
+  /* The box's one moment gets the same treatment as the reveal's: a cross-fade
+     to the state the stamp would have landed on. */
+  .box__result {
     animation: fade 220ms linear both;
   }
 }

@@ -299,6 +299,35 @@ export function getItem(id: string, kind: ItemKind): Item | undefined {
 }
 
 /**
+ * An item by id alone, for the one caller that does not know the kind: a box
+ * result arrives as an id, and which list it came out of is the answer rather
+ * than part of the question. Safe because ids are unique across both lists —
+ * asserted in `tests/items.test.ts`, which is what this leans on.
+ */
+export function findItem(id: string): Item | undefined {
+  return ITEMS.find((item) => item.id === id);
+}
+
+/**
+ * Whether a player may wear an item.
+ *
+ * Pure, and shared by both sides on purpose: the server enforces it on equip and
+ * the wardrobe uses the same rule to decide what its steppers walk, so the two
+ * cannot drift into a screen that offers something the server will refuse.
+ *
+ * Starter items always pass. They are owned implicitly by everyone and are never
+ * written to an inventory — see `keys.inventory`.
+ */
+export function ownsItem(owned: readonly string[], item: Item): boolean {
+  return item.starter === true || owned.includes(item.id);
+}
+
+/** The subset of a layer a player can actually put on. */
+export function ownedItems(items: readonly Item[], owned: readonly string[]): Item[] {
+  return items.filter((item) => ownsItem(owned, item));
+}
+
+/**
  * What to draw for a stored id.
  *
  * Ids live in storage and an entry can be removed from the catalogue, so this

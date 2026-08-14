@@ -5,6 +5,10 @@
  * marks the streak alone. The points tile stays plain, because a number that
  * only ever goes up is not news, and spending an accent on it would put three
  * meanings of colour on one screen.
+ *
+ * The coin balance is deliberately not here. It is read in the two places it is
+ * relevant — the page of totals, and the wardrobe where it is spent — and a
+ * third counter in the header is a third thing to read before the question.
  */
 
 import type { PlayerStats } from '../../shared/types.js';
