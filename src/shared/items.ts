@@ -317,6 +317,32 @@ export function resolveAccessory(id: string | undefined | null): Item {
 }
 
 /**
+ * Where an item sits in its list, for the wardrobe's "7 of 8".
+ *
+ * An id the catalogue does not have reads as the first item rather than as -1,
+ * because every caller here is about to index with the answer and the first item
+ * is the same fallback `resolveItem` would have reached for anyway.
+ */
+export function itemIndex(items: readonly Item[], id: string): number {
+  const at = items.findIndex((item) => item.id === id);
+  return at === -1 ? 0 : at;
+}
+
+/**
+ * The item `delta` places along, wrapping at both ends.
+ *
+ * A catalogue has no first or last item — it is a ring you step around — and a
+ * stepper that stops has two controls that do nothing whenever you are parked on
+ * an end. Wrapping costs one modulo and removes the dead ends entirely.
+ */
+export function stepItem(items: readonly Item[], id: string, delta: number): Item {
+  const at = itemIndex(items, id) + delta;
+  // Twice, because `%` in JavaScript keeps the sign of the left operand and a
+  // step backwards off the front would otherwise land on a negative index.
+  return items[((at % items.length) + items.length) % items.length]!;
+}
+
+/**
  * `"faceId:accessoryId"`, the whole avatar in one hash field.
  *
  * Packed rather than spread over two fields or two keys so that a screen wanting

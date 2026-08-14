@@ -32,7 +32,10 @@ import {
   type Equipped,
   FACES,
   type Item,
-  STARTER_ACCESSORY,
+  itemIndex,
+  resolveAccessory,
+  resolveFace,
+  stepItem,
 } from '../../shared/items.js';
 import type { AvatarResponse, DailyPointer, PlayerStats } from '../../shared/types.js';
 import { fetchAvatar, fetchDaily, saveAvatar } from '../api.js';
@@ -42,22 +45,13 @@ import { PlayerBoard } from './PlayerBoard.js';
 import { StatBar } from './StatBar.js';
 import { WobbleRule } from './WobbleRule.js';
 
-type PanelId = 'record' | 'board' | 'misjudged' | 'wardrobe';
+type PanelId = 'record' | 'wardrobe' | 'board' | 'misjudged';
 
-/**
- * Every room's title, including the one that is not in the list below.
- *
- * The wardrobe is deliberately missing from `ENTRIES`. The menu is two levels
- * and no more, and a wardrobe reached from the blob it changes is more obvious
- * than a fourth line in a list of things to read. It is the only room that opens
- * from inside another, which is also why it is the only one whose way back goes
- * somewhere other than the root.
- */
 const TITLES: Record<PanelId, string> = {
   record: 'Your record',
+  wardrobe: 'Wardrobe',
   board: 'Leaderboard',
   misjudged: 'Hardest to read',
-  wardrobe: 'Wardrobe',
 };
 
 type Entry = {
@@ -66,8 +60,14 @@ type Entry = {
   blurb: string;
 };
 
+/**
+ * The wardrobe sits next to Your record because both are about the player and
+ * everything below them is about everyone else. It is the only room in the list
+ * that writes anything, which is the one thing its blurb has to make obvious.
+ */
 const ENTRIES: Entry[] = [
   { id: 'record', blurb: 'your blob, your streak, and how often you read the room' },
+  { id: 'wardrobe', blurb: 'change the face and the accessory your blob wears' },
   { id: 'board', blurb: 'who has banked the most points' },
   { id: 'misjudged', blurb: 'what the subreddit misjudged most' },
 ];
@@ -136,30 +136,19 @@ export function Menu({
             opened after a long one starts at the top rather than mid-scroll. */}
         <div className="menu__body fade-in" key={panel ?? 'root'}>
           {panel === null && <Root onOpen={setPanel} daily={daily} />}
-          {panel === 'record' && (
-            <Record stats={stats} avatar={avatar} onChange={() => setPanel('wardrobe')} />
-          )}
+          {panel === 'record' && <Record stats={stats} avatar={avatar} />}
+          {panel === 'wardrobe' && <Wardrobe avatar={avatar} onEquip={equip} />}
           {panel === 'board' && <Board />}
           {panel === 'misjudged' && <Misjudged />}
-          {panel === 'wardrobe' && <Wardrobe avatar={avatar} onEquip={equip} />}
         </div>
 
         {showBack && (
           <button
             type="button"
             className="button menu__back"
-            onClick={() => {
-              if (panel === null) onExit?.();
-              // The one room opened from inside another is the one that goes
-              // back to it rather than to the list.
-              else setPanel(panel === 'wardrobe' ? 'record' : null);
-            }}
+            onClick={() => (panel === null ? onExit?.() : setPanel(null))}
           >
-            {panel === null
-              ? 'Back to the question'
-              : panel === 'wardrobe'
-                ? 'Back to your record'
-                : 'Back to the menu'}
+            {panel === null ? 'Back to the question' : 'Back to the menu'}
           </button>
         )}
       </section>
@@ -323,18 +312,16 @@ function Panel({
  * Banked state, read off the same counters the header shows — and the blob those
  * counters belong to.
  *
- * The blob is above the figures because it is the only thing in the room that is
- * a choice rather than a total, and because **Change** has to be next to the
- * thing it changes for the wardrobe to be findable at all.
+ * The blob is here to say whose record this is, and nothing more: the way to
+ * change it is its own room on the menu, so this one stays what it has always
+ * been, a page of totals with nothing on it to press.
  */
 function Record({
   stats,
   avatar,
-  onChange,
 }: {
   stats: PlayerStats;
   avatar: AvatarResponse | null;
-  onChange: () => void;
 }): React.JSX.Element {
   const rate =
     stats.totalPlayed > 0 ? Math.round((stats.totalHits / stats.totalPlayed) * 100) : 0;
@@ -350,25 +337,12 @@ function Record({
         </>
       }
     >
-      <div className="record__blob">
-        <Blob
-          face={avatar?.face}
-          accessory={avatar?.accessory}
-          size={BLOB_SIZE.panel}
-          label="Your blob"
-        />
-        {/* Disabled until the pair arrives, for the same reason the Daily button
-            is: a control that changes state under the pointer is worse than one
-            that was briefly inert. */}
-        <button
-          type="button"
-          className="button button--quiet"
-          onClick={onChange}
-          disabled={avatar === null}
-        >
-          Change
-        </button>
-      </div>
+      <Blob
+        face={avatar?.face}
+        accessory={avatar?.accessory}
+        size={BLOB_SIZE.panel}
+        label="Your blob"
+      />
 
       <div className="figures">
         <div className="figure">
@@ -399,13 +373,19 @@ function Record({
 }
 
 /**
- * Two racks and no save button.
+ * The blob you are making, and the two layers it is made of.
  *
- * Tapping equips. This is a two-tap game and the wardrobe should not be the
- * heaviest screen in it, so there is nothing to confirm and nothing to commit —
- * the blob above the racks changing is all the receipt the change needs.
+ * A blob is a face with an accessory over it, so the wardrobe is that same pair
+ * of layers with a way to step through each — the face above, the accessory
+ * below, in the order they stack. Everything is on one screen at one time: the
+ * grid this replaced put nine tiles under nine more and made choosing an
+ * accessory a scroll away from seeing what it looked like on.
  *
- * Rarity is a word on the tile and the weight of the tile's outline, and no
+ * There is no save button and no confirm. Stepping *is* equipping, and the blob
+ * at the top redrawing is the whole receipt — this is a two-tap game and the
+ * wardrobe should not be the heaviest screen in it.
+ *
+ * Rarity is a word on the layer and the weight of the layer's outline, and no
  * colour at all: the screen is allowed two accents with one meaning each, and a
  * rarity ladder would spend five of them here on its own.
  */
@@ -421,86 +401,135 @@ function Wardrobe({
       title={TITLES.wardrobe}
       note={
         <>
-          Tapping puts something on &mdash; there is nothing to save. An accessory is drawn
-          to break the outline of the dot rather than sit inside it, because that is what
-          still reads when you are one of a hundred.
+          Every change is worn straight away &mdash; there is nothing to save. An accessory
+          is drawn to break the outline of the dot rather than sit inside it, because that
+          is what still reads when you are one of a hundred.
         </>
       }
     >
-      {avatar === null ? (
-        <p className="notice notice--quiet">Loading.</p>
-      ) : (
-        <div className="wardrobe">
-          <div className="wardrobe__preview">
-            <Blob face={avatar.face} accessory={avatar.accessory} size={BLOB_SIZE.panel} />
-          </div>
+      {/* The wrapper is unconditional so the room keeps its shape while the pair
+          is in flight — the centring hangs off it, and a panel that re-centres
+          the moment the blob arrives moves everything under the reader. */}
+      <div className="wardrobe">
+        {avatar === null ? (
+          <p className="notice notice--quiet">Loading.</p>
+        ) : (
+          <>
+            <div className="wardrobe__preview">
+              <Blob
+                face={avatar.face}
+                accessory={avatar.accessory}
+                size={BLOB_SIZE.wardrobe}
+                label={`Your blob: ${resolveFace(avatar.face).name}, ${resolveAccessory(
+                  avatar.accessory
+                ).name}`}
+              />
+            </div>
 
-          {!avatar.canSave && <p className="notice notice--quiet">Sign in to change your blob.</p>}
+            {!avatar.canSave && (
+              <p className="notice notice--quiet">Sign in to change your blob.</p>
+            )}
 
-          <Rack label="faces" items={FACES} equipped={avatar} onEquip={onEquip} />
-          <Rack label="accessories" items={ACCESSORIES} equipped={avatar} onEquip={onEquip} />
-        </div>
-      )}
+            <Layer
+              kind="face"
+              items={FACES}
+              current={avatar.face}
+              locked={!avatar.canSave}
+              onPick={(id) => onEquip({ face: id, accessory: avatar.accessory })}
+            />
+            <Layer
+              kind="accessory"
+              items={ACCESSORIES}
+              current={avatar.accessory}
+              locked={!avatar.canSave}
+              onPick={(id) => onEquip({ face: avatar.face, accessory: id })}
+            />
+          </>
+        )}
+      </div>
     </Panel>
   );
 }
 
-/** One kind's worth of tiles. Both racks are the same grid. */
-function Rack({
-  label,
+/**
+ * One layer, and the two arrows that walk it.
+ *
+ * The count is spelled out beside the rarity because the arrows alone say
+ * nothing about how far there is to go, and a ring with no end needs some other
+ * way to tell you that you have seen all of it.
+ */
+function Layer({
+  kind,
   items,
-  equipped,
-  onEquip,
+  current,
+  locked,
+  onPick,
 }: {
-  label: string;
+  kind: string;
   items: readonly Item[];
-  equipped: AvatarResponse;
-  onEquip: (next: Equipped) => void;
+  current: string;
+  locked: boolean;
+  onPick: (id: string) => void;
 }): React.JSX.Element {
+  const item = items[itemIndex(items, current)]!;
+
   return (
-    <div className="wardrobe__rack">
-      <p className="wardrobe__rack-label">{label}</p>
-      <ul className="wardrobe__grid">
-        {items.map((item) => {
-          const face = item.kind === 'face';
-          const worn = face ? equipped.face === item.id : equipped.accessory === item.id;
+    <div className={`wardrobe__layer wardrobe__layer--${item.rarity}`}>
+      <p className="wardrobe__layer-label">{kind}</p>
+      <div className="wardrobe__stepper">
+        <button
+          type="button"
+          className="wardrobe__arrow"
+          aria-label={`Previous ${kind}`}
+          disabled={locked}
+          onClick={() => onPick(stepItem(items, current, -1).id)}
+        >
+          <Chevron back />
+        </button>
 
-          // What tapping this tile would leave you in.
-          const next: Equipped = face
-            ? { face: item.id, accessory: equipped.accessory }
-            : { face: equipped.face, accessory: item.id };
+        {/* Announced as one string on change, so a reader hears "Wink, rare, 7
+            of 8" rather than three separate updates racing each other. */}
+        <span className="wardrobe__pick" aria-live="polite">
+          <span className="wardrobe__name">{item.name}</span>
+          <span className="wardrobe__meta">
+            {item.rarity} &middot; {itemIndex(items, current) + 1} of {items.length}
+          </span>
+        </span>
 
-          /*
-           * What the tile draws, which is not the same thing. A face tile shows
-           * the face bare, so the only thing varying down the rack is the face;
-           * an accessory has to sit on a head, so it borrows the one being worn.
-           */
-          const shown: Equipped = face
-            ? { face: item.id, accessory: STARTER_ACCESSORY.id }
-            : next;
-
-          return (
-            <li key={item.id}>
-              <button
-                type="button"
-                className={`button wardrobe__tile wardrobe__tile--${item.rarity}${
-                  worn ? ' is-worn' : ''
-                }`}
-                aria-pressed={worn}
-                disabled={!equipped.canSave}
-                onClick={() => onEquip(next)}
-              >
-                <Blob face={shown.face} accessory={shown.accessory} size={BLOB_SIZE.panel} />
-                <span className="wardrobe__name">{item.name}</span>
-                <span className="wardrobe__meta">
-                  {worn ? `${item.rarity} · worn` : item.rarity}
-                </span>
-              </button>
-            </li>
-          );
-        })}
-      </ul>
+        <button
+          type="button"
+          className="wardrobe__arrow"
+          aria-label={`Next ${kind}`}
+          disabled={locked}
+          onClick={() => onPick(stepItem(items, current, 1).id)}
+        >
+          <Chevron back={false} />
+        </button>
+      </div>
     </div>
+  );
+}
+
+/**
+ * The arrows, drawn rather than typed.
+ *
+ * The bundled fonts are subsetted to the Latin ranges they need, so an arrow
+ * glyph would fall through to whatever the device happens to have. A stroked
+ * path is two lines of markup, always the same shape, and is the drawing
+ * language the rest of the app is already in.
+ */
+function Chevron({ back }: { back: boolean }): React.JSX.Element {
+  return (
+    <svg className="chevron" viewBox="0 0 12 20" width="12" height="20" aria-hidden="true">
+      <path
+        d={back ? 'M 9.5 3 L 2.5 10 L 9.5 17' : 'M 2.5 3 L 9.5 10 L 2.5 17'}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
 

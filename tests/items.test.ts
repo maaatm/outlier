@@ -14,10 +14,12 @@ import {
   blobHeight,
   blobStroke,
   getItem,
+  itemIndex,
   packAvatar,
   resolveAccessory,
   resolveFace,
   starterFor,
+  stepItem,
   unpackAvatar,
 } from '../src/shared/items.js';
 
@@ -104,6 +106,64 @@ describe('resolving what to draw', () => {
   it('falls back when an id is real but belongs to the other slot', () => {
     expect(resolveAccessory(STARTER_FACE.id)).toBe(STARTER_ACCESSORY);
     expect(resolveFace(STARTER_ACCESSORY.id)).toBe(STARTER_FACE);
+  });
+});
+
+describe('stepping through a layer', () => {
+  it('finds where an item sits, counting from zero', () => {
+    expect(itemIndex(FACES, STARTER_FACE.id)).toBe(0);
+    expect(itemIndex(FACES, FACES[3]!.id)).toBe(3);
+  });
+
+  it('reads an id it does not recognise as the first item', () => {
+    // The wardrobe indexes with this answer, so -1 would be a crash rather than
+    // a fallback. The first item is where `resolveItem` would land anyway.
+    expect(itemIndex(FACES, 'gone')).toBe(0);
+    expect(itemIndex(ACCESSORIES, '')).toBe(0);
+  });
+
+  it('moves one along in either direction', () => {
+    expect(stepItem(FACES, FACES[2]!.id, 1)).toBe(FACES[3]);
+    expect(stepItem(FACES, FACES[2]!.id, -1)).toBe(FACES[1]);
+  });
+
+  it('wraps at both ends rather than stopping', () => {
+    // A catalogue is a ring. A stepper that stops has two controls that do
+    // nothing whenever you are parked on an end.
+    expect(stepItem(FACES, FACES[FACES.length - 1]!.id, 1)).toBe(FACES[0]);
+    expect(stepItem(FACES, FACES[0]!.id, -1)).toBe(FACES[FACES.length - 1]);
+    expect(stepItem(ACCESSORIES, ACCESSORIES[0]!.id, -1)).toBe(
+      ACCESSORIES[ACCESSORIES.length - 1]
+    );
+  });
+
+  it('returns to where it started after a full lap in either direction', () => {
+    for (const items of [FACES, ACCESSORIES]) {
+      let forward = items[0]!.id;
+      let backward = items[0]!.id;
+      for (let i = 0; i < items.length; i++) {
+        forward = stepItem(items, forward, 1).id;
+        backward = stepItem(items, backward, -1).id;
+      }
+      expect(forward).toBe(items[0]!.id);
+      expect(backward).toBe(items[0]!.id);
+    }
+  });
+
+  it('visits every item exactly once on the way round', () => {
+    const seen = new Set<string>();
+    let at = FACES[0]!.id;
+    for (let i = 0; i < FACES.length; i++) {
+      seen.add(at);
+      at = stepItem(FACES, at, 1).id;
+    }
+    expect(seen.size).toBe(FACES.length);
+  });
+
+  it('always lands on a real item, however big the step', () => {
+    for (const delta of [-100, -9, 0, 1, 17, 1000]) {
+      expect(FACES).toContain(stepItem(FACES, STARTER_FACE.id, delta));
+    }
   });
 });
 

@@ -1252,87 +1252,134 @@ button {
   overflow: visible;
 }
 
-/* Your blob and the way to change it, above the totals in Your record. Bottom
-   aligned for the same reason the byline is. */
-.record__blob {
-  display: flex;
-  align-items: flex-end;
-  gap: var(--s3);
+/*
+ * The one room whose contents are the subject rather than a list to read, so it
+ * takes the slack under the heading and centres in it — every other panel hangs
+ * from the top because what is in it starts there and runs on.
+ */
+.menu__panel:has(.wardrobe) {
+  flex: 1;
+  min-height: 0;
 }
 
 .wardrobe {
   display: flex;
   flex-direction: column;
+  justify-content: center;
   gap: var(--s3);
+  flex: 1;
+  min-height: 0;
 }
 
+/* The blob being made, and the only thing on this screen that is not a control. */
 .wardrobe__preview {
   display: flex;
   justify-content: center;
 }
 
-.wardrobe__rack {
+/*
+ * One layer of the blob. Two of these, stacked in the order they draw in — the
+ * face above the accessory — so the screen is laid out the way the picture is.
+ *
+ * Flat, like `.figure` and unlike `.button`. The arrows inside it are what press;
+ * a drop shadow on the box around them would offer a target that is not there.
+ */
+.wardrobe__layer {
   display: flex;
   flex-direction: column;
-  gap: var(--s2);
+  gap: var(--s1);
+  border: var(--stroke) solid var(--ink);
+  border-radius: var(--radius-button);
+  padding: var(--s2);
+  background: var(--card);
 }
 
-.wardrobe__rack-label {
+/*
+ * Rarity, in outline weight and in the word beside the count. It gets no colour:
+ * the screen is allowed two accents with one meaning each, and a rarity ladder
+ * would spend the budget here and nowhere else.
+ */
+.wardrobe__layer--uncommon {
+  border-width: 3px;
+}
+
+.wardrobe__layer--rare {
+  border-width: 4px;
+}
+
+.wardrobe__layer-label {
   margin: 0;
   font-family: var(--font-mono);
   font-size: 12px;
   color: var(--ink-soft);
 }
 
-.wardrobe__grid {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+.wardrobe__stepper {
+  display: flex;
+  align-items: center;
   gap: var(--s2);
 }
 
-.wardrobe__tile {
-  flex-direction: column;
-  gap: var(--s1);
-  padding: var(--s2);
+/*
+ * The name takes the slack, so both arrows sit hard against the edges of the
+ * layer however long the word between them is — a stepper whose controls move
+ * as you step it is a stepper you have to re-aim at every press.
+ */
+.wardrobe__pick {
+  flex: 1;
+  min-width: 0;
   text-align: center;
 }
 
-/*
- * Rarity, in outline weight and in the word under the name. It gets no colour:
- * the screen is allowed two accents with one meaning each, and a five-rung
- * rarity ladder would spend the budget here and nowhere else.
- */
-.wardrobe__tile--uncommon {
-  border-width: 3px;
-}
-
-.wardrobe__tile--rare {
-  border-width: 4px;
-}
-
-/*
- * The one you have on is pressed into the page, using the same shadow the app
- * gives anything held down. A sticker that is stuck down reads as chosen without
- * spending a colour on saying so.
- */
-.wardrobe__tile.is-worn {
-  box-shadow: var(--drop-pressed);
-  transform: translate(2px, 2px);
-}
-
 .wardrobe__name {
-  font-size: 13px;
+  display: block;
+  font-size: 16px;
+  font-weight: 600;
   line-height: 1.2;
 }
 
 .wardrobe__meta {
+  display: block;
   font-family: var(--font-mono);
   font-size: 11px;
-  font-weight: 400;
   color: var(--ink-soft);
+}
+
+/*
+ * Borderless on purpose. These live inside a box that already has an outline,
+ * and a bordered button inside a bordered row inside a bordered card is three
+ * rectangles saying the same thing.
+ */
+.wardrobe__arrow {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--s2);
+  border: none;
+  background: none;
+  color: var(--ink);
+  transition: scale 100ms ease-out, opacity 100ms ease-out;
+}
+
+.wardrobe__arrow:active:not(:disabled) {
+  scale: 0.86;
+}
+
+.wardrobe__arrow:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.wardrobe__arrow:focus-visible {
+  outline: var(--stroke) solid var(--signal);
+  outline-offset: 2px;
+  border-radius: var(--radius-button);
+}
+
+.chevron {
+  display: block;
+  overflow: visible;
 }
 
 /* ── States ─────────────────────────────────────────────────────────────── */
@@ -1395,6 +1442,12 @@ button {
     zoom: 0.85;
   }
 
+  /* The blob gives up size before the two layers under it do — it is the result,
+     they are the controls, and a control that has shrunk is harder to hit. */
+  .wardrobe__preview {
+    zoom: 0.85;
+  }
+
   .question {
     font-size: 18px;
   }
@@ -1427,6 +1480,10 @@ button {
 @media (max-height: 560px) {
   .stage {
     zoom: 0.72;
+  }
+
+  .wardrobe__preview {
+    zoom: 0.68;
   }
 
   .verdict {
