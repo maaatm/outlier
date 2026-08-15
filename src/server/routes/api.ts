@@ -30,7 +30,6 @@ import type {
   CommentRequest,
   CommentResponse,
   DailyPointer,
-  MisjudgedResponse,
   PlayerBoardResponse,
   StateResponse,
   VoteRequest,
@@ -55,7 +54,6 @@ import {
   getQuestionIdForPost,
   toPublicQuestion,
 } from '../core/questions.js';
-import { misjudgedLeaderboard } from '../core/stats.js';
 import { EMPTY_USER, getUser, projectStats, recordPlay } from '../core/users.js';
 import { buildReveal, castVote, getStoredVote, recordComment } from '../core/votes.js';
 
@@ -77,8 +75,15 @@ api.get('/api/state/:postId', async (c) => {
 
   // No question on this post. The pinned menu post is the legitimate reason for
   // that, so it is checked here rather than on every load of a playable post.
+  // Whether the menu offers the room that asks a question. One boolean about
+  // the viewer, settled the same way `canVote` is and carrying nothing else —
+  // not how many of today's three are left, and nothing about anybody else.
+  const canSubmit = Boolean(userId);
+
   if (!questionId) {
-    if (await isMenuPost(postId)) return c.json<StateResponse>({ kind: 'menu', stats });
+    if (await isMenuPost(postId)) {
+      return c.json<StateResponse>({ kind: 'menu', stats, canSubmit });
+    }
     return c.json<ApiError>({ error: 'No question on this post.' }, 404);
   }
 
@@ -100,6 +105,7 @@ api.get('/api/state/:postId', async (c) => {
     reveal,
     stats,
     canVote: Boolean(userId) && question.lockedAt === 0,
+    canSubmit,
     authorAvatar,
   });
 });
@@ -362,11 +368,6 @@ api.post('/api/box/open', async (c) => {
     refunded: outcome.refunded,
     coins: outcome.coins,
   });
-});
-
-/** The most misjudged questions ever. Safe to read without having voted. */
-api.get('/api/leaderboard/questions', async (c) => {
-  return c.json<MisjudgedResponse>({ entries: await misjudgedLeaderboard() });
 });
 
 /**

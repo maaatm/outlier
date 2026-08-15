@@ -11,10 +11,13 @@ assuming the previous prompt is still in the window.
 | 03 | [Blob avatars and accessories](03-blob-avatars.md) | 02 (names) | medium |
 | 04 | [Coins and gift boxes](04-coins-and-gift-boxes.md) | 03 | large |
 | 05 | [Crowd cameos](05-crowd-cameos.md) | 03, 04 | medium |
+| 06 | [Ask a question](06-ask-a-question.md) | 01 | medium |
 
 Run them in order. 01 and 02 are independently shippable and touch nothing the others
 need. 03 is the point at which a player can see a blob at all; 04 is what makes acquiring
 one a loop; 05 is last on purpose, because it is the only one that touches the reveal.
+06 depends on 01 for the menu it adds a room to, and it is the first prompt that gives a
+player a control that writes to the subreddit.
 
 ---
 
@@ -98,6 +101,15 @@ whose side effect is a real Reddit post each time, so the spam pressure lands on
 subreddit and not just the economy. The prompt implements it as specified and adds one
 config constant, `COIN_ELIGIBLE_SUBMISSIONS_PER_DAY`, as an unused-by-default safety
 valve that can be turned on without a code change if the queue floods.
+
+**Superseded by prompt 06: three a day.** That decision was made while the only door to
+submission was a subreddit menu item most players never open. 06 puts the same action one
+tap from the front door, so `SUBMISSIONS_PER_DAY` (3) replaces "uncapped" — a UTC-day
+allowance rather than the rolling cooldown 04 deleted, because three questions in one
+sitting is a normal thing to do and the day is the boundary the rest of the game already
+turns on. The fingerprint dedupe 04 introduced stays: it guards a retried timeout, not a
+rate, and the two are not the same guard. `COIN_ELIGIBLE_SUBMISSIONS_PER_DAY` also stays,
+still `Infinity`, still capping only the reward.
 
 ---
 

@@ -949,7 +949,16 @@ button {
   background: var(--ink);
 }
 
-/* ── Detail strip: histogram or leaderboard, same slot ───────────────────── */
+/* ── Detail strip ───────────────────────────────────────────────────────── */
+
+/*
+ * The score slide's histogram, and the player leaderboard's two tabs, which
+ * borrow this idiom rather than inventing a second one. The strip used to hold
+ * either the histogram or the misjudged board behind a pair of tabs; the board
+ * came off this screen with the room that shared it, so `.detail__tab` is now
+ * `PlayerBoard`'s alone — it is not dead, and deleting it takes the week/all-time
+ * tabs with it.
+ */
 
 /* Takes the slack on the score slide so the bars grow with the screen. */
 .detail {
@@ -1198,20 +1207,6 @@ button {
   align-items: baseline;
   justify-content: space-between;
   gap: var(--s2);
-}
-
-.board__text {
-  font-size: 13px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.board__error {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--ink-soft);
-  white-space: nowrap;
 }
 
 /*
@@ -1731,6 +1726,133 @@ button {
   font-size: 11px;
   color: var(--ink-soft);
   white-space: nowrap;
+}
+
+/* ── Ask a question ─────────────────────────────────────────────────────── */
+
+/*
+ * The one room in the menu that is a form, and the only one taller than the
+ * card. It scrolls rather than being squeezed: four fields, a preview and a
+ * button cannot all give up height, and the alternative to scrolling is a
+ * primary button below the fold pretending it is not.
+ *
+ * The fields borrow the share slide's note field wholesale — same border, same
+ * radius, same 16px, which is also what stops iOS zooming on focus. A form in
+ * this app should look like the form this app already has.
+ */
+.ask {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.ask__field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Label and counter share a line, because four counters on four lines of their
+   own is a quarter of the room spent on arithmetic. */
+.ask__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s2);
+}
+
+.ask__label {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.ask__hint {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ask__input {
+  width: 100%;
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.4;
+  color: inherit;
+  background: var(--card);
+  border: var(--stroke) solid var(--ink);
+  border-radius: var(--radius-button);
+  padding: var(--s2);
+  overflow-wrap: anywhere;
+}
+
+/* Grows with what is typed into it, the way the note field does — the height is
+   set from the content on every keystroke, so nothing scrolls out of sight. */
+.ask__text {
+  resize: none;
+  overflow-y: hidden;
+}
+
+.ask__input:focus-visible {
+  outline: var(--stroke) solid var(--signal);
+  outline-offset: 2px;
+}
+
+.ask__input:disabled {
+  color: var(--ink-soft);
+  background: var(--paper);
+}
+
+/* The two answers are one thing, so they sit on one line. */
+.ask__pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s2);
+}
+
+/*
+ * The post as it will appear. On paper rather than card, and outlined, because
+ * it is the one block here that is not a control — it is what the controls add
+ * up to, and the difference has to be visible before the button is pressed.
+ */
+.ask__preview {
+  border: var(--stroke) solid var(--ink);
+  border-radius: var(--radius-button);
+  background: var(--paper);
+  padding: var(--s2);
+}
+
+.ask__preview-title {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.25;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.ask__preview-text {
+  font-size: 13px;
+  line-height: 1.4;
+  margin: var(--s1) 0 0;
+  overflow-wrap: anywhere;
+}
+
+.ask__preview-answers {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin: var(--s2) 0 0;
+}
+
+/* Never shrinks. Everything above it can scroll; the one irreversible control
+   in the app does not get to be half a button. */
+.ask__post {
+  flex: none;
 }
 
 /* ── States ─────────────────────────────────────────────────────────────── */

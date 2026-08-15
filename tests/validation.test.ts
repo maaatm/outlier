@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { filterQuestionText } from '../src/server/core/filter.js';
-import { NOTE_MAX_LENGTH, QUESTION_MAX_LENGTH } from '../src/shared/config.js';
+import { filterText } from '../src/server/core/filter.js';
+import {
+  NOTE_MAX_LENGTH,
+  QUESTION_MAX_LENGTH,
+  TITLE_MAX_LENGTH,
+  TITLE_MIN_LENGTH,
+} from '../src/shared/config.js';
 import { buildComment, normalizeNote } from '../src/shared/comment.js';
 import { bucketFor } from '../src/server/core/votes.js';
 import { buildDailySummary } from '../src/server/core/daily.js';
@@ -9,9 +14,11 @@ import { toPublicQuestion } from '../src/server/core/questions.js';
 import type { Question, Reveal } from '../src/shared/types.js';
 import {
   normalizeQuestionText,
+  normalizeTitle,
   submissionFingerprint,
   validateQuestionText,
   validateSubmission,
+  validateTitle,
 } from '../src/shared/validate.js';
 
 describe('question text rules', () => {
@@ -42,12 +49,78 @@ describe('question text rules', () => {
   });
 
   it('needs the two answers to differ', () => {
-    expect(validateSubmission('Do you eat the crust?', 'Yes', 'yes').ok).toBe(false);
-    expect(validateSubmission('Do you eat the crust?', 'Yes', 'No')).toEqual({ ok: true });
+    expect(validateSubmission('Do you eat the crust?', 'Yes', 'yes', '').ok).toBe(false);
+    expect(validateSubmission('Do you eat the crust?', 'Yes', 'No', '')).toEqual({ ok: true });
   });
 
   it('caps label length', () => {
-    expect(validateSubmission('Do you eat the crust?', 'Yes', 'A'.repeat(13)).ok).toBe(false);
+    expect(validateSubmission('Do you eat the crust?', 'Yes', 'A'.repeat(13), '').ok).toBe(false);
+  });
+});
+
+/*
+ * The post title. It is the half of a submission the feed shows, and it is not a
+ * question — so it is held to everything that made the question safe to publish
+ * and to none of the rules that are about being a question.
+ */
+describe('title rules', () => {
+  it('takes a title that is not a question', () => {
+    expect(validateTitle('The pizza crust question')).toEqual({ ok: true });
+  });
+
+  it('does not mind how many question marks it has', () => {
+    expect(validateTitle('Crust? Really? Truly?')).toEqual({ ok: true });
+  });
+
+  it('enforces the length bounds at both ends', () => {
+    expect(validateTitle('a'.repeat(TITLE_MIN_LENGTH - 1)).ok).toBe(false);
+    expect(validateTitle('a'.repeat(TITLE_MIN_LENGTH)).ok).toBe(true);
+    expect(validateTitle('a'.repeat(TITLE_MAX_LENGTH)).ok).toBe(true);
+    expect(validateTitle('a'.repeat(TITLE_MAX_LENGTH + 1)).ok).toBe(false);
+  });
+
+  it('needs something that reads as words', () => {
+    expect(validateTitle('12345678901').ok).toBe(false);
+  });
+
+  it('rejects links and usernames', () => {
+    expect(validateTitle('Settled at https://example.com').ok).toBe(false);
+    expect(validateTitle('As asked by u/spez').ok).toBe(false);
+  });
+
+  /*
+   * An empty title has always meant "the question was the title" — every record
+   * written before the field existed means exactly that — so the fallback is
+   * what keeps those and these identical rather than a convenience.
+   */
+  it('falls back to the question when nothing was typed', () => {
+    const question = 'Do you eat the pizza crust?';
+    expect(normalizeTitle('', question)).toBe(question);
+    expect(normalizeTitle('   ', question)).toBe(question);
+    // Zero-width space and word joiner: a title that is only the invisible
+    // characters people paste in is an empty title.
+    expect(normalizeTitle('​⁠', question)).toBe(question);
+    expect(normalizeTitle('  Crust,  settled ​once  ', question)).toBe('Crust, settled once');
+  });
+
+  it('refuses a bad title on a good question', () => {
+    const question = 'Do you eat the pizza crust?';
+    expect(validateSubmission(question, 'Yes', 'No', 'Read https://example.com').ok).toBe(false);
+    expect(validateSubmission(question, 'Yes', 'No', 'Nope').ok).toBe(false);
+    expect(validateSubmission(question, 'Yes', 'No', 'The crust question')).toEqual({ ok: true });
+  });
+
+  /*
+   * The fallback is resolved after validation rather than before it, which is
+   * what stops a 110-character question from being refused for being a long
+   * title — a rule the player never broke and could only satisfy by typing
+   * something they were told was optional.
+   */
+  it('does not hold an untyped title to the title bounds', () => {
+    const long = `Do you ${'really '.repeat(13)}eat the pizza crust?`;
+    expect(long.length).toBeGreaterThan(TITLE_MAX_LENGTH);
+    expect(long.length).toBeLessThanOrEqual(QUESTION_MAX_LENGTH);
+    expect(validateSubmission(long, 'Yes', 'No', '')).toEqual({ ok: true });
   });
 });
 
@@ -58,23 +131,77 @@ describe('the content filter', () => {
       'Do you visit Scunthorpe often?',
       'Do you eat the pizza crust?',
     ]) {
-      expect(filterQuestionText(text), text).toEqual({ ok: true });
+      expect(filterText(text, 'question'), text).toEqual({ ok: true });
     }
   });
 
   it('blocks slurs even when they are spelled around', () => {
-    expect(filterQuestionText('Do you think the f4ggot deserved it?').ok).toBe(false);
+    expect(filterText('Do you think the f4ggot deserved it?', 'question').ok).toBe(false);
   });
 
   it('turns away political, medical and identity questions', () => {
-    expect(filterQuestionText('Did you vote republican last election?').ok).toBe(false);
-    expect(filterQuestionText('Are you vaccinated against the flu?').ok).toBe(false);
-    expect(filterQuestionText('Have you been diagnosed with anything?').ok).toBe(false);
+    expect(filterText('Did you vote republican last election?', 'question').ok).toBe(false);
+    expect(filterText('Are you vaccinated against the flu?', 'question').ok).toBe(false);
+    expect(filterText('Have you been diagnosed with anything?', 'question').ok).toBe(false);
   });
 
   it('turns away shouting and keysmash', () => {
-    expect(filterQuestionText('DO YOU EAT THE PIZZA CRUST?').ok).toBe(false);
-    expect(filterQuestionText('Do you aaaaaaaa the crust?').ok).toBe(false);
+    expect(filterText('DO YOU EAT THE PIZZA CRUST?', 'question').ok).toBe(false);
+    expect(filterText('Do you aaaaaaaa the crust?', 'question').ok).toBe(false);
+  });
+
+  /*
+   * The title is filtered too, because a field that skipped it would be an
+   * unfiltered path to a real post made under the player's own account — on the
+   * half of the post the feed actually shows. The rules do not vary by subject;
+   * only the word the refusal uses does, so a player knows which field to fix.
+   */
+  it('gives the same verdict whichever subject it is given', () => {
+    for (const text of [
+      'Do you eat the pizza crust?',
+      'The crust question, settled',
+      'Do you think the f4ggot deserved it?',
+      'Did you vote republican last election?',
+      'WRITTEN ENTIRELY IN CAPITALS',
+      'Crust aaaaaaaa crust',
+    ]) {
+      expect(filterText(text, 'title').ok, text).toBe(filterText(text, 'question').ok);
+    }
+  });
+
+  it('names the subject it was asked about', () => {
+    const slur = 'Do you think the f4ggot deserved it?';
+    expect(filterText(slur, 'question')).toEqual({
+      ok: false,
+      reason: expect.stringContaining('question'),
+    });
+    expect(filterText(slur, 'title')).toEqual({
+      ok: false,
+      reason: expect.stringContaining('title'),
+    });
+
+    const noise = 'Crust aaaaaaaa crust';
+    expect(filterText(noise, 'question')).toEqual({
+      ok: false,
+      reason: expect.stringContaining('question'),
+    });
+    expect(filterText(noise, 'title')).toEqual({
+      ok: false,
+      reason: expect.stringContaining('title'),
+    });
+
+    // Every refusal this filter can give names what it is refusing, including
+    // the shouting rule — a player told "sentence case" while looking at four
+    // fields should not have to work out which one is being complained about.
+    const shouting = 'WRITTEN ENTIRELY IN CAPITALS';
+    expect(filterText(shouting, 'question')).toEqual({
+      ok: false,
+      reason: expect.stringContaining('question'),
+    });
+    expect(filterText(shouting, 'title')).toEqual({
+      ok: false,
+      reason: expect.stringContaining('title'),
+    });
   });
 });
 
@@ -188,6 +315,7 @@ describe('the public question projection', () => {
   const record = {
     id: 'h001',
     text: 'Do you eat the pizza crust?',
+    title: 'The crust question',
     labelA: 'Yes',
     labelB: 'No',
     authorId: '',
@@ -227,6 +355,13 @@ describe('the public question projection', () => {
   // button and has no business on a question the client is already looking at.
   it('keeps the cached permalink off the wire', () => {
     expect(toPublicQuestion(record, '2026-04-02')).not.toHaveProperty('permalink');
+  });
+
+  // Same rule, and the title is the newer half of it: the client renders
+  // `question.text`, and where the post sits in a feed is a Reddit artifact
+  // rather than game content.
+  it('keeps the post title off the wire', () => {
+    expect(toPublicQuestion(record, '2026-04-02')).not.toHaveProperty('title');
   });
 });
 

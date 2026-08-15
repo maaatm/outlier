@@ -2,9 +2,11 @@
  * The pinned menu post.
  *
  * One post on the subreddit that opens straight onto the menu instead of onto a
- * question: the rules, the four outcomes, the player's own record, and the
- * misjudged leaderboard. It is the app's front door for somebody who has just
- * arrived and does not yet know what any of this is.
+ * question: what the game is, the player's own record, the leaderboard, and the
+ * room that asks the subreddit something. It is the app's front door for
+ * somebody who has just arrived and does not yet know what any of this is —
+ * which is also why the room that creates a post has to say plainly why it is
+ * inert for a visitor who is not signed in. See `canSubmit`.
  *
  * It carries no question, so it is the one post where `/api/state` answers
  * without ever going near a tally.

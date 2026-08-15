@@ -21,7 +21,6 @@ import { Compose } from './components/Compose.js';
 import { DotCrowd } from './components/DotCrowd.js';
 import { Histogram } from './components/Histogram.js';
 import { Menu } from './components/Menu.js';
-import { MisjudgedBoard } from './components/MisjudgedBoard.js';
 import { StatBar } from './components/StatBar.js';
 import { WobbleRule } from './components/WobbleRule.js';
 import { useCountUp } from './countUp.js';
@@ -92,11 +91,18 @@ export function App(): React.JSX.Element {
   // The pinned menu post has no question behind it, so the menu is the whole
   // screen and there is nothing to exit to.
   if (state.kind === 'menu') {
-    return <Menu stats={state.stats} postId={postId} />;
+    return <Menu stats={state.stats} postId={postId} canSubmit={state.canSubmit} />;
   }
 
   if (screen === 'menu') {
-    return <Menu stats={state.stats} postId={postId} onExit={() => setScreen('game')} />;
+    return (
+      <Menu
+        stats={state.stats}
+        postId={postId}
+        canSubmit={state.canSubmit}
+        onExit={() => setScreen('game')}
+      />
+    );
   }
 
   return (
@@ -392,7 +398,6 @@ function RevealView({
   const mine = reveal.choice === 'a' ? question.labelA : question.labelB;
   const theirs = reveal.choice === 'a' ? question.labelB : question.labelA;
   const rest = CROWD_SIZE - reveal.dotsWithYou;
-  const [detail, setDetail] = useState<'guesses' | 'misjudged'>('guesses');
 
   const captionBits = [
     `${reveal.dotsWithYou} ${mine} \u00b7 ${rest} ${theirs}`,
@@ -483,28 +488,19 @@ function RevealView({
 
           <BadgeStamp id={reveal.badge} animate={animate} />
 
+          {/* Where everyone guessed, and nothing else. This slot used to be two
+              tabs; the misjudged board went with the room that shared it, and
+              one tab is not a tab strip.
+
+              The wrapper stays whether or not there are bars — it is what takes
+              the slack on this slide — but the label goes with them. `Histogram`
+              renders nothing at all on a question with no guesses banked, and a
+              heading over an empty box is a heading for nothing. */}
           <div className="detail">
-            <div className="detail__tabs">
-              <button
-                type="button"
-                className={`detail__tab${detail === 'guesses' ? ' is-active' : ''}`}
-                onClick={() => setDetail('guesses')}
-              >
-                where everyone guessed
-              </button>
-              <button
-                type="button"
-                className={`detail__tab${detail === 'misjudged' ? ' is-active' : ''}`}
-                onClick={() => setDetail('misjudged')}
-              >
-                hardest to read
-              </button>
-            </div>
-            {detail === 'guesses' ? (
-              <Histogram buckets={reveal.histogram} yourGuess={reveal.guess} accent={accent} />
-            ) : (
-              <MisjudgedBoard />
+            {reveal.histogram.some((count) => count > 0) && (
+              <p className="section__title">where everyone guessed</p>
             )}
+            <Histogram buckets={reveal.histogram} yourGuess={reveal.guess} accent={accent} />
           </div>
         </div>
       )}

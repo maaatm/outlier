@@ -128,10 +128,33 @@ export const BLOB_SIZE = { crowd: 18, inline: 24, panel: 40, wardrobe: 72 } as c
  */
 export const SUBMISSION_DEDUPE_SECONDS = 60;
 
+/**
+ * Questions one player may post in a UTC day.
+ *
+ * Submission used to be uncapped, which was defensible while the only way to
+ * reach it was a subreddit menu item most players never open. The room in the
+ * app puts it one tap from the front door — including the pinned menu post,
+ * where somebody who has never played lands — so the rate moves by an order of
+ * magnitude and `queue:pending` with it. This is the middle path: more than one
+ * a day, still bounded.
+ */
+export const SUBMISSIONS_PER_DAY = 3;
+
+/** How long the counter outlives its day. Only needs to exceed one day. */
+export const SUBMISSION_COUNT_TTL_SECONDS = 48 * 60 * 60;
+
 /** Question text bounds, enforced on both sides of the wire. */
 export const QUESTION_MIN_LENGTH = 10;
 export const QUESTION_MAX_LENGTH = 120;
 export const LABEL_MAX_LENGTH = 12;
+
+/**
+ * Post title bounds. Reddit's own cap is 300; the feed truncates long before
+ * that and so does the card, so this is set by what is readable rather than by
+ * what is allowed.
+ */
+export const TITLE_MIN_LENGTH = 8;
+export const TITLE_MAX_LENGTH = 100;
 
 /** Optional note appended to the generated comment. Short on purpose. */
 export const NOTE_MAX_LENGTH = 140;

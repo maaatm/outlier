@@ -102,6 +102,13 @@ GET /api/leaderboard/players     the new one
 with `Leaderboard.tsx` → `MisjudgedBoard.tsx` and `PlayerBoard.tsx` alongside it. The
 menu room "Hardest to read" keeps its name; only the code moves.
 
+> **Since superseded.** The misjudged board came off both in-app surfaces to free the menu
+> slot for **Ask a question** — the room, the reveal's tab, `MisjudgedBoard.tsx` and
+> `GET /api/leaderboard/questions` are all gone. The ranking itself survives:
+> `stats:misjudged` is still maintained on every vote and `misjudgedLeaderboard()` still
+> reads it, for the moderator-posted event post, which is now its only reader and the one
+> that reaches people who are not already in the app.
+
 ### Keys
 
 ```

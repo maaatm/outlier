@@ -9,6 +9,15 @@ import { keys } from './keys.js';
 export type QuestionRecord = {
   id: string;
   text: string;
+  /**
+   * The Reddit post's title.
+   *
+   * Its own field rather than a second use of `text`, because the two stopped
+   * being the same string when the room let players write one. Empty on every
+   * record written before that, which means the same thing it has always meant:
+   * the question was the title.
+   */
+  title: string;
   labelA: string;
   labelB: string;
   authorId: string;
@@ -34,6 +43,7 @@ export type QuestionRecord = {
 export type NewQuestion = {
   id: string;
   text: string;
+  title: string;
   labelA: string;
   labelB: string;
   authorId: string;
@@ -44,6 +54,7 @@ export type NewQuestion = {
 export async function writeQuestion(question: NewQuestion): Promise<void> {
   await redis.hSet(keys.question(question.id), {
     text: question.text,
+    title: question.title,
     labelA: question.labelA,
     labelB: question.labelB,
     authorId: question.authorId,
@@ -63,6 +74,7 @@ export async function getQuestion(questionId: string): Promise<QuestionRecord | 
   return {
     id: questionId,
     text: raw.text,
+    title: raw.title ?? '',
     labelA: raw.labelA || 'Yes',
     labelB: raw.labelB || 'No',
     authorId: raw.authorId ?? '',
@@ -115,6 +127,10 @@ export async function lockQuestion(questionId: string): Promise<void> {
 
 /**
  * The public projection. Author id and timestamps never cross the wire.
+ *
+ * Neither does the title. The client renders `question.text`; the title is a
+ * Reddit artifact — where the post sits in a feed — rather than game content,
+ * and this projection is deliberately narrow.
  *
  * `isToday` is resolved here rather than on the client for the usual reason: the
  * client has no business reading a local clock to decide what "today" means.

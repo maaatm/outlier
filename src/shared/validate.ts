@@ -4,7 +4,13 @@
  * client-side validation is a courtesy, not a gate.
  */
 
-import { LABEL_MAX_LENGTH, QUESTION_MAX_LENGTH, QUESTION_MIN_LENGTH } from './config.js';
+import {
+  LABEL_MAX_LENGTH,
+  QUESTION_MAX_LENGTH,
+  QUESTION_MIN_LENGTH,
+  TITLE_MAX_LENGTH,
+  TITLE_MIN_LENGTH,
+} from './config.js';
 
 export type ValidationResult = { ok: true } | { ok: false; reason: string };
 
@@ -19,6 +25,18 @@ export function normalizeQuestionText(raw: string): string {
 }
 
 export function normalizeLabel(raw: string, fallback: string): string {
+  const cleaned = normalizeQuestionText(raw);
+  return cleaned.length > 0 ? cleaned : fallback;
+}
+
+/**
+ * The post title, falling back to the question when nothing was typed.
+ *
+ * An empty title is not a mistake and never has been: every question posted
+ * before the field existed was titled with its own text, and the fallback is
+ * what keeps those records and these identical.
+ */
+export function normalizeTitle(raw: string, fallback: string): string {
   const cleaned = normalizeQuestionText(raw);
   return cleaned.length > 0 ? cleaned : fallback;
 }
@@ -47,6 +65,33 @@ export function validateQuestionText(raw: string): ValidationResult {
   return OK;
 }
 
+/**
+ * The post title, judged as a title rather than as a question.
+ *
+ * Deliberately not `validateQuestionText`: the trailing question mark and the
+ * one-question-mark rules are rules about a question, and a title is not one. A
+ * title with no `?` is fine, and so is a title that is three of them. What does
+ * carry over is everything that made the question safe to put on the subreddit —
+ * the length bounds, something that reads as words, and no links or usernames.
+ */
+export function validateTitle(raw: string): ValidationResult {
+  const title = normalizeQuestionText(raw);
+
+  if (title.length < TITLE_MIN_LENGTH) {
+    return { ok: false, reason: `Titles are at least ${TITLE_MIN_LENGTH} characters.` };
+  }
+  if (title.length > TITLE_MAX_LENGTH) {
+    return { ok: false, reason: `Titles are at most ${TITLE_MAX_LENGTH} characters.` };
+  }
+  if (!/[a-z]/i.test(title)) {
+    return { ok: false, reason: 'That does not read as a title.' };
+  }
+  if (/(https?:\/\/|www\.|\bu\/|\br\/)/i.test(title)) {
+    return { ok: false, reason: 'No links or usernames in titles.' };
+  }
+  return OK;
+}
+
 export function validateLabel(raw: string, which: string): ValidationResult {
   const label = normalizeQuestionText(raw);
   if (label.length === 0) return { ok: false, reason: `${which} needs a label.` };
@@ -56,10 +101,21 @@ export function validateLabel(raw: string, which: string): ValidationResult {
   return OK;
 }
 
+/**
+ * Everything a submission has to be, in the order the room reads its fields.
+ *
+ * `title` is a required parameter rather than an optional one so that no call
+ * site can forget it, and it is the **raw** field rather than a resolved title:
+ * an untyped title means the question is the title, and the question has just
+ * been checked by its own rules. Validating the fallback here would refuse a
+ * perfectly good 110-character question for being a long title — a rule the
+ * player never broke and could only satisfy by typing something.
+ */
 export function validateSubmission(
   text: string,
   labelA: string,
-  labelB: string
+  labelB: string,
+  title: string
 ): ValidationResult {
   const textResult = validateQuestionText(text);
   if (!textResult.ok) return textResult;
@@ -74,6 +130,11 @@ export function validateSubmission(
     normalizeQuestionText(labelA).toLowerCase() === normalizeQuestionText(labelB).toLowerCase()
   ) {
     return { ok: false, reason: 'The two answers need to differ.' };
+  }
+
+  if (normalizeQuestionText(title).length > 0) {
+    const titleResult = validateTitle(title);
+    if (!titleResult.ok) return titleResult;
   }
   return OK;
 }

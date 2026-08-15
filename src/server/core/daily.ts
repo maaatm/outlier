@@ -47,6 +47,9 @@ async function drawFromHousePool(): Promise<string> {
     await writeQuestion({
       id: draw.id,
       text: draw.text,
+      // Nobody titled these. A house question reaches the subreddit through
+      // `dailyTitle`, which builds its own from the day and the text.
+      title: '',
       labelA: draw.labelA ?? 'Yes',
       labelB: draw.labelB ?? 'No',
       authorId: '',

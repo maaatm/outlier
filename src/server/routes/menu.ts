@@ -7,25 +7,47 @@ import { context, reddit } from '@devvit/web/server';
 import type { UiResponse } from '@devvit/web/shared';
 import { Hono } from 'hono';
 
-import { LABEL_MAX_LENGTH, QUESTION_MAX_LENGTH, MOD_QUEUE_PAGE_SIZE } from '../../shared/config.js';
+import {
+  LABEL_MAX_LENGTH,
+  QUESTION_MAX_LENGTH,
+  MOD_QUEUE_PAGE_SIZE,
+  SUBMISSIONS_PER_DAY,
+  TITLE_MAX_LENGTH,
+} from '../../shared/config.js';
 import { SUBMISSION_GUIDANCE } from '../../shared/validate.js';
 import { currentSubredditName, postDaily } from '../core/daily.js';
 import { pinMenuPost } from '../core/menuPost.js';
 import { isModerator } from '../core/mod.js';
 import { listPending } from '../core/queue.js';
 import { misjudgedLeaderboard, renderLeaderboardPost } from '../core/stats.js';
+import { remainingSubmissions } from '../core/submit.js';
 
 export const menuRoutes = new Hono();
 
-/** "Submit a question" — the whole open-question flow starts here. */
+/**
+ * "Submit a question" — the same flow as the room in the app, from outside it.
+ *
+ * Kept deliberately. It is the only path for somebody who never opens a post,
+ * and both entry points call `submitOpenQuestion` and read the same constants,
+ * so there is no second copy of any rule to keep in step.
+ */
 menuRoutes.post('/internal/menu/submit-question', async (c) => {
-  if (!context.userId) {
+  const userId = context.userId;
+  if (!userId) {
     return c.json<UiResponse>({ showToast: 'Sign in to submit a question.' });
   }
 
-  // Nothing is checked before the form opens any more. Submission is uncapped,
-  // and the only guard left — a repeat of the identical question — cannot be
-  // known until there is a question to compare.
+  // The one thing worth knowing before a form opens: everything else about a
+  // submission needs a submission to judge, but the allowance is spent or it is
+  // not, and four fields typed into a form that will refuse them is worse than
+  // being told first.
+  const remaining = await remainingSubmissions(userId);
+  if (remaining <= 0) {
+    return c.json<UiResponse>({
+      showToast: `That is ${SUBMISSIONS_PER_DAY} today. The allowance turns over at midnight UTC.`,
+    });
+  }
+
   return c.json<UiResponse>({
     showForm: {
       name: 'submitQuestion',
@@ -58,6 +80,13 @@ menuRoutes.post('/internal/menu/submit-question', async (c) => {
             helpText: `Up to ${LABEL_MAX_LENGTH} characters.`,
             defaultValue: 'No',
             required: true,
+          },
+          {
+            type: 'string',
+            name: 'title',
+            label: 'Post title (optional)',
+            helpText: `Leave it empty and the question is the title. Up to ${TITLE_MAX_LENGTH} characters.`,
+            required: false,
           },
         ],
       },

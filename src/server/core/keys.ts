@@ -20,7 +20,7 @@
  */
 
 export const keys = {
-  /** hash: text, labelA, labelB, authorId, authorName, source, createdAt, postId, permalink, lockedAt, dailyDate */
+  /** hash: text, title, labelA, labelB, authorId, authorName, source, createdAt, postId, permalink, lockedAt, dailyDate */
   question: (questionId: string) => `q:${questionId}`,
 
   /** string: questionId of the Daily for a `YYYY-MM-DD` day. */
@@ -108,15 +108,33 @@ export const keys = {
   /**
    * hash: submission fingerprint -> "1", TTL `SUBMISSION_DEDUPE_SECONDS`.
    *
-   * Not a rate limit — the 24h submission cooldown this replaced is gone, and a
-   * player may post as many *different* questions as they like. This refuses an
-   * identical one, because nothing in `submitOpenQuestion` is idempotent and a
-   * retried timeout would otherwise be a second post and a second payment.
+   * Not a rate limit — that is `submissionCount` below, and the two guard
+   * different things. This one refuses an *identical* question from the same
+   * player inside a short window, because nothing in `submitOpenQuestion` is
+   * idempotent and a retried timeout would otherwise be a second post and a
+   * second payment. Two different questions a second apart are both fine.
    *
    * One hash per player rather than a key per submission, so the TTL is set
    * once on a key that already exists rather than on every entry.
    */
   submissionRecent: (userId: string) => `sub:recent:${userId}`,
+
+  /**
+   * string with a TTL: how many questions this player has posted today.
+   *
+   * Keyed by UTC day rather than a rolling 24h window, so the allowance turns
+   * over with the game's own day boundary — the same one the streak and the
+   * Daily use. The TTL is a cleanup mechanism, not the limit; the day in the
+   * key is the limit.
+   *
+   * A key of its own rather than the `subDay`/`subCount` pair already on the
+   * user hash, which counts the same event for a different purpose: those bound
+   * the coin *reward* and are written by assignment after a read, a race the
+   * comment on `awardSubmissionCoins` accepts because the valve is off by
+   * default. A limit that actually refuses somebody cannot be read-then-write,
+   * so this one is an `incrBy` and answers with the count it just made.
+   */
+  submissionCount: (userId: string, day: string) => `sub:count:${userId}:${day}`,
 
   /** zset: questionId -> upvotes on the open post. */
   queuePending: 'queue:pending',
