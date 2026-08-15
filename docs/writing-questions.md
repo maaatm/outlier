@@ -80,14 +80,45 @@ rather than a yes-or-no:
 >
 > Do you brush your teeth before or after breakfast? — `Before` / `After`
 
-Labels cap at twelve characters. If a label needs more than that, the question is
-probably asking two things.
+Keep labels to about twelve characters. That is guidance rather than a limit — nothing
+refuses a longer one — but the two answers are rendered as the two buttons a player taps,
+and a label that does not fit one is a question that is probably asking two things.
+
+## Post titles
+
+The question is the title of its post unless somebody writes a different one. Leaving
+that field empty is not a lesser submission — it is what every question posted before the
+field existed did, and it is still the right answer for most of them. A question that
+reads well reads well in a feed.
+
+A title earns its place when the question is long enough to be cut off in the feed, or
+when it wants a word of framing the question cannot carry without becoming two sentences.
+
+> Do you reverse into parking spaces or drive in front-first? — `The parking space
+> question`
+
+Titles cap at 300 characters, which is Reddit's own limit rather than ours — a longer one
+is a post Reddit will not create. There is no lower bound and no other length rule
+anywhere in a submission. Titles are held to everything a question is held to — no links,
+no usernames, no slurs, nothing political, medical, or about identity, and sentence case —
+and to none of the rules that are about being a question. A title need not end in a
+question mark, and it may contain three.
+
+A question long enough to outrun that cap still posts: the title falls back to the
+question, and the fallback is trimmed to fit rather than refused. Writing your own title
+is how you decide what the trim keeps.
+
+**A title that misrepresents the question is the one thing here that will get a post
+removed.** The title is what the subreddit sees before it sees anything else, and a post
+that promises one question and opens on another is bait however it was meant. Nothing
+automatic catches this. The filter reads words; it does not read honesty.
 
 ## The feedback loop
 
-The app tracks average guessing error per question and surfaces a leaderboard of the
-most misjudged questions ever — available in the app on any reveal screen, and postable
-as an event post from the mod menu (**Outlier: post the misjudged leaderboard**).
+The app tracks average guessing error per question and ranks the most misjudged questions
+ever. It is no longer a screen in the app: it is an event post, published from the mod
+menu (**Outlier: post the misjudged leaderboard**), which is where it reaches people who
+are not already playing.
 
 Read that leaderboard before you approve anything. It will teach you what works here
 faster than this page will, and it is worth posting periodically: it shows the subreddit

@@ -6,11 +6,18 @@
  * whole of the pinned menu post, where somebody may be meeting the game for the
  * first time.
  *
- * Everything in the list is a read — what they have banked, who is ahead, the
- * questions the subreddit misjudged most. Nothing on this screen can change a
- * vote, and nothing on it exposes a tally the player has not already earned. The
- * wardrobe is the one thing here that writes, and what it writes is what their
- * blob looks like.
+ * Most of the list is a read — what they have banked, who is ahead. Nothing on
+ * this screen can change a vote, and nothing on it exposes a tally the player
+ * has not already earned.
+ *
+ * Two rooms write, and they are not the same kind of writing. The wardrobe
+ * changes what a blob looks like, which is undone by pressing the other arrow.
+ * Ask a question creates a real post on the subreddit under the player's own
+ * name: public, permanent, and not undone by anything in this app. It leads the
+ * list because it is the only entry that adds to the subreddit rather than
+ * reading it back, and what guards it is not its position — it is that the panel
+ * is the confirmation step, with one deliberate button instead of the wardrobe's
+ * saving as it goes.
  *
  * The one exception is the Daily action at the top, which is not a room: every
  * entry below it opens in place, and that one leaves the post entirely. It sits
@@ -26,7 +33,7 @@ import {
   BOX_PRICE,
   CROWD_SIZE,
   HIT_THRESHOLD,
-  LEADERBOARD_MIN_VOTES,
+  TITLE_MAX_LENGTH,
 } from '../../shared/config.js';
 import {
   ACCESSORIES,
@@ -47,21 +54,28 @@ import type {
   DailyPointer,
   PlayerStats,
 } from '../../shared/types.js';
-import { fetchAvatar, fetchDaily, openBox, saveAvatar, saveShowBlob } from '../api.js';
+import { normalizeTitle, validateSubmission } from '../../shared/validate.js';
+import {
+  fetchAvatar,
+  fetchDaily,
+  openBox,
+  saveAvatar,
+  saveShowBlob,
+  submitQuestion,
+} from '../api.js';
 import { coalescingWriter } from '../coalesce.js';
 import { Blob } from './Blob.js';
-import { MisjudgedBoard } from './MisjudgedBoard.js';
 import { PlayerBoard } from './PlayerBoard.js';
 import { StatBar } from './StatBar.js';
 import { WobbleRule } from './WobbleRule.js';
 
-type PanelId = 'record' | 'wardrobe' | 'board' | 'misjudged';
+type PanelId = 'record' | 'wardrobe' | 'board' | 'ask';
 
 const TITLES: Record<PanelId, string> = {
   record: 'Your record',
   wardrobe: 'Wardrobe',
   board: 'Leaderboard',
-  misjudged: 'Hardest to read',
+  ask: 'Ask a question',
 };
 
 type Entry = {
@@ -71,19 +85,21 @@ type Entry = {
 };
 
 /**
- * The wardrobe sits next to Your record because both are about the player and
- * everything below them is about everyone else. It is the only room in the list
- * that writes anything, which is the one thing its blurb has to make obvious.
+ * Ask a question is first, because it is the only entry here that adds anything
+ * to the subreddit and the only one worth putting in front of somebody who has
+ * just arrived on the pinned menu post. The three below it are all readings of
+ * what has already happened, in the usual order: you, your blob, everyone else.
+ *
+ * It is still the one room that cannot be undone. Being first does not change
+ * that — what guards it is that the panel is the confirmation step and nothing
+ * in it posts without a deliberate press.
  */
 const ENTRIES: Entry[] = [
+  { id: 'ask', blurb: 'write one for the subreddit and post it' },
   { id: 'record', blurb: 'your blob, your streak, and how often you read the room' },
   { id: 'wardrobe', blurb: 'change the face and the accessory your blob wears' },
   { id: 'board', blurb: 'who has banked the most points' },
-  { id: 'misjudged', blurb: 'what the subreddit misjudged most' },
 ];
-
-/** How many leaderboard rows fit here. The reveal's strip shows fewer. */
-const BOARD_ROWS = 5;
 
 /**
  * Reddit hands back permalinks as paths, and `navigateTo` throws on anything it
@@ -100,14 +116,21 @@ const REDDIT_ORIGIN = 'https://www.reddit.com';
  * `postId` is the post the menu is open on, and is only used to ask the server
  * whether that post is today's Daily. The menu post has no question on it, so
  * the server cannot work it out from a `post:` lookup.
+ *
+ * `canSubmit` rides in on the state response rather than being fetched here: it
+ * is one boolean about whether the viewer is signed in, and the room it governs
+ * is the one place a signed-out visitor most needs to be told why a control is
+ * inert rather than shown nothing at all.
  */
 export function Menu({
   stats,
   postId,
+  canSubmit,
   onExit,
 }: {
   stats: PlayerStats;
   postId?: string;
+  canSubmit: boolean;
   onExit?: () => void;
 }): React.JSX.Element {
   const [panel, setPanel] = useState<PanelId | null>(null);
@@ -151,7 +174,7 @@ export function Menu({
             <Wardrobe avatar={avatar} onEquip={equip} onOpened={absorb} />
           )}
           {panel === 'board' && <Board />}
-          {panel === 'misjudged' && <Misjudged />}
+          {panel === 'ask' && <Ask canSubmit={canSubmit} />}
         </div>
 
         {showBack && (
@@ -838,18 +861,210 @@ function Board(): React.JSX.Element {
   );
 }
 
-function Misjudged(): React.JSX.Element {
+/**
+ * Ask the subreddit something.
+ *
+ * The one room that ends with a public post under the player's own name, and the
+ * only screen in the app that asks anybody to type. Four things follow.
+ *
+ * **It fits on the screen.** Every field, the preview and the button are visible
+ * at once, at the 512px the inline post view can be — the same budget the
+ * wardrobe is built to. That is what makes the fields single-line boxes that
+ * scroll sideways rather than boxes that grow downward: a question is one line
+ * however long it is, and a room that reflows as you type moves the button you
+ * are reaching for.
+ *
+ * **Four fields, in the order they are read**, and only the first is work: the
+ * answers arrive as Yes/No the way the Devvit form's do, and the title defaults
+ * to the question. Only the title carries a counter, because it is the only
+ * field with a limit left — Reddit's, on titles, which is a post that will not
+ * be created rather than a matter of taste.
+ *
+ * **One primary button, and the panel is the confirm.** Nothing here submits on
+ * blur or on the last keystroke. The wardrobe can afford to save as it goes
+ * because the way to undo the wardrobe is to press the other arrow; there is no
+ * other arrow for a post.
+ *
+ * **The client's validation is a courtesy.** Every rule below is re-run on the
+ * server before anything is created, and that is the gate — this copy exists to
+ * say why the button is dark, not to decide whether the question is allowed.
+ */
+function Ask({ canSubmit }: { canSubmit: boolean }): React.JSX.Element {
+  const [text, setText] = useState('');
+  const [labelA, setLabelA] = useState('Yes');
+  const [labelB, setLabelB] = useState('No');
+  const [title, setTitle] = useState('');
+  const [posting, setPosting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const check = validateSubmission(text, labelA, labelB, title);
+  // Silent until they have started. A form that objects to being empty is
+  // objecting to being opened.
+  const started = text.trim().length > 0;
+  const ready = canSubmit && check.ok && !posting;
+
+  async function post(): Promise<void> {
+    setPosting(true);
+    setError(null);
+    try {
+      const posted = await submitQuestion({ text, labelA, labelB, title });
+      // Straight to the post. `posting` is deliberately left set: the button has
+      // done its one job and must not spring back to life behind a navigation.
+      navigateTo(new URL(posted.permalink, REDDIT_ORIGIN).toString());
+    } catch (failure) {
+      // The server's words, whatever they were — the allowance, the filter, or a
+      // question already on its way up. It is the honest version and it is the
+      // only one that knows which of the three happened.
+      setError(failure instanceof Error ? failure.message : 'That did not post.');
+      setPosting(false);
+    }
+  }
+
   return (
-    <Panel
-      title={TITLES.misjudged}
-      note={
-        <>
-          Average gap between guess and reality, across every vote a question has taken.{' '}
-          {LEADERBOARD_MIN_VOTES} votes to qualify.
-        </>
-      }
-    >
-      <MisjudgedBoard rows={BOARD_ROWS} />
+    <Panel title={TITLES.ask}>
+      <div className="ask">
+        {!canSubmit && (
+          <p className="notice notice--quiet">
+            Sign in to ask the subreddit something. You can read the rest of the menu either
+            way.
+          </p>
+        )}
+
+        <Field id="ask-text" label="Your question">
+          <input
+            id="ask-text"
+            className="ask__input"
+            type="text"
+            value={text}
+            placeholder="Do you eat the pizza crust?"
+            disabled={!canSubmit}
+            onChange={(event) => setText(event.target.value)}
+          />
+        </Field>
+
+        <div className="ask__pair">
+          <Field id="ask-a" label="First answer">
+            <input
+              id="ask-a"
+              className="ask__input"
+              type="text"
+              value={labelA}
+              disabled={!canSubmit}
+              onChange={(event) => setLabelA(event.target.value)}
+            />
+          </Field>
+          <Field id="ask-b" label="Second answer">
+            <input
+              id="ask-b"
+              className="ask__input"
+              type="text"
+              value={labelB}
+              disabled={!canSubmit}
+              onChange={(event) => setLabelB(event.target.value)}
+            />
+          </Field>
+        </div>
+
+        {/* The placeholder is the question as it stands, so the field reads as a
+            refinement of something that already works rather than as a fifth
+            thing to invent. */}
+        <Field
+          id="ask-title"
+          label="Post title (optional)"
+          hint={`${TITLE_MAX_LENGTH - title.length} left`}
+        >
+          <input
+            id="ask-title"
+            className="ask__input"
+            type="text"
+            maxLength={TITLE_MAX_LENGTH}
+            value={title}
+            placeholder={text || 'The question, unless you write one.'}
+            disabled={!canSubmit}
+            onChange={(event) => setTitle(event.target.value)}
+          />
+        </Field>
+
+        <AskPreview text={text} labelA={labelA} labelB={labelB} title={title} />
+
+        <button
+          type="button"
+          className="button button--primary ask__post"
+          disabled={!ready}
+          onClick={() => void post()}
+        >
+          {posting ? 'Posting...' : 'Post this question'}
+        </button>
+
+        {error ? (
+          <p className="notice notice--quiet">{error}</p>
+        ) : (
+          started && !check.ok && <p className="notice notice--quiet">{check.reason}</p>
+        )}
+      </div>
     </Panel>
+  );
+}
+
+/**
+ * One labelled field, with a counter on the label's line if it has a limit.
+ *
+ * The counter shares the label's line rather than taking one under the box: this
+ * room has a height budget and a hint per field would be four rows of it. Only
+ * the title has one at all — nothing else in a submission is bounded any more.
+ */
+function Field({
+  id,
+  label,
+  hint,
+  children,
+}: {
+  id: string;
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}): React.JSX.Element {
+  return (
+    <div className="ask__field">
+      <div className="ask__head">
+        <label className="ask__label" htmlFor={id}>
+          {label}
+        </label>
+        {hint !== undefined && <span className="ask__hint">{hint}</span>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+/**
+ * The post as it will appear, which is the part nobody can take back.
+ *
+ * It resolves the title the same way the server does — `normalizeTitle` with the
+ * question as the fallback — so an untouched title field shows what it will
+ * actually post rather than an empty line.
+ */
+function AskPreview({
+  text,
+  labelA,
+  labelB,
+  title,
+}: {
+  text: string;
+  labelA: string;
+  labelB: string;
+  title: string;
+}): React.JSX.Element {
+  const shown = normalizeTitle(title, text);
+
+  return (
+    <div className="ask__preview">
+      <p className="section__title">what the subreddit sees</p>
+      <p className="ask__preview-title">{shown || 'Your question, as its own post.'}</p>
+      <p className="ask__preview-text">{text || 'The question goes here.'}</p>
+      <p className="ask__preview-answers">
+        {labelA} &middot; {labelB}
+      </p>
+    </div>
   );
 }

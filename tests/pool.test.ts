@@ -9,7 +9,7 @@ import {
   QUESTION_MIN_LENGTH,
 } from '../src/shared/config.js';
 import { validateSubmission } from '../src/shared/validate.js';
-import { filterQuestionText } from '../src/server/core/filter.js';
+import { filterText } from '../src/server/core/filter.js';
 
 describe('the shipped house pool', () => {
   it('carries at least four months of questions', () => {
@@ -23,12 +23,23 @@ describe('the shipped house pool', () => {
     expect(texts.size).toBe(HOUSE_QUESTIONS.length);
   });
 
-  it('meets the same rules players are held to', () => {
+  /*
+   * Two different standards, and the pool is held to both. The first is what a
+   * player is held to, which is now only "it is something, and it is not a
+   * link". The second is the pool's own style bounds in `config.ts` — no longer
+   * enforced on anybody's submission, and still worth enforcing on our own
+   * content, because a 200-character house question would ship silently.
+   */
+  it('passes submission validation and the pool’s own style bounds', () => {
     for (const question of HOUSE_QUESTIONS) {
+      // No title: a house question reaches the subreddit through `dailyTitle`,
+      // and an untyped title is exactly what the empty string means everywhere
+      // else in the submission path.
       const result = validateSubmission(
         question.text,
         question.labelA ?? 'Yes',
-        question.labelB ?? 'No'
+        question.labelB ?? 'No',
+        ''
       );
       expect(result, `${question.id}: ${question.text}`).toEqual({ ok: true });
 
@@ -41,7 +52,7 @@ describe('the shipped house pool', () => {
 
   it('passes its own content filter', () => {
     for (const question of HOUSE_QUESTIONS) {
-      expect(filterQuestionText(question.text), question.text).toEqual({ ok: true });
+      expect(filterText(question.text, 'question'), question.text).toEqual({ ok: true });
     }
   });
 

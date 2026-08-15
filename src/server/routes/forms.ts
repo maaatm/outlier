@@ -35,6 +35,9 @@ formRoutes.post('/internal/forms/submit-question', async (c) => {
     text: firstValue(values.text),
     labelA: firstValue(values.labelA) || 'Yes',
     labelB: firstValue(values.labelB) || 'No',
+    // Optional in the form and optional here. An untouched field arrives as ''
+    // and means what it means everywhere else: the question is the title.
+    title: firstValue(values.title),
   });
 
   if (outcome.status !== 'ok') {

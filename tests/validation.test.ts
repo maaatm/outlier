@@ -1,17 +1,20 @@
 import { describe, expect, it } from 'vitest';
 
-import { filterQuestionText } from '../src/server/core/filter.js';
-import { NOTE_MAX_LENGTH, QUESTION_MAX_LENGTH } from '../src/shared/config.js';
+import { filterText } from '../src/server/core/filter.js';
+import { NOTE_MAX_LENGTH, TITLE_MAX_LENGTH } from '../src/shared/config.js';
 import { buildComment, normalizeNote } from '../src/shared/comment.js';
 import { bucketFor } from '../src/server/core/votes.js';
 import { buildDailySummary } from '../src/server/core/daily.js';
 import { toPublicQuestion } from '../src/server/core/questions.js';
 import type { Question, Reveal } from '../src/shared/types.js';
 import {
+  fitTitle,
   normalizeQuestionText,
+  normalizeTitle,
   submissionFingerprint,
   validateQuestionText,
   validateSubmission,
+  validateTitle,
 } from '../src/shared/validate.js';
 
 describe('question text rules', () => {
@@ -19,17 +22,29 @@ describe('question text rules', () => {
     expect(validateQuestionText('Do you eat the pizza crust?')).toEqual({ ok: true });
   });
 
-  it('requires a question mark', () => {
-    expect(validateQuestionText('You eat the pizza crust').ok).toBe(false);
+  /*
+   * Length and punctuation are not rules. Both used to be, and both fell on
+   * somebody who had already typed the thing — a question is refused here for
+   * being a link or being nothing, and for nothing else. What a *good* question
+   * looks like is `docs/writing-questions.md`'s business, and the mod queue in
+   * front of the Daily slot is the gate that enforces any of it.
+   */
+  it('does not require a question mark', () => {
+    expect(validateQuestionText('You eat the pizza crust')).toEqual({ ok: true });
+    expect(validateQuestionText('Crust. Yes or no')).toEqual({ ok: true });
   });
 
-  it('rejects more than one question', () => {
-    expect(validateQuestionText('Do you? Do you really?').ok).toBe(false);
+  it('takes a question of any length, short or long', () => {
+    expect(validateQuestionText('Crust?')).toEqual({ ok: true });
+    expect(validateQuestionText(`Do you ${'really '.repeat(200)}eat it?`)).toEqual({ ok: true });
   });
 
-  it('enforces the length bounds', () => {
-    expect(validateQuestionText('Hi?').ok).toBe(false);
-    expect(validateQuestionText(`${'a'.repeat(QUESTION_MAX_LENGTH)}?`).ok).toBe(false);
+  it('still refuses a blank one', () => {
+    expect(validateQuestionText('').ok).toBe(false);
+    expect(validateQuestionText('   ').ok).toBe(false);
+    // Zero-width characters normalize away, so this is blank too.
+    expect(validateQuestionText('​⁠').ok).toBe(false);
+    expect(validateQuestionText('?!.').ok).toBe(false);
   });
 
   it('rejects links and usernames', () => {
@@ -42,12 +57,109 @@ describe('question text rules', () => {
   });
 
   it('needs the two answers to differ', () => {
-    expect(validateSubmission('Do you eat the crust?', 'Yes', 'yes').ok).toBe(false);
-    expect(validateSubmission('Do you eat the crust?', 'Yes', 'No')).toEqual({ ok: true });
+    expect(validateSubmission('Do you eat the crust?', 'Yes', 'yes', '').ok).toBe(false);
+    expect(validateSubmission('Do you eat the crust?', 'Yes', 'No', '')).toEqual({ ok: true });
   });
 
-  it('caps label length', () => {
-    expect(validateSubmission('Do you eat the crust?', 'Yes', 'A'.repeat(13)).ok).toBe(false);
+  /*
+   * A long answer is a long button — the two choices render at whatever width
+   * they come out at — but that is a question asked badly rather than one asked
+   * wrongly, and the person it looks worst for is the one who wrote it.
+   */
+  it('takes an answer of any length but not a blank one', () => {
+    expect(validateSubmission('Do you eat the crust?', 'Yes', 'A'.repeat(80), '')).toEqual({
+      ok: true,
+    });
+    expect(validateSubmission('Do you eat the crust?', '', 'No', '').ok).toBe(false);
+    expect(validateSubmission('Do you eat the crust?', 'Yes', '   ', '').ok).toBe(false);
+  });
+});
+
+/*
+ * The post title. It is the half of a submission the feed shows, and it is not a
+ * question — so it is held to everything that made the question safe to publish
+ * and to none of the rules that are about being a question.
+ */
+describe('title rules', () => {
+  it('takes a title that is not a question', () => {
+    expect(validateTitle('The pizza crust question')).toEqual({ ok: true });
+  });
+
+  it('does not mind how many question marks it has', () => {
+    expect(validateTitle('Crust? Really? Truly?')).toEqual({ ok: true });
+  });
+
+  /*
+   * The one length still enforced anywhere in a submission, and only because
+   * Reddit enforces it: a `submitCustomPost` over the cap is refused on their
+   * side, so this is a post that will not be created rather than a matter of
+   * taste. There is no lower bound — a one-word title is a title.
+   */
+  it('allows any length up to Reddit’s cap', () => {
+    expect(validateTitle('Crust')).toEqual({ ok: true });
+    expect(validateTitle('a'.repeat(TITLE_MAX_LENGTH))).toEqual({ ok: true });
+    expect(validateTitle('a'.repeat(TITLE_MAX_LENGTH + 1)).ok).toBe(false);
+  });
+
+  it('refuses a blank title when it is given one', () => {
+    expect(validateTitle('').ok).toBe(false);
+    expect(validateTitle('   ').ok).toBe(false);
+  });
+
+  it('needs something that reads as words', () => {
+    expect(validateTitle('12345678901').ok).toBe(false);
+  });
+
+  it('rejects links and usernames', () => {
+    expect(validateTitle('Settled at https://example.com').ok).toBe(false);
+    expect(validateTitle('As asked by u/spez').ok).toBe(false);
+  });
+
+  /*
+   * An empty title has always meant "the question was the title" — every record
+   * written before the field existed means exactly that — so the fallback is
+   * what keeps those and these identical rather than a convenience.
+   */
+  it('falls back to the question when nothing was typed', () => {
+    const question = 'Do you eat the pizza crust?';
+    expect(normalizeTitle('', question)).toBe(question);
+    expect(normalizeTitle('   ', question)).toBe(question);
+    // Zero-width space and word joiner: a title that is only the invisible
+    // characters people paste in is an empty title.
+    expect(normalizeTitle('​⁠', question)).toBe(question);
+    expect(normalizeTitle('  Crust,  settled ​once  ', question)).toBe('Crust, settled once');
+  });
+
+  it('refuses a bad title on a good question', () => {
+    const question = 'Do you eat the pizza crust?';
+    expect(validateSubmission(question, 'Yes', 'No', 'Read https://example.com').ok).toBe(false);
+    expect(validateSubmission(question, 'Yes', 'No', '?!.').ok).toBe(false);
+    expect(validateSubmission(question, 'Yes', 'No', 'The crust question')).toEqual({ ok: true });
+  });
+
+  /*
+   * A question is no longer bounded, so a long one can outrun the only bound
+   * left. The two failures are different and are handled differently: a title
+   * somebody typed past the cap is refused with a reason, because they wrote it
+   * and can shorten it — a question past the cap is not a title anybody wrote,
+   * so it is cut to fit rather than refusing a perfectly good question for the
+   * length of a field the player was told was optional.
+   */
+  it('trims the fallback to the cap instead of refusing the question', () => {
+    const long = `Do you ${'really '.repeat(80)}eat the pizza crust?`;
+    expect(long.length).toBeGreaterThan(TITLE_MAX_LENGTH);
+
+    expect(validateSubmission(long, 'Yes', 'No', '')).toEqual({ ok: true });
+
+    const title = normalizeTitle('', long);
+    expect(title.length).toBe(TITLE_MAX_LENGTH);
+    expect(title.endsWith('...')).toBe(true);
+    expect(long.startsWith(title.slice(0, -3))).toBe(true);
+  });
+
+  it('leaves a title that already fits exactly as it was written', () => {
+    expect(normalizeTitle('The crust question', 'Do you eat it?')).toBe('The crust question');
+    expect(fitTitle('The crust question')).toBe('The crust question');
   });
 });
 
@@ -58,23 +170,77 @@ describe('the content filter', () => {
       'Do you visit Scunthorpe often?',
       'Do you eat the pizza crust?',
     ]) {
-      expect(filterQuestionText(text), text).toEqual({ ok: true });
+      expect(filterText(text, 'question'), text).toEqual({ ok: true });
     }
   });
 
   it('blocks slurs even when they are spelled around', () => {
-    expect(filterQuestionText('Do you think the f4ggot deserved it?').ok).toBe(false);
+    expect(filterText('Do you think the f4ggot deserved it?', 'question').ok).toBe(false);
   });
 
   it('turns away political, medical and identity questions', () => {
-    expect(filterQuestionText('Did you vote republican last election?').ok).toBe(false);
-    expect(filterQuestionText('Are you vaccinated against the flu?').ok).toBe(false);
-    expect(filterQuestionText('Have you been diagnosed with anything?').ok).toBe(false);
+    expect(filterText('Did you vote republican last election?', 'question').ok).toBe(false);
+    expect(filterText('Are you vaccinated against the flu?', 'question').ok).toBe(false);
+    expect(filterText('Have you been diagnosed with anything?', 'question').ok).toBe(false);
   });
 
   it('turns away shouting and keysmash', () => {
-    expect(filterQuestionText('DO YOU EAT THE PIZZA CRUST?').ok).toBe(false);
-    expect(filterQuestionText('Do you aaaaaaaa the crust?').ok).toBe(false);
+    expect(filterText('DO YOU EAT THE PIZZA CRUST?', 'question').ok).toBe(false);
+    expect(filterText('Do you aaaaaaaa the crust?', 'question').ok).toBe(false);
+  });
+
+  /*
+   * The title is filtered too, because a field that skipped it would be an
+   * unfiltered path to a real post made under the player's own account — on the
+   * half of the post the feed actually shows. The rules do not vary by subject;
+   * only the word the refusal uses does, so a player knows which field to fix.
+   */
+  it('gives the same verdict whichever subject it is given', () => {
+    for (const text of [
+      'Do you eat the pizza crust?',
+      'The crust question, settled',
+      'Do you think the f4ggot deserved it?',
+      'Did you vote republican last election?',
+      'WRITTEN ENTIRELY IN CAPITALS',
+      'Crust aaaaaaaa crust',
+    ]) {
+      expect(filterText(text, 'title').ok, text).toBe(filterText(text, 'question').ok);
+    }
+  });
+
+  it('names the subject it was asked about', () => {
+    const slur = 'Do you think the f4ggot deserved it?';
+    expect(filterText(slur, 'question')).toEqual({
+      ok: false,
+      reason: expect.stringContaining('question'),
+    });
+    expect(filterText(slur, 'title')).toEqual({
+      ok: false,
+      reason: expect.stringContaining('title'),
+    });
+
+    const noise = 'Crust aaaaaaaa crust';
+    expect(filterText(noise, 'question')).toEqual({
+      ok: false,
+      reason: expect.stringContaining('question'),
+    });
+    expect(filterText(noise, 'title')).toEqual({
+      ok: false,
+      reason: expect.stringContaining('title'),
+    });
+
+    // Every refusal this filter can give names what it is refusing, including
+    // the shouting rule — a player told "sentence case" while looking at four
+    // fields should not have to work out which one is being complained about.
+    const shouting = 'WRITTEN ENTIRELY IN CAPITALS';
+    expect(filterText(shouting, 'question')).toEqual({
+      ok: false,
+      reason: expect.stringContaining('question'),
+    });
+    expect(filterText(shouting, 'title')).toEqual({
+      ok: false,
+      reason: expect.stringContaining('title'),
+    });
   });
 });
 
@@ -188,6 +354,7 @@ describe('the public question projection', () => {
   const record = {
     id: 'h001',
     text: 'Do you eat the pizza crust?',
+    title: 'The crust question',
     labelA: 'Yes',
     labelB: 'No',
     authorId: '',
@@ -227,6 +394,13 @@ describe('the public question projection', () => {
   // button and has no business on a question the client is already looking at.
   it('keeps the cached permalink off the wire', () => {
     expect(toPublicQuestion(record, '2026-04-02')).not.toHaveProperty('permalink');
+  });
+
+  // Same rule, and the title is the newer half of it: the client renders
+  // `question.text`, and where the post sits in a feed is a Reddit artifact
+  // rather than game content.
+  it('keeps the post title off the wire', () => {
+    expect(toPublicQuestion(record, '2026-04-02')).not.toHaveProperty('title');
   });
 });
 

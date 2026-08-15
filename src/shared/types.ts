@@ -153,6 +153,16 @@ export type QuestionState = {
   /** Signed-out users can read the question but cannot vote. */
   canVote: boolean;
   /**
+   * Whether the menu offers the room that asks a question.
+   *
+   * A boolean about the viewer and nothing else — the same shape and the same
+   * job as `canVote` above and `canSave` on the wardrobe. It deliberately does
+   * not carry how many of today's three are left: that would be a Redis read on
+   * every state load for a number nobody needs until the room is open, and the
+   * server's refusal is what settles it either way.
+   */
+  canSubmit: boolean;
+  /**
    * The blob of whoever asked, for the author line.
    *
    * Null on house questions, which carry no author line at all. It rides on the
@@ -173,6 +183,12 @@ export type QuestionState = {
 export type MenuState = {
   kind: 'menu';
   stats: PlayerStats;
+  /**
+   * As on `QuestionState`, and needed here most: the pinned menu post is where
+   * a signed-out visitor is most likely to be, and this shape carries no other
+   * signal about who is reading it.
+   */
+  canSubmit: boolean;
 };
 
 export type VoteRequest = {
@@ -205,6 +221,15 @@ export type SubmitQuestionRequest = {
   text: string;
   labelA: string;
   labelB: string;
+  /** Empty means the question text is the title. */
+  title?: string;
+};
+
+export type SubmitQuestionResponse = {
+  ok: true;
+  questionId: string;
+  postId: string;
+  permalink: string;
 };
 
 export type QueueEntry = {
@@ -223,17 +248,20 @@ export type QueueResponse = {
   approved: QueueEntry[];
 };
 
-/** One row of the most-misjudged-questions board. */
+/**
+ * One row of the most-misjudged-questions board.
+ *
+ * No longer a wire type: the board came off both in-app surfaces and its only
+ * reader is now the moderator-posted event post, which renders on the server.
+ * It stays here because `server/core/stats.ts` returns it and this is where the
+ * shapes that cross between question and presentation live.
+ */
 export type MisjudgedEntry = {
   id: string;
   text: string;
   avgError: number;
   votes: number;
   source: QuestionSource;
-};
-
-export type MisjudgedResponse = {
-  entries: MisjudgedEntry[];
 };
 
 /**

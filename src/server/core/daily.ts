@@ -12,6 +12,7 @@ import type { T3 } from '@devvit/web/shared';
 import { COINS_PROMOTION, DAILY_FLAIR, PROVISIONAL_VOTE_FLOOR } from '../../shared/config.js';
 import { previousDay, toDayKey } from '../../shared/day.js';
 import { percentAgreeing } from '../../shared/scoring.js';
+import { fitTitle } from '../../shared/validate.js';
 import { creditCoins } from './coins.js';
 import { keys } from './keys.js';
 import { questionAtCursor, poolSize } from './pool.js';
@@ -47,6 +48,9 @@ async function drawFromHousePool(): Promise<string> {
     await writeQuestion({
       id: draw.id,
       text: draw.text,
+      // Nobody titled these. A house question reaches the subreddit through
+      // `dailyTitle`, which builds its own from the day and the text.
+      title: '',
       labelA: draw.labelA ?? 'Yes',
       labelB: draw.labelB ?? 'No',
       authorId: '',
@@ -78,10 +82,11 @@ export async function resolveDailyQuestion(): Promise<DailyResolution> {
 }
 
 function dailyTitle(day: string, text: string): string {
-  const title = `Daily · ${day} · ${text}`;
-  // Reddit titles cap at 300; questions cap at 120, so this only ever trims a
-  // pathological case.
-  return title.length <= 300 ? title : `${title.slice(0, 297)}...`;
+  // Player questions have no length rule any more, so a promoted one can be
+  // longer than Reddit will take once the day and the prefix are on the front of
+  // it. Trimmed rather than refused — the same call `normalizeTitle` makes, and
+  // by the same function, so there is one answer to "too long for Reddit".
+  return fitTitle(`Daily · ${day} · ${text}`);
 }
 
 export type PostDailyResult =

@@ -258,8 +258,8 @@ reach them, and a viewer who has already holds the tally those ten answers are p
 All Redis, exactly as specced, plus three derived indexes.
 
 ```
-q:{questionId}         hash   text, labelA, labelB, authorId, authorName, source,
-                              createdAt, postId, permalink, lockedAt, dailyDate
+q:{questionId}         hash   text, title, labelA, labelB, authorId, authorName,
+                              source, createdAt, postId, permalink, lockedAt, dailyDate
 daily:{YYYY-MM-DD}     string questionId
 daily:claims           hash   day -> "1"          (double-fire guard, see below)
 daily:summaries        hash   day -> "1"          (double-post guard for the sticky)
@@ -277,6 +277,7 @@ user:{userId}          hash   streak, bestStreak, lastPlayedDay, points,
                               totalPlayed, totalHits, weekPoints, weekKey,
                               coins, pity, subDay, subCount, showBlob
 sub:recent:{userId}    hash   submission fingerprint -> "1", TTL 60s
+sub:count:{userId}:{day}  string  questions posted today, TTL 48h
 
 queue:pending          zset   questionId -> upvotes
 queue:approved         zset   questionId -> upvotes
@@ -291,9 +292,10 @@ avatars                hash   userId -> "faceId:accessoryId"
 inv:{userId}           hash   itemId -> "1"
 ```
 
-**Additions and why.** `hist:` and `stats:misjudged` are caches so the reveal and the
-leaderboard are cheap reads instead of scans over `guesses:` and every question;
-`guesses:` remains the record of truth. `commented:` stops one tap from posting twice.
+**Additions and why.** `hist:` is a cache so the reveal is a cheap read instead of a scan
+over `guesses:`, which remains the record of truth. `stats:misjudged` is the same idea for
+the misjudged ranking, which is now read by one caller: the moderator-posted event post.
+`commented:` stops one tap from posting twice.
 `daily:claims` is the `post-daily` lock: the claim has to be taken *before* the question
 is resolved, or two overlapping runs both draw from the house pool and one draw is
 thrown away. `daily:summaries` is the same idea for `summarize-daily` — it gets its own
@@ -358,8 +360,8 @@ that has since moved would contradict the total it already added to.
 GET  /api/state/:postId       question, prior answer, tallies only if voted
 POST /api/vote                { postId, choice, guess } -> reveal
 POST /api/comment             posts the generated comment as this user
-POST /api/submit              create an open question + post
-GET  /api/leaderboard/questions  most misjudged questions ever
+POST /api/submit              { text, labelA, labelB, title? } -> the new post;
+                              429 past the day's allowance, 409 on a repeat
 GET  /api/leaderboard/players?range=week|all   players by points banked
 GET  /api/avatar              the pair you are wearing, what you own, your balance,
                               and whether other players may see it
@@ -417,27 +419,57 @@ be a problem. There is no mod affordance wired to it yet.
    of Dailies with zero community input. The next pass reshuffles rather than repeating
    the first.
 
-Anyone can submit an open question from the subreddit menu. It becomes its own playable
-post immediately, counts toward the streak and pays points like any other question,
-accumulates real vote data, enters the promotion queue, and pays its author coins.
+Anyone can ask a question, from the **Ask a question** room in the menu or from the
+subreddit menu item. It becomes its own playable post immediately, counts toward the
+streak and pays points like any other question, accumulates real vote data, enters the
+promotion queue, and pays its author coins. Both doors call the same
+`submitOpenQuestion` and read the same constants, so there is no second copy of any rule.
 
-**Submission is uncapped.** The one-per-24h cooldown is gone — more questions is the goal
-for now. What replaced it is narrower on purpose: an identical submission from the same
-player inside `SUBMISSION_DEDUPE_SECONDS` (60) is refused, because nothing in
-`submitOpenQuestion` is idempotent and a client retrying a request that timed out after
-the post went up would otherwise create a second post and be paid twice. Two *different*
-questions a second apart are both fine.
+**Three a day**, per `SUBMISSIONS_PER_DAY`. Submission was uncapped while the only way to
+reach it was a subreddit menu item most players never open; the room puts it one tap from
+the front door — including the pinned menu post, where somebody who has never played
+lands — so uncapped stopped meaning "rarely used" and started meaning an unbounded source
+of real posts attached to the lowest-friction control in the game. The allowance is keyed
+by UTC day rather than a rolling window, so it turns over on the same boundary the streak
+and the Daily use, and three in one sitting is a normal thing to do.
 
-The consequence is stated where it lives, in `core/submit.ts`: uncapped submission plus
-+10 coins each is an unbounded coin source whose side effect is a real Reddit post every
-time, so the pressure lands on the front page and the mod queue rather than only on the
-economy. `COIN_ELIGIBLE_SUBMISSIONS_PER_DAY` is the valve — `Infinity` by default, wired
-through so capping the *reward* (never the submission) is a one-line config change.
+The fingerprint guard is still there and is not the same guard. `sub:recent:{userId}`
+refuses an *identical* submission from the same player inside `SUBMISSION_DEDUPE_SECONDS`
+(60), because nothing in `submitOpenQuestion` is idempotent and a client retrying a
+request that timed out after the post went up would otherwise create a second post and be
+paid twice. Two *different* questions a second apart are both fine.
 
-Question text is validated and filtered before a post is created — length, a single
-trailing question mark, no links or usernames, and a content filter that turns away
-slurs along with political, medical, and identity topics. See
-[docs/writing-questions.md](docs/writing-questions.md).
+The order the two guards run in is what makes them fair, and it is one rule in both
+directions: **nothing a player is refused for costs them anything.** The allowance is
+checked before the question is validated and spent after it, so a question the filter
+turns away is not one of the three. It is spent before the post call rather than after,
+because a post that throws must not be retryable without limit — and a post call that does
+throw takes its half-written `q:{id}` record with it rather than leaving an orphan nothing
+can reach. `COIN_ELIGIBLE_SUBMISSIONS_PER_DAY` still caps the *reward* independently, and
+is `Infinity` by default.
+
+**What a submission is checked for is deliberately narrow.** Something was written, it
+reads as words rather than as punctuation, and it is not a link or a username — then the
+content filter, which turns away slurs along with political, medical, and identity topics.
+Length is not a rule and neither is punctuation: a question that had to be ten characters,
+or under a hundred and twenty, or ended in a question mark, was a house style enforced as
+a validity check on somebody else's writing, and every one of those refusals fell on
+somebody who had already typed the thing. [docs/writing-questions.md](docs/writing-questions.md)
+still says what a good question looks like, and the mod queue in front of the Daily slot
+is still the gate that decides what becomes one.
+
+**The post title is filtered too.** It is optional and defaults to the question, it is
+held to the same content rules and to none of the rules about being a question, and it is
+the half of a submission the feed shows — a title field that skipped the filter would be
+an unfiltered path to a real post made under the player's own account.
+
+The one length still enforced anywhere is `TITLE_MAX_LENGTH` (300), and only because
+Reddit enforces it: a longer title is a post Reddit refuses to create. A title typed past
+it is refused with a reason, because the player wrote it and can shorten it; a *question*
+past it is cut to fit by `fitTitle` when it falls back into the title slot, because that
+is not a title anybody wrote and refusing it would be refusing a question for the length
+of a field the player was told was optional. `dailyTitle` uses the same function, so there
+is one answer to "too long for Reddit".
 
 ---
 
@@ -541,10 +573,10 @@ room at all.
 | Entry | What it holds |
 |---|---|
 | **Today's question** | leaves the post for today's Daily. Not a room |
+| Ask a question | write one for the subreddit and post it |
 | Your record | streak, best, points, coins, questions answered, read rate, and whether other players see your blob |
 | Wardrobe | your blob, your balance, the items you own, and the gift box |
 | Leaderboard | who has banked the most points, weekly or all time |
-| Hardest to read | the misjudged leaderboard, five rows |
 
 The Daily action sits above the wobbled rule and the others below it, because every
 entry in the list opens in place and that one navigates away — a player should be able
@@ -584,6 +616,29 @@ cross-fade to the same final state under `prefers-reduced-motion`. Rarity there 
 word beside the name and the same three-step ladder the layers already use, which is what
 keeps that ladder confined to one screen.
 
+**Ask a question leads the list, and it is the only room that cannot be undone.** It is
+first because it is the only entry that adds anything to the subreddit — the three below
+it read back what has already happened — and because it is the one thing worth putting in
+front of somebody who has just landed on the pinned menu post. What guards an irreversible
+control is not its position in a list: the panel itself is the confirmation, nothing
+submits on blur or on the last keystroke, and one primary button is the only thing that
+posts.
+
+It is built to ask for as little as it can. The two answers arrive as Yes/No, the title
+defaults to the question and the preview shows what will actually be posted, and every
+field is one line. **The room fits the card without scrolling**, at the same 512px the
+wardrobe is measured against, which is what the single-line fields buy: a box that scrolls
+sideways holds a question of any length in one row, where a box that grows downward
+reflows the room on the keystroke that wraps and moves the button out from under a thumb
+already reaching for it. Only the title carries a counter, because it is the only field
+with a limit left.
+
+Every rule it checks is re-run on the server, which is the actual gate; the client's copy
+is there to say why the button is dark. A signed-out visitor sees the room and why it is
+inert rather than not seeing it, which matters most on the pinned menu post. That is what
+`canSubmit` on the state response is for — one boolean about the viewer, carrying no count
+and nothing about anybody else.
+
 **The leaderboard opens on the week, not on all time.** Points are banked per vote and
 nothing closes on a schedule, so on an all-time board the fastest climb is grinding the
 archive rather than reading the room well — and a board carrying months of accumulated
@@ -607,13 +662,12 @@ root's three-sentence tagline, which has to name both things being scored withou
 becoming a rules page. Every threshold the menu still quotes is read from `src/shared/`,
 so it cannot drift from what the game actually scores.
 
-Nothing here is a leak, including the Daily pointer. The misjudged board is average error
-on questions long since answered, the counters are the player's own, the player board is
-points totalled across every question a player ever answered — an aggregate that narrows
-down nobody's answer to anything — and `/api/daily` returns a state and a permalink:
-`voted` is a boolean about *you*, never a count. The
-menu never touches a live tally, which is what makes it safe to hand out on its own,
-below.
+Nothing here is a leak, including the Daily pointer. The counters are the player's own,
+the player board is points totalled across every question a player ever answered — an
+aggregate that narrows down nobody's answer to anything — and `/api/daily` returns a state
+and a permalink: `voted` is a boolean about *you*, never a count. `canSubmit` is the same
+kind of boolean. The menu never touches a live tally, which is what makes it safe to hand
+out on its own, below.
 
 The reveal's page index lives in `App` rather than inside the reveal, which is what makes
 the trip out to the menu and back land on the slide it left from.

@@ -1,10 +1,16 @@
 /**
- * Content filter applied to submitted question text before a post is created.
+ * Content filter applied to everything a player writes before a post is
+ * created — the question, and the title it is posted under.
  *
  * Two jobs: keep slurs and abuse out of the subreddit, and keep the tone of the
  * game where it belongs. Questions about ordinary habits work; questions that
  * are really statements about identity, politics, or someone's health do not —
  * they invite brigading and the answer stops being a habit.
+ *
+ * The rules do not vary by subject. A slur is a slur in a title, and a title is
+ * the more public of the two — it is what the feed shows. All `subject` decides
+ * is which word the refusal uses, so a player who is told no knows which field
+ * to fix.
  *
  * Matching is on word boundaries against a normalised copy of the text, so
  * "Scunthorpe" and "assemble" survive. This is a coarse net on purpose: the mod
@@ -126,11 +132,11 @@ function firstMatch(haystack: string, needles: readonly string[]): string | null
   return null;
 }
 
-export function filterQuestionText(text: string): FilterResult {
+export function filterText(text: string, subject: 'question' | 'title'): FilterResult {
   const normalised = normalise(text);
 
   if (firstMatch(normalised, BLOCKED)) {
-    return { ok: false, reason: 'That language does not belong in a question here.' };
+    return { ok: false, reason: `That language does not belong in a ${subject} here.` };
   }
 
   const offTopic = firstMatch(normalised, OFF_TOPIC);
@@ -138,19 +144,19 @@ export function filterQuestionText(text: string): FilterResult {
     return {
       ok: false,
       reason:
-        'Keep questions to ordinary habits. Nothing political, medical, or about identity — ' +
+        `Keep ${subject}s to ordinary habits. Nothing political, medical, or about identity — ` +
         'the answer stops being a habit and becomes a statement.',
     };
   }
 
-  // Shouting reads as a statement, not a question.
+  // Shouting reads as a statement rather than as something being asked.
   const letters = text.replace(/[^A-Za-z]/g, '');
   if (letters.length > 12 && letters === letters.toUpperCase()) {
-    return { ok: false, reason: 'Sentence case, please.' };
+    return { ok: false, reason: `That ${subject} is shouting. Sentence case, please.` };
   }
 
   if (/(.)\1{5,}/.test(text)) {
-    return { ok: false, reason: 'That reads as noise rather than a question.' };
+    return { ok: false, reason: `That reads as noise rather than a ${subject}.` };
   }
 
   return { ok: true };

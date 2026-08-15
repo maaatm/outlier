@@ -77,9 +77,11 @@ UTC, the same moment the Daily posts.
 
 ### Asking your own question
 
-**Submit a question** in the subreddit menu. It becomes its own playable post immediately,
-counts toward streaks and points like any other, and enters the queue to be promoted to a
-Daily. One per person per day.
+**Ask a question** in the app's menu, or **Submit a question** in the subreddit menu.
+Either way it becomes its own playable post immediately, counts toward streaks and points
+like any other, and enters the queue to be promoted to a Daily. Three a day per person.
+
+The post title is optional. Leave it and the question is the title.
 
 Questions are about ordinary behavior — things a person can answer about themselves
 without looking anything up. Not opinions, not politics, not trivia.
@@ -102,7 +104,7 @@ streak, so the archive stays playable. A split posted the next morning says wher
 | 10 for turning up | `POINTS_BASE` | `src/shared/config.ts` |
 | the five bands and their bonuses | `BANDS` | `src/shared/points.ts` |
 | the four outcome names and lines | `BADGES` | `src/shared/badges.ts` |
-| one submission per day | `SUBMISSION_COOLDOWN_SECONDS` | `src/shared/config.ts` |
+| three questions a day | `SUBMISSIONS_PER_DAY` | `src/shared/config.ts` |
 | streak rules, UTC day boundary | `advance()`, `toDayKey()` | `src/server/core/users.ts`, `src/shared/day.ts` |
 
 Two numbers are deliberately left out: `PROMOTION_THRESHOLD` (10 upvotes to reach the

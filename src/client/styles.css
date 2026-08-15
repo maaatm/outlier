@@ -949,7 +949,16 @@ button {
   background: var(--ink);
 }
 
-/* ── Detail strip: histogram or leaderboard, same slot ───────────────────── */
+/* ── Detail strip ───────────────────────────────────────────────────────── */
+
+/*
+ * The score slide's histogram, and the player leaderboard's two tabs, which
+ * borrow this idiom rather than inventing a second one. The strip used to hold
+ * either the histogram or the misjudged board behind a pair of tabs; the board
+ * came off this screen with the room that shared it, so `.detail__tab` is now
+ * `PlayerBoard`'s alone — it is not dead, and deleting it takes the week/all-time
+ * tabs with it.
+ */
 
 /* Takes the slack on the score slide so the bars grow with the screen. */
 .detail {
@@ -1198,20 +1207,6 @@ button {
   align-items: baseline;
   justify-content: space-between;
   gap: var(--s2);
-}
-
-.board__text {
-  font-size: 13px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.board__error {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--ink-soft);
-  white-space: nowrap;
 }
 
 /*
@@ -1733,6 +1728,163 @@ button {
   white-space: nowrap;
 }
 
+/* ── Ask a question ─────────────────────────────────────────────────────── */
+
+/*
+ * The one room in the menu that is a form, and the second built to a height
+ * budget: four fields, a preview and a button have to fit the card at the 512px
+ * Devvit's inline post view can be, without scrolling, because a form whose
+ * submit button is below the fold is a form that looks finished before it is.
+ *
+ * What pays for it is that every field is one line. A single-line box that
+ * scrolls sideways holds a question of any length in the height of one row —
+ * where a box that grows downward reflows the whole room on the keystroke that
+ * wraps, and moves the button out from under a thumb already on its way to it.
+ * The trade is real and it is deliberate: a long question is read by scrolling
+ * it, and the preview underneath is where the whole thing can be checked.
+ *
+ * The boxes borrow the share slide's note field — same border, same radius, same
+ * 16px, which is also what stops iOS zooming the page on focus.
+ */
+.ask {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  flex: 1;
+  min-height: 0;
+}
+
+.ask__field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Label and counter share a line, because four counters on four lines of their
+   own is a quarter of the room spent on arithmetic. */
+.ask__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s2);
+}
+
+.ask__label {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.ask__hint {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/*
+ * One line, always. A text input scrolls its own content horizontally and keeps
+ * the caret in view while it does, so the height of this box is the height of
+ * one row whatever is typed into it — which is what keeps the room on one
+ * screen.
+ */
+.ask__input {
+  width: 100%;
+  min-width: 0;
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.4;
+  color: inherit;
+  background: var(--card);
+  border: var(--stroke) solid var(--ink);
+  border-radius: var(--radius-button);
+  padding: var(--s2);
+  text-overflow: ellipsis;
+}
+
+/* The ellipsis is for the resting state only — while the field has focus the
+   end of the line has to be readable, not summarised. */
+.ask__input:focus {
+  text-overflow: clip;
+}
+
+.ask__input:focus-visible {
+  outline: var(--stroke) solid var(--signal);
+  outline-offset: 2px;
+}
+
+.ask__input:disabled {
+  color: var(--ink-soft);
+  background: var(--paper);
+}
+
+/* The two answers are one thing, so they sit on one line. */
+.ask__pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s2);
+}
+
+/*
+ * The post as it will appear. On paper rather than card, and outlined, because
+ * it is the one block here that is not a control — it is what the controls add
+ * up to, and the difference has to be visible before the button is pressed.
+ *
+ * Its lines scroll sideways for the same reason the fields do: this block is
+ * three rows tall whatever is typed, so the button under it does not move while
+ * somebody is still writing.
+ */
+.ask__preview {
+  border: var(--stroke) solid var(--ink);
+  border-radius: var(--radius-button);
+  background: var(--paper);
+  padding: var(--s2);
+  flex: none;
+}
+
+.ask__preview-title,
+.ask__preview-text,
+.ask__preview-answers {
+  white-space: nowrap;
+  overflow-x: auto;
+  /* No scrollbar gutter under three short lines: the overflow is there to be
+     dragged, and on a phone that is what a finger does to it anyway. */
+  scrollbar-width: none;
+}
+
+.ask__preview-title::-webkit-scrollbar,
+.ask__preview-text::-webkit-scrollbar,
+.ask__preview-answers::-webkit-scrollbar {
+  display: none;
+}
+
+.ask__preview-title {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.25;
+  margin: 0;
+}
+
+.ask__preview-text {
+  font-size: 13px;
+  line-height: 1.4;
+  margin: var(--s1) 0 0;
+}
+
+.ask__preview-answers {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin: var(--s2) 0 0;
+}
+
+/* Never shrinks. Everything above it can scroll; the one irreversible control
+   in the app does not get to be half a button. */
+.ask__post {
+  flex: none;
+}
+
 /* ── States ─────────────────────────────────────────────────────────────── */
 
 .notice {
@@ -1826,6 +1978,17 @@ button {
   .menu__wordmark {
     font-size: 26px;
   }
+
+  /* The boxes lose vertical padding before anything else in the room does. The
+     16px inside them is not styling — it is what stops iOS zooming the page when
+     a field takes focus — so it is the last thing to go and it does not go. */
+  .ask {
+    gap: var(--s1);
+  }
+
+  .ask__input {
+    padding: var(--s1) var(--s2);
+  }
 }
 
 @media (max-height: 560px) {
@@ -1912,6 +2075,26 @@ button {
 
   .award__breakdown {
     display: none;
+  }
+
+  /* The last thing the ask room gives up is the preview's air. The preview
+     itself stays: it is the only place the whole post can be read at once now
+     that the fields are single lines, and it is what the button is confirming. */
+  .ask__preview {
+    padding: var(--s1) var(--s2);
+  }
+
+  .ask__preview-title {
+    font-size: 14px;
+  }
+
+  .ask__preview-answers {
+    margin-top: var(--s1);
+  }
+
+  .ask__label,
+  .ask__hint {
+    font-size: 11px;
   }
 }
 

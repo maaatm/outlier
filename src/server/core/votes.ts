@@ -252,10 +252,3 @@ export async function recordComment(
 ): Promise<void> {
   await redis.hSet(keys.commented(questionId), { [userId]: commentId });
 }
-
-export async function readAverageError(questionId: string): Promise<number | null> {
-  const raw = await redis.hGetAll(keys.votes(questionId));
-  const count = Number(raw?.[voteFields.guessCount] ?? 0) || 0;
-  if (count === 0) return null;
-  return (Number(raw?.[voteFields.errSum] ?? 0) || 0) / count;
-}

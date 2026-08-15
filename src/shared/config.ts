@@ -128,10 +128,43 @@ export const BLOB_SIZE = { crowd: 18, inline: 24, panel: 40, wardrobe: 72 } as c
  */
 export const SUBMISSION_DEDUPE_SECONDS = 60;
 
-/** Question text bounds, enforced on both sides of the wire. */
+/**
+ * Questions one player may post in a UTC day.
+ *
+ * Submission used to be uncapped, which was defensible while the only way to
+ * reach it was a subreddit menu item most players never open. The room in the
+ * app puts it one tap from the front door — including the pinned menu post,
+ * where somebody who has never played lands — so the rate moves by an order of
+ * magnitude and `queue:pending` with it. This is the middle path: more than one
+ * a day, still bounded.
+ */
+export const SUBMISSIONS_PER_DAY = 3;
+
+/** How long the counter outlives its day. Only needs to exceed one day. */
+export const SUBMISSION_COUNT_TTL_SECONDS = 48 * 60 * 60;
+
+/**
+ * The house pool's own style bounds, and no longer a rule anybody is held to.
+ *
+ * A player's question and answers are checked for being *something* — not blank,
+ * reads as words, no links — and not for being short. What the shipped pool in
+ * `data/questions.json` is held to is a different question from what a player is
+ * allowed to ask, and these are the first: `tests/pool.test.ts` measures our own
+ * content against them so a 200-character house question cannot quietly ship.
+ */
 export const QUESTION_MIN_LENGTH = 10;
 export const QUESTION_MAX_LENGTH = 120;
 export const LABEL_MAX_LENGTH = 12;
+
+/**
+ * The longest a post title may be.
+ *
+ * This is Reddit's own cap rather than a taste judgement — a `submitCustomPost`
+ * with a longer title is refused by Reddit, so it is the one length in the
+ * submission path that has to stay enforced. The feed truncates long before it,
+ * which is the player's business and not ours.
+ */
+export const TITLE_MAX_LENGTH = 300;
 
 /** Optional note appended to the generated comment. Short on purpose. */
 export const NOTE_MAX_LENGTH = 140;

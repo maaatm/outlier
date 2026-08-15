@@ -8,10 +8,11 @@ import type {
   BoxResponse,
   CommentResponse,
   DailyPointer,
-  MisjudgedResponse,
   PlayerBoardResponse,
   Reveal,
   StateResponse,
+  SubmitQuestionRequest,
+  SubmitQuestionResponse,
 } from '../shared/types.js';
 
 export class ApiFailure extends Error {
@@ -78,8 +79,21 @@ export function postComment(
   });
 }
 
-export function fetchMisjudged(): Promise<MisjudgedResponse> {
-  return request<MisjudgedResponse>('/api/leaderboard/questions');
+/**
+ * Ask the subreddit something. The one call in this file that creates a post.
+ *
+ * Every rule the room checks before enabling its button is checked again on the
+ * other side of this, and that side is the gate: the client's copy exists to
+ * save a round trip, not to decide anything. A refusal comes back as an
+ * `ApiFailure` carrying the server's own words, which is what the room shows —
+ * 429 for the day's allowance, 409 for the same question twice, 400 for the
+ * rest.
+ */
+export function submitQuestion(input: SubmitQuestionRequest): Promise<SubmitQuestionResponse> {
+  return request<SubmitQuestionResponse>('/api/submit', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
 }
 
 /** Who has banked the most points. One read per tab, no cache behind it. */
