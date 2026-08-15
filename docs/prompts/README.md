@@ -102,6 +102,31 @@ subreddit and not just the economy. The prompt implements it as specified and ad
 config constant, `COIN_ELIGIBLE_SUBMISSIONS_PER_DAY`, as an unused-by-default safety
 valve that can be turned on without a code change if the queue floods.
 
+**Prompt 06's own room was revised while it was being built.** The file still describes
+what was asked for; where the two disagree, the code is right and these are the calls:
+
+- **Ask a question is first in `ENTRIES`, not last.** The prompt put it last to keep an
+  irreversible action away from a mis-tap. It leads instead, because it is the only entry
+  that adds to the subreddit rather than reading it back, and what actually guards it is
+  the panel being the confirmation step.
+- **No footnote.** `SUBMISSION_GUIDANCE` was to be the room's fine print in the `Panel`
+  note slot. The room has none — it is still the Devvit form's description, and it is
+  still `docs/writing-questions.md` in longer form.
+- **Every field is one line.** No autosizing textarea, no counter on anything but the
+  title. A single-line box scrolls sideways and holds a question of any length in one
+  row, which is what lets the whole room — fields, preview and button — fit the 512px card
+  without scrolling. Measured at 320/360/430 wide by 512/560/640 tall, in four states.
+- **Length is not a rule.** `QUESTION_MIN_LENGTH`, `QUESTION_MAX_LENGTH` and
+  `LABEL_MAX_LENGTH` no longer gate a submission; they are the house pool's own style
+  bounds, enforced on `data/questions.json` by `tests/pool.test.ts` and on nobody else. A
+  question no longer has to end in a question mark either. What is left is: something was
+  written, it reads as words, it is not a link.
+- **`TITLE_MAX_LENGTH` is 300 and there is no `TITLE_MIN_LENGTH`.** 300 is Reddit's cap
+  rather than a taste judgement, which makes it the one length still enforced anywhere in
+  the submission path — a longer title is a post Reddit refuses to create. Since a
+  question can now outrun it, `fitTitle` trims the question when it falls back into the
+  title slot rather than refusing it. `dailyTitle` uses the same function.
+
 **Superseded by prompt 06: three a day.** That decision was made while the only door to
 submission was a subreddit menu item most players never open. 06 puts the same action one
 tap from the front door, so `SUBMISSIONS_PER_DAY` (3) replaces "uncapped" — a UTC-day

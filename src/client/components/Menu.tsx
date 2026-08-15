@@ -13,9 +13,11 @@
  * Two rooms write, and they are not the same kind of writing. The wardrobe
  * changes what a blob looks like, which is undone by pressing the other arrow.
  * Ask a question creates a real post on the subreddit under the player's own
- * name: public, permanent, and not undone by anything in this app. That is what
- * puts it last in the list, gives it one deliberate button instead of saving as
- * it goes, and makes the panel itself the confirmation step.
+ * name: public, permanent, and not undone by anything in this app. It leads the
+ * list because it is the only entry that adds to the subreddit rather than
+ * reading it back, and what guards it is not its position — it is that the panel
+ * is the confirmation step, with one deliberate button instead of the wardrobe's
+ * saving as it goes.
  *
  * The one exception is the Daily action at the top, which is not a room: every
  * entry below it opens in place, and that one leaves the post entirely. It sits
@@ -24,15 +26,13 @@
  */
 
 import { navigateTo } from '@devvit/web/client';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import {
   BLOB_SIZE,
   BOX_PRICE,
   CROWD_SIZE,
   HIT_THRESHOLD,
-  LABEL_MAX_LENGTH,
-  QUESTION_MAX_LENGTH,
   TITLE_MAX_LENGTH,
 } from '../../shared/config.js';
 import {
@@ -54,12 +54,15 @@ import type {
   DailyPointer,
   PlayerStats,
 } from '../../shared/types.js';
+import { normalizeTitle, validateSubmission } from '../../shared/validate.js';
 import {
-  SUBMISSION_GUIDANCE,
-  normalizeTitle,
-  validateSubmission,
-} from '../../shared/validate.js';
-import { fetchAvatar, fetchDaily, openBox, saveAvatar, saveShowBlob, submitQuestion } from '../api.js';
+  fetchAvatar,
+  fetchDaily,
+  openBox,
+  saveAvatar,
+  saveShowBlob,
+  submitQuestion,
+} from '../api.js';
 import { coalescingWriter } from '../coalesce.js';
 import { Blob } from './Blob.js';
 import { PlayerBoard } from './PlayerBoard.js';
@@ -82,19 +85,20 @@ type Entry = {
 };
 
 /**
- * The wardrobe sits next to Your record because both are about the player and
- * everything below them is about everyone else.
+ * Ask a question is first, because it is the only entry here that adds anything
+ * to the subreddit and the only one worth putting in front of somebody who has
+ * just arrived on the pinned menu post. The three below it are all readings of
+ * what has already happened, in the usual order: you, your blob, everyone else.
  *
- * Ask a question is last, and not because it matters least. The list runs you →
- * everyone else and this is neither; last is also as far as it is possible to
- * get from where a mis-tap lands, which is what you want from the one room that
- * does something irreversible.
+ * It is still the one room that cannot be undone. Being first does not change
+ * that — what guards it is that the panel is the confirmation step and nothing
+ * in it posts without a deliberate press.
  */
 const ENTRIES: Entry[] = [
+  { id: 'ask', blurb: 'write one for the subreddit and post it' },
   { id: 'record', blurb: 'your blob, your streak, and how often you read the room' },
   { id: 'wardrobe', blurb: 'change the face and the accessory your blob wears' },
   { id: 'board', blurb: 'who has banked the most points' },
-  { id: 'ask', blurb: 'write one for the subreddit and post it' },
 ];
 
 /**
@@ -860,15 +864,21 @@ function Board(): React.JSX.Element {
 /**
  * Ask the subreddit something.
  *
- * The heaviest screen in a game whose whole pitch is two taps and no typing, and
- * the only one that ends with a public post under the player's own name. Three
- * things follow from that.
+ * The one room that ends with a public post under the player's own name, and the
+ * only screen in the app that asks anybody to type. Four things follow.
  *
- * **Four fields, in the order they are read**, and only the first three are
- * work: the answers arrive as Yes/No the way the Devvit form's do, and the title
- * defaults to the question. A room that demanded four fields before it would do
- * anything would be asking most players to invent a title for a question that
- * already reads as one.
+ * **It fits on the screen.** Every field, the preview and the button are visible
+ * at once, at the 512px the inline post view can be — the same budget the
+ * wardrobe is built to. That is what makes the fields single-line boxes that
+ * scroll sideways rather than boxes that grow downward: a question is one line
+ * however long it is, and a room that reflows as you type moves the button you
+ * are reaching for.
+ *
+ * **Four fields, in the order they are read**, and only the first is work: the
+ * answers arrive as Yes/No the way the Devvit form's do, and the title defaults
+ * to the question. Only the title carries a counter, because it is the only
+ * field with a limit left — Reddit's, on titles, which is a post that will not
+ * be created rather than a matter of taste.
  *
  * **One primary button, and the panel is the confirm.** Nothing here submits on
  * blur or on the last keystroke. The wardrobe can afford to save as it goes
@@ -886,19 +896,6 @@ function Ask({ canSubmit }: { canSubmit: boolean }): React.JSX.Element {
   const [title, setTitle] = useState('');
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // The question takes the height of its own text, the way the note on the share
-  // slide does. Before paint, so the field is never briefly the wrong height
-  // under the cursor.
-  const questionRef = useRef<HTMLTextAreaElement>(null);
-  useLayoutEffect(() => {
-    const field = questionRef.current;
-    if (!field) return;
-    field.style.height = 'auto';
-    // scrollHeight leaves out the border, and the box is border-box.
-    const border = field.offsetHeight - field.clientHeight;
-    field.style.height = `${field.scrollHeight + border}px`;
-  }, [text]);
 
   const check = validateSubmission(text, labelA, labelB, title);
   // Silent until they have started. A form that objects to being empty is
@@ -924,7 +921,7 @@ function Ask({ canSubmit }: { canSubmit: boolean }): React.JSX.Element {
   }
 
   return (
-    <Panel title={TITLES.ask} note={SUBMISSION_GUIDANCE}>
+    <Panel title={TITLES.ask}>
       <div className="ask">
         {!canSubmit && (
           <p className="notice notice--quiet">
@@ -933,13 +930,11 @@ function Ask({ canSubmit }: { canSubmit: boolean }): React.JSX.Element {
           </p>
         )}
 
-        <Field id="ask-text" label="Your question" hint={`${QUESTION_MAX_LENGTH - text.length} left`}>
-          <textarea
+        <Field id="ask-text" label="Your question">
+          <input
             id="ask-text"
-            ref={questionRef}
-            className="ask__input ask__text"
-            rows={2}
-            maxLength={QUESTION_MAX_LENGTH}
+            className="ask__input"
+            type="text"
             value={text}
             placeholder="Do you eat the pizza crust?"
             disabled={!canSubmit}
@@ -948,23 +943,21 @@ function Ask({ canSubmit }: { canSubmit: boolean }): React.JSX.Element {
         </Field>
 
         <div className="ask__pair">
-          <Field id="ask-a" label="First answer" hint={`${LABEL_MAX_LENGTH - labelA.length} left`}>
+          <Field id="ask-a" label="First answer">
             <input
               id="ask-a"
               className="ask__input"
               type="text"
-              maxLength={LABEL_MAX_LENGTH}
               value={labelA}
               disabled={!canSubmit}
               onChange={(event) => setLabelA(event.target.value)}
             />
           </Field>
-          <Field id="ask-b" label="Second answer" hint={`${LABEL_MAX_LENGTH - labelB.length} left`}>
+          <Field id="ask-b" label="Second answer">
             <input
               id="ask-b"
               className="ask__input"
               type="text"
-              maxLength={LABEL_MAX_LENGTH}
               value={labelB}
               disabled={!canSubmit}
               onChange={(event) => setLabelB(event.target.value)}
@@ -1014,11 +1007,11 @@ function Ask({ canSubmit }: { canSubmit: boolean }): React.JSX.Element {
 }
 
 /**
- * One labelled field with its remaining characters on the label's line.
+ * One labelled field, with a counter on the label's line if it has a limit.
  *
- * The counter is beside the label rather than under the box because every field
- * in this room is bounded and four hints stacked under four boxes is half the
- * room's height spent on arithmetic.
+ * The counter shares the label's line rather than taking one under the box: this
+ * room has a height budget and a hint per field would be four rows of it. Only
+ * the title has one at all — nothing else in a submission is bounded any more.
  */
 function Field({
   id,
@@ -1028,7 +1021,7 @@ function Field({
 }: {
   id: string;
   label: string;
-  hint: string;
+  hint?: string;
   children: React.ReactNode;
 }): React.JSX.Element {
   return (
@@ -1037,7 +1030,7 @@ function Field({
         <label className="ask__label" htmlFor={id}>
           {label}
         </label>
-        <span className="ask__hint">{hint}</span>
+        {hint !== undefined && <span className="ask__hint">{hint}</span>}
       </div>
       {children}
     </div>

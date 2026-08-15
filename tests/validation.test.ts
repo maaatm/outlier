@@ -1,18 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import { filterText } from '../src/server/core/filter.js';
-import {
-  NOTE_MAX_LENGTH,
-  QUESTION_MAX_LENGTH,
-  TITLE_MAX_LENGTH,
-  TITLE_MIN_LENGTH,
-} from '../src/shared/config.js';
+import { NOTE_MAX_LENGTH, TITLE_MAX_LENGTH } from '../src/shared/config.js';
 import { buildComment, normalizeNote } from '../src/shared/comment.js';
 import { bucketFor } from '../src/server/core/votes.js';
 import { buildDailySummary } from '../src/server/core/daily.js';
 import { toPublicQuestion } from '../src/server/core/questions.js';
 import type { Question, Reveal } from '../src/shared/types.js';
 import {
+  fitTitle,
   normalizeQuestionText,
   normalizeTitle,
   submissionFingerprint,
@@ -26,17 +22,29 @@ describe('question text rules', () => {
     expect(validateQuestionText('Do you eat the pizza crust?')).toEqual({ ok: true });
   });
 
-  it('requires a question mark', () => {
-    expect(validateQuestionText('You eat the pizza crust').ok).toBe(false);
+  /*
+   * Length and punctuation are not rules. Both used to be, and both fell on
+   * somebody who had already typed the thing — a question is refused here for
+   * being a link or being nothing, and for nothing else. What a *good* question
+   * looks like is `docs/writing-questions.md`'s business, and the mod queue in
+   * front of the Daily slot is the gate that enforces any of it.
+   */
+  it('does not require a question mark', () => {
+    expect(validateQuestionText('You eat the pizza crust')).toEqual({ ok: true });
+    expect(validateQuestionText('Crust. Yes or no')).toEqual({ ok: true });
   });
 
-  it('rejects more than one question', () => {
-    expect(validateQuestionText('Do you? Do you really?').ok).toBe(false);
+  it('takes a question of any length, short or long', () => {
+    expect(validateQuestionText('Crust?')).toEqual({ ok: true });
+    expect(validateQuestionText(`Do you ${'really '.repeat(200)}eat it?`)).toEqual({ ok: true });
   });
 
-  it('enforces the length bounds', () => {
-    expect(validateQuestionText('Hi?').ok).toBe(false);
-    expect(validateQuestionText(`${'a'.repeat(QUESTION_MAX_LENGTH)}?`).ok).toBe(false);
+  it('still refuses a blank one', () => {
+    expect(validateQuestionText('').ok).toBe(false);
+    expect(validateQuestionText('   ').ok).toBe(false);
+    // Zero-width characters normalize away, so this is blank too.
+    expect(validateQuestionText('​⁠').ok).toBe(false);
+    expect(validateQuestionText('?!.').ok).toBe(false);
   });
 
   it('rejects links and usernames', () => {
@@ -53,8 +61,17 @@ describe('question text rules', () => {
     expect(validateSubmission('Do you eat the crust?', 'Yes', 'No', '')).toEqual({ ok: true });
   });
 
-  it('caps label length', () => {
-    expect(validateSubmission('Do you eat the crust?', 'Yes', 'A'.repeat(13), '').ok).toBe(false);
+  /*
+   * A long answer is a long button — the two choices render at whatever width
+   * they come out at — but that is a question asked badly rather than one asked
+   * wrongly, and the person it looks worst for is the one who wrote it.
+   */
+  it('takes an answer of any length but not a blank one', () => {
+    expect(validateSubmission('Do you eat the crust?', 'Yes', 'A'.repeat(80), '')).toEqual({
+      ok: true,
+    });
+    expect(validateSubmission('Do you eat the crust?', '', 'No', '').ok).toBe(false);
+    expect(validateSubmission('Do you eat the crust?', 'Yes', '   ', '').ok).toBe(false);
   });
 });
 
@@ -72,11 +89,21 @@ describe('title rules', () => {
     expect(validateTitle('Crust? Really? Truly?')).toEqual({ ok: true });
   });
 
-  it('enforces the length bounds at both ends', () => {
-    expect(validateTitle('a'.repeat(TITLE_MIN_LENGTH - 1)).ok).toBe(false);
-    expect(validateTitle('a'.repeat(TITLE_MIN_LENGTH)).ok).toBe(true);
-    expect(validateTitle('a'.repeat(TITLE_MAX_LENGTH)).ok).toBe(true);
+  /*
+   * The one length still enforced anywhere in a submission, and only because
+   * Reddit enforces it: a `submitCustomPost` over the cap is refused on their
+   * side, so this is a post that will not be created rather than a matter of
+   * taste. There is no lower bound — a one-word title is a title.
+   */
+  it('allows any length up to Reddit’s cap', () => {
+    expect(validateTitle('Crust')).toEqual({ ok: true });
+    expect(validateTitle('a'.repeat(TITLE_MAX_LENGTH))).toEqual({ ok: true });
     expect(validateTitle('a'.repeat(TITLE_MAX_LENGTH + 1)).ok).toBe(false);
+  });
+
+  it('refuses a blank title when it is given one', () => {
+    expect(validateTitle('').ok).toBe(false);
+    expect(validateTitle('   ').ok).toBe(false);
   });
 
   it('needs something that reads as words', () => {
@@ -106,21 +133,33 @@ describe('title rules', () => {
   it('refuses a bad title on a good question', () => {
     const question = 'Do you eat the pizza crust?';
     expect(validateSubmission(question, 'Yes', 'No', 'Read https://example.com').ok).toBe(false);
-    expect(validateSubmission(question, 'Yes', 'No', 'Nope').ok).toBe(false);
+    expect(validateSubmission(question, 'Yes', 'No', '?!.').ok).toBe(false);
     expect(validateSubmission(question, 'Yes', 'No', 'The crust question')).toEqual({ ok: true });
   });
 
   /*
-   * The fallback is resolved after validation rather than before it, which is
-   * what stops a 110-character question from being refused for being a long
-   * title — a rule the player never broke and could only satisfy by typing
-   * something they were told was optional.
+   * A question is no longer bounded, so a long one can outrun the only bound
+   * left. The two failures are different and are handled differently: a title
+   * somebody typed past the cap is refused with a reason, because they wrote it
+   * and can shorten it — a question past the cap is not a title anybody wrote,
+   * so it is cut to fit rather than refusing a perfectly good question for the
+   * length of a field the player was told was optional.
    */
-  it('does not hold an untyped title to the title bounds', () => {
-    const long = `Do you ${'really '.repeat(13)}eat the pizza crust?`;
+  it('trims the fallback to the cap instead of refusing the question', () => {
+    const long = `Do you ${'really '.repeat(80)}eat the pizza crust?`;
     expect(long.length).toBeGreaterThan(TITLE_MAX_LENGTH);
-    expect(long.length).toBeLessThanOrEqual(QUESTION_MAX_LENGTH);
+
     expect(validateSubmission(long, 'Yes', 'No', '')).toEqual({ ok: true });
+
+    const title = normalizeTitle('', long);
+    expect(title.length).toBe(TITLE_MAX_LENGTH);
+    expect(title.endsWith('...')).toBe(true);
+    expect(long.startsWith(title.slice(0, -3))).toBe(true);
+  });
+
+  it('leaves a title that already fits exactly as it was written', () => {
+    expect(normalizeTitle('The crust question', 'Do you eat it?')).toBe('The crust question');
+    expect(fitTitle('The crust question')).toBe('The crust question');
   });
 });
 

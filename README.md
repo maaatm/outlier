@@ -448,14 +448,28 @@ throw takes its half-written `q:{id}` record with it rather than leaving an orph
 can reach. `COIN_ELIGIBLE_SUBMISSIONS_PER_DAY` still caps the *reward* independently, and
 is `Infinity` by default.
 
-Question text is validated and filtered before a post is created — length, a single
-trailing question mark, no links or usernames, and a content filter that turns away
-slurs along with political, medical, and identity topics. **The post title is filtered
-too.** It is optional and defaults to the question, it is held to the same content rules
-and to none of the rules about being a question, and it is the half of a submission the
-feed shows — a title field that skipped the filter would be an unfiltered path to a real
-post made under the player's own account. See
-[docs/writing-questions.md](docs/writing-questions.md).
+**What a submission is checked for is deliberately narrow.** Something was written, it
+reads as words rather than as punctuation, and it is not a link or a username — then the
+content filter, which turns away slurs along with political, medical, and identity topics.
+Length is not a rule and neither is punctuation: a question that had to be ten characters,
+or under a hundred and twenty, or ended in a question mark, was a house style enforced as
+a validity check on somebody else's writing, and every one of those refusals fell on
+somebody who had already typed the thing. [docs/writing-questions.md](docs/writing-questions.md)
+still says what a good question looks like, and the mod queue in front of the Daily slot
+is still the gate that decides what becomes one.
+
+**The post title is filtered too.** It is optional and defaults to the question, it is
+held to the same content rules and to none of the rules about being a question, and it is
+the half of a submission the feed shows — a title field that skipped the filter would be
+an unfiltered path to a real post made under the player's own account.
+
+The one length still enforced anywhere is `TITLE_MAX_LENGTH` (300), and only because
+Reddit enforces it: a longer title is a post Reddit refuses to create. A title typed past
+it is refused with a reason, because the player wrote it and can shorten it; a *question*
+past it is cut to fit by `fitTitle` when it falls back into the title slot, because that
+is not a title anybody wrote and refusing it would be refusing a question for the length
+of a field the player was told was optional. `dailyTitle` uses the same function, so there
+is one answer to "too long for Reddit".
 
 ---
 
@@ -559,10 +573,10 @@ room at all.
 | Entry | What it holds |
 |---|---|
 | **Today's question** | leaves the post for today's Daily. Not a room |
+| Ask a question | write one for the subreddit and post it |
 | Your record | streak, best, points, coins, questions answered, read rate, and whether other players see your blob |
 | Wardrobe | your blob, your balance, the items you own, and the gift box |
 | Leaderboard | who has banked the most points, weekly or all time |
-| Ask a question | write one for the subreddit and post it |
 
 The Daily action sits above the wobbled rule and the others below it, because every
 entry in the list opens in place and that one navigates away — a player should be able
@@ -602,17 +616,28 @@ cross-fade to the same final state under `prefers-reduced-motion`. Rarity there 
 word beside the name and the same three-step ladder the layers already use, which is what
 keeps that ladder confined to one screen.
 
-**Ask a question is last in the list, and it is the only room that cannot be undone.** The
-list runs you → everyone else and this is neither; last is also as far as it is possible
-to get from where a mis-tap lands. It is the heaviest screen in a game whose pitch is two
-taps and no typing, so it is built to ask for as little as it can: the two answers arrive
-as Yes/No, the title defaults to the question and shows what it will post, and the panel
-itself is the confirmation — nothing submits on blur or on the last keystroke, and one
-primary button is the only thing that posts. Every rule it checks is re-run on the server,
-which is the actual gate; the client's copy is there to say why the button is dark. A
-signed-out visitor sees the room and why it is inert rather than not seeing it, which
-matters most on the pinned menu post. That is what `canSubmit` on the state response is
-for — one boolean about the viewer, carrying no count and nothing about anybody else.
+**Ask a question leads the list, and it is the only room that cannot be undone.** It is
+first because it is the only entry that adds anything to the subreddit — the three below
+it read back what has already happened — and because it is the one thing worth putting in
+front of somebody who has just landed on the pinned menu post. What guards an irreversible
+control is not its position in a list: the panel itself is the confirmation, nothing
+submits on blur or on the last keystroke, and one primary button is the only thing that
+posts.
+
+It is built to ask for as little as it can. The two answers arrive as Yes/No, the title
+defaults to the question and the preview shows what will actually be posted, and every
+field is one line. **The room fits the card without scrolling**, at the same 512px the
+wardrobe is measured against, which is what the single-line fields buy: a box that scrolls
+sideways holds a question of any length in one row, where a box that grows downward
+reflows the room on the keystroke that wraps and moves the button out from under a thumb
+already reaching for it. Only the title carries a counter, because it is the only field
+with a limit left.
+
+Every rule it checks is re-run on the server, which is the actual gate; the client's copy
+is there to say why the button is dark. A signed-out visitor sees the room and why it is
+inert rather than not seeing it, which matters most on the pinned menu post. That is what
+`canSubmit` on the state response is for — one boolean about the viewer, carrying no count
+and nothing about anybody else.
 
 **The leaderboard opens on the week, not on all time.** Points are banked per vote and
 nothing closes on a schedule, so on an all-time board the fastest climb is grinding the

@@ -143,18 +143,28 @@ export const SUBMISSIONS_PER_DAY = 3;
 /** How long the counter outlives its day. Only needs to exceed one day. */
 export const SUBMISSION_COUNT_TTL_SECONDS = 48 * 60 * 60;
 
-/** Question text bounds, enforced on both sides of the wire. */
+/**
+ * The house pool's own style bounds, and no longer a rule anybody is held to.
+ *
+ * A player's question and answers are checked for being *something* — not blank,
+ * reads as words, no links — and not for being short. What the shipped pool in
+ * `data/questions.json` is held to is a different question from what a player is
+ * allowed to ask, and these are the first: `tests/pool.test.ts` measures our own
+ * content against them so a 200-character house question cannot quietly ship.
+ */
 export const QUESTION_MIN_LENGTH = 10;
 export const QUESTION_MAX_LENGTH = 120;
 export const LABEL_MAX_LENGTH = 12;
 
 /**
- * Post title bounds. Reddit's own cap is 300; the feed truncates long before
- * that and so does the card, so this is set by what is readable rather than by
- * what is allowed.
+ * The longest a post title may be.
+ *
+ * This is Reddit's own cap rather than a taste judgement — a `submitCustomPost`
+ * with a longer title is refused by Reddit, so it is the one length in the
+ * submission path that has to stay enforced. The feed truncates long before it,
+ * which is the player's business and not ours.
  */
-export const TITLE_MIN_LENGTH = 8;
-export const TITLE_MAX_LENGTH = 100;
+export const TITLE_MAX_LENGTH = 300;
 
 /** Optional note appended to the generated comment. Short on purpose. */
 export const NOTE_MAX_LENGTH = 140;

@@ -8,8 +8,6 @@ import type { UiResponse } from '@devvit/web/shared';
 import { Hono } from 'hono';
 
 import {
-  LABEL_MAX_LENGTH,
-  QUESTION_MAX_LENGTH,
   MOD_QUEUE_PAGE_SIZE,
   SUBMISSIONS_PER_DAY,
   TITLE_MAX_LENGTH,
@@ -61,7 +59,6 @@ menuRoutes.post('/internal/menu/submit-question', async (c) => {
             type: 'string',
             name: 'text',
             label: 'Your question',
-            helpText: `Ends in a question mark. Up to ${QUESTION_MAX_LENGTH} characters.`,
             required: true,
             placeholder: 'Do you eat the pizza crust?',
           },
@@ -69,7 +66,6 @@ menuRoutes.post('/internal/menu/submit-question', async (c) => {
             type: 'string',
             name: 'labelA',
             label: 'First answer',
-            helpText: `Up to ${LABEL_MAX_LENGTH} characters.`,
             defaultValue: 'Yes',
             required: true,
           },
@@ -77,7 +73,6 @@ menuRoutes.post('/internal/menu/submit-question', async (c) => {
             type: 'string',
             name: 'labelB',
             label: 'Second answer',
-            helpText: `Up to ${LABEL_MAX_LENGTH} characters.`,
             defaultValue: 'No',
             required: true,
           },

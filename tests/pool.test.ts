@@ -23,7 +23,14 @@ describe('the shipped house pool', () => {
     expect(texts.size).toBe(HOUSE_QUESTIONS.length);
   });
 
-  it('meets the same rules players are held to', () => {
+  /*
+   * Two different standards, and the pool is held to both. The first is what a
+   * player is held to, which is now only "it is something, and it is not a
+   * link". The second is the pool's own style bounds in `config.ts` — no longer
+   * enforced on anybody's submission, and still worth enforcing on our own
+   * content, because a 200-character house question would ship silently.
+   */
+  it('passes submission validation and the pool’s own style bounds', () => {
     for (const question of HOUSE_QUESTIONS) {
       // No title: a house question reaches the subreddit through `dailyTitle`,
       // and an untyped title is exactly what the empty string means everywhere

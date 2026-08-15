@@ -80,8 +80,9 @@ rather than a yes-or-no:
 >
 > Do you brush your teeth before or after breakfast? — `Before` / `After`
 
-Labels cap at twelve characters. If a label needs more than that, the question is
-probably asking two things.
+Keep labels to about twelve characters. That is guidance rather than a limit — nothing
+refuses a longer one — but the two answers are rendered as the two buttons a player taps,
+and a label that does not fit one is a question that is probably asking two things.
 
 ## Post titles
 
@@ -96,10 +97,16 @@ when it wants a word of framing the question cannot carry without becoming two s
 > Do you reverse into parking spaces or drive in front-first? — `The parking space
 > question`
 
-Titles run from 8 to 100 characters. They are held to everything a question is held to —
-no links, no usernames, no slurs, nothing political, medical, or about identity, and
-sentence case — and to none of the rules that are about being a question. A title need not
-end in a question mark, and it may contain three.
+Titles cap at 300 characters, which is Reddit's own limit rather than ours — a longer one
+is a post Reddit will not create. There is no lower bound and no other length rule
+anywhere in a submission. Titles are held to everything a question is held to — no links,
+no usernames, no slurs, nothing political, medical, or about identity, and sentence case —
+and to none of the rules that are about being a question. A title need not end in a
+question mark, and it may contain three.
+
+A question long enough to outrun that cap still posts: the title falls back to the
+question, and the fallback is trimmed to fit rather than refused. Writing your own title
+is how you decide what the trim keeps.
 
 **A title that misrepresents the question is the one thing here that will get a post
 removed.** The title is what the subreddit sees before it sees anything else, and a post
