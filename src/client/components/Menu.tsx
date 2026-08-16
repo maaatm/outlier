@@ -567,19 +567,23 @@ function Wardrobe({
       ) : (
         <>
           <div className="wardrobe__preview">
-            <Blob
-              // Keyed on the pair so a swap replays the tip: the counter is the
-              // one thing in this design allowed to rotate, and it earns it by
-              // making the new item read as physically re-seated.
-              key={`${avatar.face}:${avatar.accessory}`}
-              face={avatar.face}
-              accessory={avatar.accessory}
-              size={COUNTER_SIZE.wardrobe}
-              fill="var(--counter-mine)"
-              label={`Your counter: ${resolveFace(avatar.face).name}, ${resolveAccessory(
-                avatar.accessory
-              ).name}`}
-            />
+            {/* The tip rides on this wrapper rather than on the drawing.
+                The drawing carries a drop shadow, and an element that is both
+                filtered and the target of an animation is the one shape a
+                browser is liable to rasterise into a rectangle — which is a
+                soft dark box around your counter every time you step it.
+                Keyed on the pair, so the tip still replays on a swap. */}
+            <span className="wardrobe__tip" key={`${avatar.face}:${avatar.accessory}`}>
+              <Blob
+                face={avatar.face}
+                accessory={avatar.accessory}
+                size={COUNTER_SIZE.wardrobe}
+                fill="var(--counter-mine)"
+                label={`Your counter: ${resolveFace(avatar.face).name}, ${resolveAccessory(
+                  avatar.accessory
+                ).name}`}
+              />
+            </span>
           </div>
 
           {!avatar.canSave && (

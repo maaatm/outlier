@@ -159,6 +159,16 @@ button {
   font: inherit;
   color: inherit;
   cursor: pointer;
+  /*
+   * Stepping a ring of items is a run of fast taps on one small target, and a
+   * browser reads a run of fast taps as a double click. Left alone that selects
+   * whatever it lands near and paints a highlight over it — including over any
+   * drawing inside the selection — and on a touch device it flashes a grey box
+   * over the control as well. Neither is this app's answer to a press: pressing
+   * is depth.
+   */
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
 }
 
 /* ── The block ──────────────────────────────────────────────────────────── */
@@ -1943,6 +1953,33 @@ button {
   margin-top: 14px;
   flex: 1;
   min-height: 0;
+  /* It is a drawing, not a passage. Nothing here can end up inside a selection
+     the steppers under it started. */
+  user-select: none;
+}
+
+/*
+ * The counter is the one thing in this design allowed to rotate, and this is
+ * the only place it does anything with the permission: a short tip as the item
+ * swaps, so the new piece reads as physically re-seated rather than as a
+ * picture being replaced. It replays because the wrapper is keyed on the pair.
+ *
+ * The tip is on the wrapper and the shadow is on the drawing inside it, and
+ * they must stay apart. An element that is both filtered and animated is the
+ * one shape a browser is liable to promote to a layer and rasterise — and a
+ * rasterised `drop-shadow` stops following the artwork's alpha and falls back
+ * to the element's box, which is a soft dark rectangle around the counter for
+ * as long as the layer lives.
+ *
+ * Full height so the two centres coincide: the drawing is centred in here and
+ * this is centred in the preview, so the piece still tips about itself.
+ */
+.wardrobe__tip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  animation: tip 220ms var(--spring) both;
 }
 
 .wardrobe__preview .blob {
@@ -1950,16 +1987,6 @@ button {
   height: auto;
   max-width: 100%;
   max-height: 100%;
-}
-
-/*
- * The counter is the one thing in this design allowed to rotate, and this is
- * the only place it does anything with the permission: a short tip as the item
- * swaps, so the new piece reads as physically re-seated rather than as a
- * picture being replaced. It replays because the drawing is keyed on the pair.
- */
-.wardrobe__preview .blob {
-  animation: tip 220ms var(--spring) both;
 }
 
 @keyframes tip {
