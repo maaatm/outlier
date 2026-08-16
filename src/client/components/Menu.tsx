@@ -321,16 +321,11 @@ function Root({
 }): React.JSX.Element {
   return (
     <div className="menu__root">
+      {/* The wordmark alone. The paragraph explaining the game used to live
+          under it and it was the tallest thing on the screen — four rooms, the
+          Daily and the way out all have to fit under this, and they now do. */}
       <div className="menu__hero block block--cream block--lg">
         <h1 className="menu__wordmark">Outlier</h1>
-        {/* With the rules gone to the sidebar, this is the only thing in the app
-            that says what the game is. It has to name both things being scored
-            without turning into a rules page. */}
-        <p className="menu__tagline">
-          One question a day about ordinary behavior. Answer it, then guess how many
-          people out of {CROWD_SIZE} answered the same way. You are scored on both &mdash;
-          how unusual your answer was, and how close the guess landed.
-        </p>
       </div>
 
       <DailyAction daily={daily} />
@@ -484,13 +479,6 @@ function Record({
           </p>
         )}
       </div>
-
-      <Footnote>
-        streak counts days you answered something, not questions &mdash; a second one the
-        same day pays points but does not move it. Miss a day and it goes back to zero;
-        best keeps the number it reached. The day turns over at midnight UTC. Points are
-        the score and are never spent; coins are, in the wardrobe.
-      </Footnote>
     </div>
   );
 }

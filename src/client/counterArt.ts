@@ -61,7 +61,7 @@ const RIM = 7;
 export const COUNTER_SIZE = {
   crowd: 18,
   inline: 24,
-  row: 28,
+  row: 26,
   panel: 76,
   wardrobe: 172,
 } as const;

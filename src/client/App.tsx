@@ -16,7 +16,6 @@ import { ApiFailure, castVote, fetchState, saveShowBlob } from './api.js';
 import { BadgeStamp } from './components/BadgeStamp.js';
 import { Blob } from './components/Blob.js';
 import { Compose } from './components/Compose.js';
-import { CounterStrip } from './components/CounterStrip.js';
 import { DotCrowd } from './components/DotCrowd.js';
 import { Histogram } from './components/Histogram.js';
 import { Menu } from './components/Menu.js';
@@ -501,7 +500,6 @@ function RevealView({
   const [named, setNamed] = useState<string | null>(null);
 
   const SLIDE_COUNT = 3;
-  const campLabel = `${reveal.dotsWithYou} of ${CROWD_SIZE} answered ${mine}`;
 
   return (
     <div className="reveal">
@@ -544,10 +542,6 @@ function RevealView({
       {slide === 1 && (
         <div className="slide slide--score fade-in" key="score">
           <div className="score__left">
-            {/* What is left of the crowd on a page of numbers: the pieces that
-                stood with you, and nothing else. */}
-            <CounterStrip count={reveal.dotsWithYou} label={campLabel} />
-
             <div className="figures">
               <div className="figure well">
                 <span className="label label--felt">you said</span>
@@ -586,7 +580,6 @@ function RevealView({
 
       {slide === 2 && (
         <div className="slide fade-in" key="share">
-          <CounterStrip count={reveal.dotsWithYou} label={campLabel} />
           <Compose postId={postId} question={question} reveal={reveal} />
         </div>
       )}

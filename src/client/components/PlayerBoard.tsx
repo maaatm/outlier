@@ -20,7 +20,8 @@ import { useEffect, useState } from 'react';
 
 import type { BoardRange, PlayerBoardEntry, PlayerBoardResponse } from '../../shared/types.js';
 import { fetchPlayerBoard } from '../api.js';
-import { rowTint } from '../counterArt.js';
+import { COUNTER_SIZE, rowTint } from '../counterArt.js';
+import { Blob } from './Blob.js';
 
 const TABS: { id: BoardRange; label: string }[] = [
   { id: 'week', label: 'This week' },
@@ -128,19 +129,30 @@ function Rows({
 }
 
 /**
- * One player.
+ * One player, wearing what they are actually wearing.
  *
- * The counter beside the name is plain — a piece in one of the three fills,
- * drawn from the id so it is stable for a given player and mixed down the
- * board. It is not their equipped one: the board knows ids, names and points,
- * and asking the server for eleven players' wardrobes would be a second round
- * trip for eleven pieces of decoration.
+ * The counter is their own — the board pays one extra `hMGet` for the whole
+ * page of them — and its fill is drawn from the id, so the pieces read as a
+ * handful of different people rather than a column of identical discs. The
+ * colour carries no meaning: it is stable for a given player and mixed down
+ * the board, and that is all it is for.
+ *
+ * A counter's drawing is half again as tall as the piece in it, because the
+ * accessory lives above the disc. The cell here is the disc's size and the
+ * drawing hangs out of the top of it, which is what puts the ears above the
+ * row instead of stretching every row to fit them.
  */
 function Row({ row }: { row: PlayerBoardEntry }): React.JSX.Element {
   return (
     <li className="board__row">
       <span className="board__rank">{row.rank}</span>
-      <span className={`board__counter board__counter--${rowTint(row.userId)}`} aria-hidden="true" />
+      <span className={`board__avatar board__avatar--${rowTint(row.userId)}`}>
+        <Blob
+          face={row.avatar.face}
+          accessory={row.avatar.accessory}
+          size={COUNTER_SIZE.row}
+        />
+      </span>
       <span className="board__name">{row.name}</span>
       <span className="board__points">{row.points}</span>
     </li>
