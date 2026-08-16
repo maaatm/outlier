@@ -656,16 +656,22 @@ function GiftBox({
 
   return (
     <div className="box well">
-      {result ? (
-        <BoxResult result={result} avatar={avatar} />
-      ) : (
-        <div className="label label--felt label-row">
-          <span>gift box</span>
-          <span>
-            you own {avatar.owned.length} of {ITEMS.length}
-          </span>
-        </div>
-      )}
+      {/* The head is one fixed slot whichever state it is in. A result is
+          taller than the status line it replaces, and a box that grew by fifty
+          pixels the moment it was opened pushed its own button down onto the
+          way out of the room. */}
+      <div className="box__head">
+        {result ? (
+          <BoxResult result={result} avatar={avatar} />
+        ) : (
+          <div className="label label--felt label-row">
+            <span>gift box</span>
+            <span>
+              you own {avatar.owned.length} of {ITEMS.length}
+            </span>
+          </div>
+        )}
+      </div>
 
       <button
         type="button"

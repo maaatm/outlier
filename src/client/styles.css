@@ -373,20 +373,6 @@ button {
   outline-offset: 3px;
 }
 
-/* The one well-button written in the body face rather than the display one:
-   it sits under the primary action and should read as an aside to it. */
-.well-button--small {
-  width: auto;
-  padding: 9px 18px;
-  border-radius: var(--r-well);
-  font-family: var(--font-body);
-  font-weight: 700;
-  font-size: 11px;
-  letter-spacing: 0.14em;
-  color: rgba(255, 246, 231, 0.85);
-  box-shadow: inset 0 2px 4px rgba(8, 42, 25, 0.5);
-}
-
 /* ── Type ───────────────────────────────────────────────────────────────── */
 
 /*
@@ -667,37 +653,35 @@ button {
  * height and its width are locked to each other — it can only fill the screen
  * sideways once it has been given about as much height as it has width. Every
  * value below is what it is so that the counters get that height: the panel is
- * one label, one number and the slider, and nothing else is allowed onto this
+ * two rows, the question and the slider, and nothing else is allowed onto this
  * screen at all.
  */
 .panel {
-  padding: 13px 16px 14px;
-  margin-top: 12px;
+  padding: 12px 16px 13px;
+  margin-top: 10px;
   border-radius: 11px;
 }
 
-.guess__readout {
-  margin: 5px 0 0;
+/*
+ * The label asks and the number answers, on one line. Centred rather than
+ * baseline-aligned, because the label wraps to two lines on a long answer and
+ * a number hanging off the first of them reads as a footnote to it.
+ */
+.guess__head {
   display: flex;
-  align-items: baseline;
-  gap: 9px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin: 0;
 }
 
 .bignum {
+  flex: none;
   font-family: var(--font-display);
   font-size: 48px;
   line-height: 0.9;
   color: var(--ink);
   font-variant-numeric: tabular-nums;
-}
-
-.guess__unit {
-  font-family: var(--font-body);
-  font-weight: 700;
-  font-size: 12px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: rgba(34, 48, 31, 0.45);
 }
 
 /*
@@ -771,27 +755,34 @@ button {
   border-radius: var(--r-well);
 }
 
-.slider__ticks {
+/*
+ * The two ways off this screen, on one row and in the reveal's own arrangement:
+ * the way back is a slot cut into the felt, the way on is a block standing on
+ * it. A second row for the smaller of them cost the crowd forty-six pixels,
+ * which on a screen this tall is most of a rank of counters.
+ */
+.guess__actions {
   display: flex;
-  justify-content: space-between;
-  margin-top: 7px;
-  font-family: var(--font-body);
-  font-weight: 700;
-  font-size: 10px;
-  letter-spacing: 0.14em;
-  color: rgba(34, 48, 31, 0.4);
+  align-items: stretch;
+  gap: 10px;
+  margin-top: 12px;
 }
 
 .guess__lock {
-  margin-top: 12px;
+  flex: 1;
   padding: 15px;
   font-size: 22px;
   border-radius: 11px;
 }
 
+/* Fixed, and narrow enough that the button it stands next to keeps most of the
+   row. A well-button is full width wherever it is the only thing on its line;
+   here it is not. */
 .guess__change {
-  align-self: center;
-  margin-top: 11px;
+  flex: none;
+  width: 104px;
+  padding: 14px 10px;
+  font-size: 15px;
 }
 
 /*
@@ -801,8 +792,8 @@ button {
  * what you took it about, and every pixel it gives up goes to the counters.
  */
 .guess .question-block--strip {
-  padding: 8px 14px;
-  margin-top: 12px;
+  padding: 7px 14px;
+  margin-top: 10px;
 }
 
 .guess .question--strip {
@@ -812,7 +803,7 @@ button {
 /* The crowd takes everything the controls do not, and starts from the top of
    the screen rather than from whatever is left at the bottom of it. */
 .guess .stage {
-  margin-top: 12px;
+  margin-top: 10px;
 }
 
 /* ── The crowd ──────────────────────────────────────────────────────────── */
@@ -1176,12 +1167,13 @@ button {
 /* ── The award ──────────────────────────────────────────────────────────── */
 
 /*
- * What the vote paid, and the badge under it. Both are being handed to you, so
- * both are blocks — the one place on the score slide where anything stands
- * proud of the table.
+ * What the vote paid: the one thing on the score slide standing proud of the
+ * table, because it is the one thing being handed to you.
  *
- * The award slides in from the left and the badge lands on it a beat later.
- * A block does not stamp; it arrives and stops.
+ * It slides in from the left rather than landing, and it is now the only thing
+ * on this half of the slide that moves at all — the badge that used to drop
+ * onto it a beat later is gone, and the height it was taking has gone to the
+ * histogram.
  */
 .award {
   display: flex;
@@ -1239,36 +1231,8 @@ button {
   }
 }
 
-.badge {
-  padding: 13px 17px;
-  margin-top: 14px;
-  flex: none;
-}
-
-.badge__title {
-  display: block;
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: 21px;
-  line-height: 1.15;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  color: var(--cream);
-}
-
-.badge__line {
-  display: block;
-  margin: 3px 0 0;
-  font-weight: 500;
-  font-size: 11.5px;
-  color: rgba(255, 246, 231, 0.85);
-}
-
-/* One thud, not a bounce sequence: it falls the last few pixels and stops. */
-.badge.is-landing {
-  animation: land-block 200ms var(--spring) 120ms both;
-}
-
+/* One thud, not a bounce sequence: it falls the last few pixels and stops.
+   The box result is what uses it now. */
 @keyframes land-block {
   from {
     transform: translateY(-14px);
@@ -1359,14 +1323,20 @@ button {
   margin-top: 11px;
 }
 
+/*
+ * The bars take the whole well.
+ *
+ * They used to be capped, on the theory that tall bars read as a poster rather
+ * than a chart — but the well is what takes the slack on this slide, so the cap
+ * showed up as a hundred pixels of empty hole above a short chart. The well is
+ * the size it is on purpose. The bars fill it.
+ */
 .histogram {
   display: flex;
   align-items: flex-end;
   gap: 5px;
   flex: 1;
   min-height: 44px;
-  /* Tall bars on a big screen read as a poster, not a chart. */
-  max-height: 180px;
 }
 
 /* The bars have a bottom face of their own, which is what keeps them plastic
@@ -1945,9 +1915,10 @@ button {
  * Everything in it is a control except the counter, and the last control is at
  * the bottom — so a wardrobe that scrolls is a wardrobe whose gift box nobody
  * finds. It has to fit at 512px, which is as short as Devvit's inline post view
- * gets. Three things pay for that: the balance sits in the header pill rather
- * than on a row of its own, each layer is one row, and the gift box is exactly
- * two rows whatever state it is in.
+ * gets. Four things pay for that: the balance sits in the header pill rather
+ * than on a row of its own, each layer is one row, the gift box is exactly two
+ * rows whatever state it is in, and the counter — the one thing here that is
+ * not a control — is what shrinks when the numbers still do not add up.
  */
 .wardrobe {
   display: flex;
@@ -1956,12 +1927,29 @@ button {
   min-height: 0;
 }
 
-/* The counter being made, and the only thing here that is not a control. */
+/*
+ * The counter being made, and the only thing here that is not a control.
+ *
+ * It is also the only thing here that can afford to give ground, so it is what
+ * takes the room's slack and what pays when there is none: drawn at its full
+ * size when the window is tall and scaled down when it is not. A fixed drawing
+ * plus a fixed stack of controls is how the gift box ended up under the way out
+ * of the room on a short desktop.
+ */
 .wardrobe__preview {
   display: flex;
+  align-items: center;
   justify-content: center;
-  margin-top: 24px;
-  flex: none;
+  margin-top: 14px;
+  flex: 1;
+  min-height: 0;
+}
+
+.wardrobe__preview .blob {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
 }
 
 /*
@@ -1990,8 +1978,8 @@ button {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  margin-top: 28px;
-  margin-bottom: 14px;
+  margin-top: 20px;
+  margin-bottom: 12px;
   flex: none;
 }
 
@@ -2074,6 +2062,22 @@ button {
   margin-top: auto;
   padding: 13px 15px;
   flex: none;
+}
+
+/*
+ * The first of those two rows, at one height in both of its states.
+ *
+ * "Always" was a promise the markup made and the metrics broke: a result is a
+ * two-line block and the status line it replaces is one small line, so opening
+ * a box grew the well by fifty pixels and drove its own button down onto the
+ * back button under it. The slot is the size of the result; the status line
+ * sits in the middle of it and waits.
+ */
+.box__head {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 53px;
 }
 
 .box__open {
@@ -2473,8 +2477,8 @@ button {
     border-radius: var(--r-hero);
   }
 
-  /* The score slide splits: the crowd, the figures and the two awards on the
-     left, the histogram and the nav on the right. */
+  /* The score slide splits: the figures and the award on the left, the
+     histogram and the nav on the right. */
   .slide--score {
     display: grid;
     grid-template-columns: 520px 1fr;
@@ -2482,10 +2486,11 @@ button {
     align-items: start;
   }
 
-  /* The cap exists so a tall phone does not turn ten bars into a poster. A
-     desktop well is the size it is on purpose, so the bars fill it. */
-  .slide--score .histogram {
-    max-height: none;
+  /* What is being handed to you sits against the middle of the chart rather
+     than at the top of a tall empty column. On a phone the same two things are
+     simply what comes before the well. */
+  .score__left {
+    justify-content: center;
   }
 
   .slide--score .detail {
@@ -2512,10 +2517,6 @@ button {
 
   .award__total {
     font-size: 42px;
-  }
-
-  .badge__title {
-    font-size: 24px;
   }
 
   .slides__step {
@@ -2611,12 +2612,10 @@ button {
   }
 
   .stage {
-    zoom: 0.85;
     margin: 12px -12px 0;
   }
 
   .wardrobe__preview {
-    zoom: 0.7;
     margin-top: 12px;
   }
 
@@ -2649,10 +2648,6 @@ button {
   .panel {
     padding: 13px 15px;
     margin-top: 12px;
-  }
-
-  .slider__ticks {
-    display: none;
   }
 
   .choice {
@@ -2723,20 +2718,17 @@ button {
 }
 
 @media (max-height: 560px) {
-  .stage {
-    zoom: 0.72;
-  }
-
   /*
    * The two rooms with a height budget are both spending it here, and what
    * they give up says which part of each is the point.
    *
-   * The wardrobe gives up the size of the counter. It is the subject of the
-   * room, but it is also the only thing in it that is not a control, and a
-   * control that has shrunk is harder to hit than a drawing that has.
+   * The wardrobe gives up the size of the counter — it does that on its own
+   * now, by taking the room's slack and giving it back, so all that is left
+   * here is the air around it. It is the subject of the room, but it is also
+   * the only thing in it that is not a control, and a control that has shrunk
+   * is harder to hit than a drawing that has.
    */
   .wardrobe__preview {
-    zoom: 0.55;
     margin-top: 6px;
   }
 
@@ -2853,14 +2845,6 @@ button {
     display: none;
   }
 
-  .badge__title {
-    font-size: 17px;
-  }
-
-  .badge__line {
-    font-size: 11px;
-  }
-
   .compose__foot {
     display: none;
   }
@@ -2873,6 +2857,20 @@ button {
 
   .box {
     padding: 9px 11px;
+  }
+
+  /* The slot shrinks with what stands in it, so the two states stay the same
+     height as each other here too. */
+  .box__head {
+    min-height: 44px;
+  }
+
+  .box__result {
+    padding: 6px 11px;
+  }
+
+  .box__result-name {
+    font-size: 16px;
   }
 
   .box__open {
@@ -2937,7 +2935,6 @@ button {
   /* The two things that arrive rather than move get the state they would have
      landed on, faded in. */
   .award.is-arriving,
-  .badge.is-landing,
   .box__result {
     animation: fade 220ms linear both;
   }

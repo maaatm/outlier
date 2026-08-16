@@ -13,7 +13,6 @@ import type { Equipped } from '../shared/items.js';
 import { getBand, type Award } from '../shared/points.js';
 import type { Choice, Question, QuestionState, Reveal, StateResponse } from '../shared/types.js';
 import { ApiFailure, castVote, fetchState, saveShowBlob } from './api.js';
-import { BadgeStamp } from './components/BadgeStamp.js';
 import { Blob } from './components/Blob.js';
 import { Compose } from './components/Compose.js';
 import { DotCrowd } from './components/DotCrowd.js';
@@ -385,13 +384,14 @@ function PlayView({
           made room for them. */}
       <div className="guess__controls">
         <div className="panel block block--cream block--lg">
-          <span className="label">
-            You said {label} — how many out of {CROWD_SIZE} agree?
-          </span>
-
-          <p className="guess__readout">
+          {/* A question and its answer on one line. The label already says out
+              of how many, so the number does not repeat it — and the row it
+              saves goes to the crowd, which is what this screen is about. */}
+          <p className="guess__head">
+            <span className="label">
+              You said {label} — how many out of {CROWD_SIZE} agree?
+            </span>
             <span className="bignum">{guess}</span>
-            <span className="guess__unit">out of {CROWD_SIZE}</span>
           </p>
 
           <input
@@ -407,28 +407,31 @@ function PlayView({
             style={{ '--fill': `${guess}%` } as React.CSSProperties}
             onChange={(event) => setGuess(Number(event.target.value))}
           />
-          <div className="slider__ticks">
-            <span>0</span>
-            <span>100</span>
-          </div>
         </div>
 
-        <button
-          type="button"
-          className="button block block--yellow block--lg guess__lock"
-          onClick={lockIn}
-          disabled={submitting}
-        >
-          {submitting ? 'Locking in...' : 'Lock it in'}
-        </button>
+        {/* The same shape the reveal's nav has: the way back is a slot cut into
+            the felt, the way on is a block standing on it. */}
+        <div className="guess__actions">
+          <button
+            type="button"
+            className="well-button guess__change"
+            // One word on the button and the whole phrase in the name it is
+            // announced by: the block beside it is the sentence's other half.
+            aria-label="Change answer"
+            onClick={() => setChoice(null)}
+          >
+            Change
+          </button>
 
-        <button
-          type="button"
-          className="well-button well-button--small guess__change"
-          onClick={() => setChoice(null)}
-        >
-          Change answer
-        </button>
+          <button
+            type="button"
+            className="button block block--yellow block--lg guess__lock"
+            onClick={lockIn}
+            disabled={submitting}
+          >
+            {submitting ? 'Locking in...' : 'Lock it in'}
+          </button>
+        </div>
 
         {error && <p className="notice notice--quiet notice--spaced">{error}</p>}
       </div>
@@ -558,15 +561,18 @@ function RevealView({
             </div>
 
             <PointsAward award={reveal.award} animate={animate} />
-
-            <BadgeStamp id={reveal.badge} animate={animate} />
           </div>
 
           {/* Where everyone guessed, and nothing else. The well stays whether or
               not there are bars — it is what takes the slack on this slide —
               but the label goes with them. `Histogram` renders nothing at all on
               a question with no guesses banked, and a heading over an empty hole
-              is a heading for nothing. */}
+              is a heading for nothing.
+
+              The badge that used to sit above this well is what pays for the
+              chart's height. It has not left the game: `buildComment` puts its
+              title in the comment posted to the thread, which is where the 2x2
+              was always going to be read by anybody but you. */}
           <div className="score__right">
             <div className="detail well">
               {reveal.histogram.some((count) => count > 0) && (

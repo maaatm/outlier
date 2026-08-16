@@ -2,8 +2,8 @@
  * A player's counter: a moulded disc with a face, and something breaking its
  * outline.
  *
- * One component and no variants — the same drawing at 18px in the crowd, 28px
- * on a leaderboard row, 76px on your record and 172px in the wardrobe. It *is*
+ * One component and no variants — the same drawing at 18px in the crowd, 26px
+ * on a leaderboard row, 76px on your record and 156px in the wardrobe. It *is*
  * one of the hundred counters, drawn larger, so it is built the same way one
  * is: a flat fill, a darker band inside the bottom edge, no border anywhere.
  *

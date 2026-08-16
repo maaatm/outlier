@@ -57,13 +57,17 @@ const RIM = 7;
  * is a leaderboard avatar; `panel` is your own record; `wardrobe` is the one
  * the player is working on, and the only screen where the counter is the
  * subject rather than a label.
+ *
+ * `wardrobe` is a maximum rather than a size: that room hands its slack to the
+ * drawing and takes it back when the window is short, so the counter is this
+ * big when there is height for it and smaller when there is not.
  */
 export const COUNTER_SIZE = {
   crowd: 18,
   inline: 24,
   row: 26,
   panel: 76,
-  wardrobe: 172,
+  wardrobe: 156,
 } as const;
 
 /**
