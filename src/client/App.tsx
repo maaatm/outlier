@@ -269,11 +269,15 @@ function Byline({
 }): React.JSX.Element {
   return (
     <p className="question__byline">
-      <Blob
-        face={avatar?.face}
-        accessory={avatar?.accessory}
-        size={COUNTER_SIZE.inline}
-      />
+      {/* On a cream block, so the counter needs the shadow it would otherwise
+          be standing on the felt for — see `.dot-slot--cameo::before`. */}
+      <span className="question__cast">
+        <Blob
+          face={avatar?.face}
+          accessory={avatar?.accessory}
+          size={COUNTER_SIZE.inline}
+        />
+      </span>
       <span className="question__meta">asked by u/{name}</span>
     </p>
   );

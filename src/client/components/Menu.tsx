@@ -428,13 +428,17 @@ function Record({
   return (
     <div className="menu__panel">
       <div className="record__card block block--cream block--lg">
-        <Blob
-          face={avatar?.face}
-          accessory={avatar?.accessory}
-          size={COUNTER_SIZE.panel}
-          fill="var(--counter-mine)"
-          label="Your counter"
-        />
+        {/* The wrapper is what the counter's shadow is cast from — see the
+            note on `.dot-slot--cameo::before` in the stylesheet. */}
+        <span className="record__cast">
+          <Blob
+            face={avatar?.face}
+            accessory={avatar?.accessory}
+            size={COUNTER_SIZE.panel}
+            fill="var(--counter-mine)"
+            label="Your counter"
+          />
+        </span>
         <div className="record__side">
           <span className="record__title">You, on the table</span>
           {avatar?.canSave && <ShowBlob showBlob={avatar.showBlob} onShow={onShow} />}

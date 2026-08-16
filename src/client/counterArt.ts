@@ -168,6 +168,36 @@ export function faceDepth(block: Block): number {
 }
 
 /**
+ * What an accessory casts, drawn rather than filtered.
+ *
+ * The disc's shadow is a circle in the stylesheet — see the note on
+ * `.dot-slot--cameo::before` — but an accessory is not a circle and it is the
+ * half of the drawing that leaves the disc's silhouette, so it needs its own.
+ * This is the same block, a little bigger and a little lower, in a dark
+ * translucent fill, painted behind everything.
+ *
+ * It has to exist. Accessories are moulded in cream, and a counter is drawn on
+ * a cream block in two places — your record and a community question's author
+ * line — where cream on cream is nothing at all. A soft halo was hiding that;
+ * this is what replaces it. Hard-edged, because every other shadow in this
+ * design is, and offset downward, because the light is above.
+ */
+const CAST = { spread: 2.4, drop: 2.6 } as const;
+
+export const CAST_FILL = 'rgba(18, 32, 24, 0.26)';
+
+export function blockCast(block: Block): Block {
+  return {
+    x: block.x - CAST.spread,
+    y: block.y - CAST.spread + CAST.drop,
+    w: block.w + CAST.spread * 2,
+    h: block.h + CAST.spread * 2,
+    r: block.r + CAST.spread,
+    ...(block.rot === undefined ? {} : { rot: block.rot }),
+  };
+}
+
+/**
  * Where the disc starts hiding things.
  *
  * Accessory blocks run past the rim on purpose — they are drawn behind the

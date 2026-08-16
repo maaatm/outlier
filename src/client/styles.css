@@ -606,6 +606,14 @@ button {
   margin: 0 0 6px;
 }
 
+.question__cast {
+  --cast: 0 3px 5px rgba(18, 32, 24, 0.26);
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex: none;
+}
+
 .question__meta {
   font-weight: 500;
   font-size: 11px;
@@ -959,6 +967,7 @@ button {
  * which outranks everything on this screen.
  */
 .dot-slot--cameo {
+  --cast: 0 4px 7px rgba(18, 32, 24, 0.32);
   z-index: 1;
   cursor: pointer;
   touch-action: manipulation;
@@ -1611,6 +1620,14 @@ button {
   flex: none;
 }
 
+.record__cast {
+  --cast: 0 6px 10px rgba(10, 40, 25, 0.24);
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex: none;
+}
+
 /* The counter keeps its size; everything said about it takes the rest. */
 .record__side {
   display: flex;
@@ -1833,7 +1850,11 @@ button {
  * without the board having to know how a counter is drawn.
  */
 .board__avatar {
+  --cast: 0 4px 7px rgba(18, 32, 24, 0.32);
   position: relative;
+  /* The cell is the disc; the drawing hangs out of the top of it. So the cast
+     below is this box exactly, and it stays inside the row. */
+  isolation: isolate;
   width: 26px;
   height: 26px;
 }
@@ -1964,29 +1985,26 @@ button {
  * swaps, so the new piece reads as physically re-seated rather than as a
  * picture being replaced. It replays because the wrapper is keyed on the pair.
  *
- * The tip is on the wrapper and the shadow is on the drawing inside it, and
- * they must stay apart. An element that is both filtered and animated is the
- * one shape a browser is liable to promote to a layer and rasterise — and a
- * rasterised `drop-shadow` stops following the artwork's alpha and falls back
- * to the element's box, which is a soft dark rectangle around the counter for
- * as long as the layer lives.
- *
- * Full height so the two centres coincide: the drawing is centred in here and
- * this is centred in the preview, so the piece still tips about itself.
+ * The wrapper is the drawing's own box — half again as tall as it is wide, the
+ * proportions every counter is drawn in — because the shadow under it is a
+ * circle pinned to the bottom of this box and that has to be the disc. It is
+ * also what shrinks when the room is short: the height gives way first and the
+ * width follows it, so the drawing keeps its shape and the cast keeps its size.
  */
 .wardrobe__tip {
+  --cast: 0 12px 20px rgba(10, 40, 25, 0.34);
+  position: relative;
+  isolation: isolate;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
+  aspect-ratio: 2 / 3;
+  max-height: 100%;
+  min-height: 0;
   animation: tip 220ms var(--spring) both;
 }
 
 .wardrobe__preview .blob {
-  width: auto;
-  height: auto;
-  max-width: 100%;
-  max-height: 100%;
+  width: 100%;
+  height: 100%;
 }
 
 @keyframes tip {
@@ -2365,19 +2383,43 @@ button {
   display: block;
   flex: none;
   overflow: visible;
-  /* What a counter casts. It is a filter rather than a box-shadow because the
-     shape is the artwork's, accessory and all, not the element's box. */
-  filter: drop-shadow(0 4px 7px rgba(18, 32, 24, 0.32));
 }
 
-/* The one being worked on, and the only counter in the app drawn big enough to
-   throw a real shadow. */
-.wardrobe__preview .blob {
-  filter: drop-shadow(0 12px 20px rgba(10, 40, 25, 0.34));
-}
-
-.record__card .blob {
-  filter: drop-shadow(0 6px 10px rgba(10, 40, 25, 0.24));
+/*
+ * What a counter casts.
+ *
+ * A circle pinned to the bottom of whatever the drawing is standing in,
+ * carrying an ordinary box-shadow — which is what every other shadow in this
+ * app is. It was `filter: drop-shadow` on the drawing itself, so that the
+ * accessory cast a shadow too; that was the only shadow here computed from an
+ * alpha channel, and the only one a browser can get wrong. Rasterise the
+ * drawing into a layer and the shadow stops following the alpha and takes the
+ * element's box instead — a dark rectangle around the counter, which is what
+ * the wardrobe was showing every time an item was stepped.
+ *
+ * A counter is a disc filling the bottom square of its own drawing, so a circle
+ * there is the same shape the alpha would have given, and it cannot become
+ * anything else. What is lost is the accessory's own shadow: the piece rests on
+ * the table and its ears stand off it, which is the more honest reading anyway.
+ *
+ * Behind the drawing rather than over it, so the blur cannot wash across the
+ * bottom of an accessory or a neighbour in the crowd.
+ */
+.dot-slot--cameo::before,
+.board__avatar::before,
+.question__cast::before,
+.record__cast::before,
+.wardrobe__tip::before {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  box-shadow: var(--cast);
+  z-index: -1;
+  pointer-events: none;
 }
 
 /* ── States ─────────────────────────────────────────────────────────────── */

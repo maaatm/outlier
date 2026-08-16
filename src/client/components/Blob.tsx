@@ -22,7 +22,15 @@
  */
 
 import { BLOB_CIRCLE, VIEW_BOX, blobHeight, resolveAccessory, resolveFace } from '../../shared/items.js';
-import { DISC_RIM, blockFace, blockSpin, blocksFor, paintFor } from '../counterArt.js';
+import {
+  CAST_FILL,
+  DISC_RIM,
+  blockCast,
+  blockFace,
+  blockSpin,
+  blocksFor,
+  paintFor,
+} from '../counterArt.js';
 
 type Props = {
   /** Item ids. Unknown, missing or wrong-kind ids fall back to the starter pair. */
@@ -62,6 +70,24 @@ export function Blob({ face, accessory, size, label, fill }: Props): React.JSX.E
       aria-label={label}
       aria-hidden={label ? undefined : true}
     >
+      {/* Every accessory's shadow before any accessory, so two pieces that
+          stand close do not cast onto each other. */}
+      {blocksFor(accessoryItem.id).map((block, index) => {
+        const cast = blockCast(block);
+        return (
+          <rect
+            key={index}
+            x={cast.x}
+            y={cast.y}
+            width={cast.w}
+            height={cast.h}
+            rx={cast.r}
+            fill={CAST_FILL}
+            transform={blockSpin(block)}
+          />
+        );
+      })}
+
       {blocksFor(accessoryItem.id).map((block, index) => (
         <g key={index} transform={blockSpin(block)}>
           <rect
