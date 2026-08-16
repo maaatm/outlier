@@ -2,11 +2,16 @@
  * Deliberate imperfection, seeded.
  *
  * A perfect CSS grid of circles reads as machine output. Every offset here is
- * derived from the dot's index, so the scatter is stable across renders and
- * across reloads — the crowd looks drawn, not randomised on each paint.
+ * derived from the counter's index, so the scatter is stable across renders and
+ * across reloads — the crowd looks tipped out, not randomised on each paint.
  *
- * Three moves, and only three: jitter the crowd, wobble the rule, tilt the
- * badge. A fourth becomes a gimmick.
+ * One move now, where there used to be three. The wobbled rule and the tilted
+ * badge went with the flat sticker-book they belonged to: in Blocks every piece
+ * is square to the screen and the counters are the only thing that leans, which
+ * is what makes the lean read as pieces on a table rather than as a house
+ * style. `counterArt.ts` opens `rotation` up from ±3° to the ±14° a tipped
+ * counter wants, and this stays the one place the crowd's imperfection is
+ * seeded.
  */
 
 /** Deterministic hash of an integer to [0, 1). */
@@ -64,8 +69,12 @@ export function scatterFor(
 }
 
 /**
- * The handful of dots that get faces. A crowd where every face is drawn looks
- * like a mascot sheet; a crowd where a few surface looks alive.
+ * The handful of counters that get faces. A crowd where every face is drawn
+ * looks like a mascot sheet; a crowd where a few surface looks alive.
+ *
+ * The strip on the score and share slides asks for the same treatment at the
+ * same rate, so the pieces that stood with you are recognisably the same pieces
+ * one slide later.
  */
 export function facedDots(count: number, crowdSize: number, salt = 7): Set<number> {
   const picked = new Set<number>();
@@ -76,23 +85,4 @@ export function facedDots(count: number, crowdSize: number, salt = 7): Set<numbe
     cursor++;
   }
   return picked;
-}
-
-/**
- * The wobbled divider. An `<hr>` is a machine line; this is a path with a slight
- * hand-drawn waver, seeded so it does not shimmer between renders.
- */
-export function wobblePath(width: number, salt = 5): string {
-  const segments = 8;
-  const step = width / segments;
-  const points: string[] = [`M 0 ${(4 + hashSigned(0, salt) * 1.2).toFixed(2)}`];
-
-  for (let i = 1; i <= segments; i++) {
-    const x = step * i;
-    const y = 4 + hashSigned(i, salt) * 1.6;
-    const cx = x - step / 2;
-    const cy = 4 + hashSigned(i, salt + 1) * 2.2;
-    points.push(`Q ${cx.toFixed(2)} ${cy.toFixed(2)} ${x.toFixed(2)} ${y.toFixed(2)}`);
-  }
-  return points.join(' ');
 }

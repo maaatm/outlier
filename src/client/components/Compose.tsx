@@ -4,9 +4,14 @@
  * The comment is pre-written and that is load-bearing — nothing here requires
  * the player to type. The note field is optional, is appended to the generated
  * text, and never blocks posting.
+ *
+ * Both fields are wells cut into the cream block. That is the rule the whole
+ * design runs on and this is where it is easiest to see: a well cut into the
+ * felt is inert and holds a number you have earned; a well cut into a block
+ * takes text.
  */
 
-import { useLayoutEffect, useRef, useState } from 'react';
+import { Fragment, useLayoutEffect, useRef, useState } from 'react';
 
 import { buildComment, normalizeNote } from '../../shared/comment.js';
 import { NOTE_MAX_LENGTH } from '../../shared/config.js';
@@ -21,7 +26,6 @@ type Props = {
 
 export function Compose({ postId, question, reveal }: Props): React.JSX.Element {
   const [note, setNote] = useState('');
-  const [showNote, setShowNote] = useState(false);
   const [posting, setPosting] = useState(false);
   const [posted, setPosted] = useState(reveal.commented);
   const [error, setError] = useState<string | null>(null);
@@ -37,10 +41,8 @@ export function Compose({ postId, question, reveal }: Props): React.JSX.Element 
     const field = noteRef.current;
     if (!field) return;
     field.style.height = 'auto';
-    // scrollHeight leaves out the border, and the box is border-box.
-    const border = field.offsetHeight - field.clientHeight;
-    field.style.height = `${field.scrollHeight + border}px`;
-  }, [note, showNote]);
+    field.style.height = `${field.scrollHeight}px`;
+  }, [note, posted]);
 
   async function submit(): Promise<void> {
     setPosting(true);
@@ -59,54 +61,77 @@ export function Compose({ postId, question, reveal }: Props): React.JSX.Element 
     }
   }
 
-  if (posted) {
-    return <p className="notice notice--quiet">Posted to the thread.</p>;
-  }
-
   return (
     <div className="compose">
-      <div className="compose__body">
-        <p className="section__title">your comment, already written</p>
-        <pre className="compose__preview">{preview}</pre>
+      <div className="compose__card block block--cream block--lg">
+        <span className="label">your comment</span>
 
-        {showNote && (
+        {/*
+          Posting fills this well with one line of confirmation, in place. The
+          room does not grow and nothing moves: the block under it went flat,
+          which is the whole receipt.
+        */}
+        <p className="compose__preview well--cut">
+          {posted ? 'Posted to the thread.' : <Bolded text={preview} />}
+        </p>
+
+        {!posted && (
           <>
-            <label className="visually-hidden" htmlFor="note">
-              Optional note
+            <label className="label compose__label" htmlFor="note">
+              add a line — optional
             </label>
             <textarea
               id="note"
               ref={noteRef}
-              className="compose__note"
+              className="compose__note well--cut"
               rows={2}
               maxLength={NOTE_MAX_LENGTH}
               value={note}
               placeholder="Add a line, or do not."
               onChange={(event) => setNote(event.target.value)}
             />
-            <p className="compose__hint">{NOTE_MAX_LENGTH - note.length} left. Skippable.</p>
+            <div className="label label-row compose__foot">
+              <span>posts to the thread</span>
+              <span>
+                {note.length} / {NOTE_MAX_LENGTH}
+              </span>
+            </div>
           </>
         )}
       </div>
 
-      <div className="compose__actions">
-        {!showNote && (
-          <button type="button" className="button button--quiet" onClick={() => setShowNote(true)}>
-            Add a line (optional)
-          </button>
-        )}
-
+      {!posted && (
         <button
           type="button"
-          className="button button--primary"
+          className="button block block--orange block--lg compose__post"
           onClick={submit}
           disabled={posting}
         >
-          {posting ? 'Posting...' : 'Post this to the thread'}
+          {posting ? 'Posting...' : 'Post comment'}
         </button>
+      )}
 
-        {error && <p className="notice notice--quiet">{error}</p>}
-      </div>
+      {error && <p className="notice notice--quiet notice--spaced">{error}</p>}
     </div>
+  );
+}
+
+/**
+ * The comment, with its bold runs drawn bold.
+ *
+ * `buildComment` writes Reddit markdown, so the side taken and the badge come
+ * out wrapped in asterisks — and asterisks in a preview are the one thing on
+ * this screen that would not appear in the thread. Rendering the runs instead
+ * of printing the markers is what makes this a preview rather than a copy of
+ * the source. The text itself is untouched: what gets posted is still the
+ * string the server builds, byte for byte.
+ */
+function Bolded({ text }: { text: string }): React.JSX.Element {
+  return (
+    <>
+      {text.split('**').map((run, index) =>
+        index % 2 === 1 ? <strong key={index}>{run}</strong> : <Fragment key={index}>{run}</Fragment>
+      )}
+    </>
   );
 }

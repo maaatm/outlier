@@ -9,8 +9,8 @@
         "entry": "index.html",
         "height": "tall",
         "styles": {
-          "backgroundColor": "#E7E9F5FF",
-          "backgroundColorDark": "#14161BFF"
+          "backgroundColor": "#2E9E6BFF",
+          "backgroundColorDark": "#2E9E6BFF"
         }
       }
     }

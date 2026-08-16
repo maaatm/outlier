@@ -1,95 +1,108 @@
 /*
- * Flat sticker-book.
+ * Blocks.
  *
- * The rules, in one place so they are hard to drift from:
- *   - 2px solid ink on every card, button and dot. Never thinner.
- *   - Hard offset shadows only. No blur, ever.
- *   - No gradients, no translucency, no backdrop blur.
- *   - Radius 14 on cards, 10 on buttons. Never a pill.
- *   - Spacing comes from the scale below and nowhere else.
- *   - Two accents on screen at most.
+ * The app is a green felt table, and everything on it is a moulded plastic
+ * piece. Three surfaces, and every element on every screen is one of them:
+ *
+ *   BLOCK — flat fill, no border, a solid bottom face in a darker shade of its
+ *           own colour, and a soft drop shadow behind that. Pressable, or
+ *           holding something being awarded.
+ *   WELL  — cut into whatever it sits in: darker fill, inset shadow, no bottom
+ *           face. Never pressable, never moves. Holds what you have earned.
+ *   FELT  — the page. Titles and body copy sit directly on it, in cream.
+ *
+ * The rules that fall out of that, in one place so they are hard to drift from:
+ *   - No borders. Depth does the work an outline used to, and no rule here is
+ *     allowed to reintroduce one.
+ *   - A number you have earned sits in a well. A number being awarded to you
+ *     sits on a block.
+ *   - An input is a well cut into a block, never into the felt. Felt wells are
+ *     inert; block wells take text.
+ *   - Selection is depth, not colour: a chosen tab loses its bottom face and
+ *     gains the inset.
+ *   - Blocks are rigid. They travel down and back up and nothing else — no
+ *     scale, no rotation, no fade.
+ *   - Radius is never a pill. A block is a square-cornered moulded piece.
+ *   - The counters are the one tilted thing in the app.
  */
 
 /* ── Fonts ──────────────────────────────────────────────────────────────── */
 
-@font-face {
-  font-family: 'Gabarito';
-  src: url('./fonts/gabarito-latin.woff2') format('woff2');
-  font-weight: 400 500;
-  font-style: normal;
-  font-display: swap;
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+2000-206F, U+2122, U+2212;
-}
+/*
+ * Two families, both self-hosted rather than hotlinked: the app makes no
+ * external requests, and that is a property worth keeping. Space Grotesk ships
+ * as one variable file covering the whole 400–700 range, so the three weights
+ * this design uses cost one download between them.
+ */
 
 @font-face {
-  font-family: 'Instrument Sans';
-  src: url('./fonts/instrumentsans-latin.woff2') format('woff2');
-  font-weight: 400 600;
-  font-style: normal;
-  font-display: swap;
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+2000-206F, U+2122, U+2212;
-}
-
-@font-face {
-  font-family: 'Instrument Sans';
-  src: url('./fonts/instrumentsans-latin-ext.woff2') format('woff2');
-  font-weight: 400 600;
-  font-style: normal;
-  font-display: swap;
-  unicode-range: U+0100-02BA, U+1E00-1E9F, U+2020, U+20A0-20AB, U+2C60-2C7F, U+A720-A7FF;
-}
-
-@font-face {
-  font-family: 'DM Mono';
-  src: url('./fonts/dmmono-400-latin.woff2') format('woff2');
+  font-family: 'Lilita One';
+  src: url('./fonts/lilitaone-latin.woff2') format('woff2');
   font-weight: 400;
   font-style: normal;
   font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+2000-206F, U+2122, U+2212;
 }
 
 @font-face {
-  font-family: 'DM Mono';
-  src: url('./fonts/dmmono-500-latin.woff2') format('woff2');
-  font-weight: 500;
+  font-family: 'Space Grotesk';
+  src: url('./fonts/spacegrotesk-latin.woff2') format('woff2');
+  font-weight: 400 700;
   font-style: normal;
   font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+2000-206F, U+2122, U+2212;
 }
 
 /* ── Tokens ─────────────────────────────────────────────────────────────── */
 
 :root {
-  --ink: #15181d;
-  --paper: #e7e9f5;
-  --card: #ffffff;
+  /* felt */
+  --felt: #2e9e6b;
+  --well: rgba(8, 42, 25, 0.3);
+  --well-pill: rgba(8, 42, 25, 0.32);
+  --well-button: rgba(8, 42, 25, 0.28);
+  --well-inset: inset 0 3px 5px rgba(8, 42, 25, 0.5);
+  --well-inset-sm: inset 0 2px 3px rgba(8, 42, 25, 0.5);
+  --well-inset-btn: inset 0 2px 4px rgba(8, 42, 25, 0.5);
 
-  --signal: #2b6be4; /* you / your answer */
-  --rare: #ff4d6d; /* minority position */
-  --hit: #00a676; /* accurate guess */
-  --sun: #ffc53d; /* streak only, never anything else */
+  /* blocks */
+  --cream: #fff6e7;
+  --cream-face: #cbb795;
+  --yellow: #ffc93c;
+  --yellow-face: #c48d12;
+  --orange: #ff7a2f;
+  --orange-face: #bf5215;
+  --violet: #8b5cf6;
+  --violet-face: #6d3ee0;
+
+  /* ink */
+  --ink: #22301f; /* on cream and yellow */
+  --ink-on-felt: #fff6e7;
+  --ink-soft-felt: rgba(255, 246, 231, 0.6);
+  --ink-soft-cream: rgba(34, 48, 31, 0.5);
+  --ink-body-cream: rgba(34, 48, 31, 0.7);
+  --ink-body-felt: rgba(255, 246, 231, 0.75);
+  /* the well a text field is: cut into a cream block, not into the felt */
+  --well-cut: rgba(34, 48, 31, 0.09);
+  --well-cut-inset: inset 0 2px 4px rgba(34, 48, 31, 0.2);
+
+  /* counters */
+  --counter: #fff1da;
+  --counter-mine: #ff7a2f;
+  --counter-eye: #3a2a18;
+  --counter-lift: inset 0 -2px 0 rgba(0, 0, 0, 0.16), 0 4px 7px rgba(18, 32, 24, 0.32);
 
   /*
-   * The rarity ladder, and the one place the app spends colour on something
-   * other than the four meanings above. It appears on the wardrobe's two layer
-   * borders and nowhere else, so it never shares a screen with any of them.
-   *
-   * The hues are picked out of the gaps the four accents leave. Blue, red, green
-   * and yellow are taken and their meanings are load-bearing, which rules out
-   * the ladder a player would expect from other games — grey, green, blue —
-   * because two thirds of it would be borrowing a meaning. Slate stays a
-   * neutral so `common` reads as unmarked; cyan and violet sit in the two widest
-   * gaps left, at roughly 190 and 260 degrees.
-   *
-   * Colour is the second channel here, not the only one: the rarity is also
-   * written next to the count, which is what anybody who cannot separate these
-   * three reads instead.
+   * The rarity ladder, and still the one place the app spends colour on
+   * something other than the meanings the three surfaces carry. It appears in
+   * the wardrobe — on an accessory's bottom face, on the meta line beside the
+   * count, and on the block a box result arrives in — and on no other screen.
+   * Colour is the second channel, never the only one: the rarity is written out
+   * next to the count as well.
    */
   --rarity-common: #8b93a1;
   --rarity-uncommon: #0f9bbd;
   --rarity-rare: #8b5cf6;
-
-  /* The opposing camp: ink, held back. */
-  --ink-quiet: rgba(21, 24, 29, 0.15);
-  --ink-soft: rgba(21, 24, 29, 0.55);
 
   --s1: 4px;
   --s2: 8px;
@@ -97,36 +110,26 @@
   --s4: 24px;
   --s5: 40px;
 
-  --stroke: 2px;
-  --radius-card: 14px;
-  --radius-button: 10px;
-  --drop: 3px 3px 0 var(--ink);
-  --drop-pressed: 1px 1px 0 var(--ink);
-  --drop-raised: 5px 5px 0 var(--ink);
+  /* radii */
+  --r-well: 8px;
+  --r-block: 10px;
+  --r-hero: 12px;
+  --r-pill: 7px;
 
-  --font-display: 'Gabarito', ui-sans-serif, system-ui, sans-serif;
-  --font-body: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
-  --font-mono: 'DM Mono', ui-monospace, 'SFMono-Regular', monospace;
+  --font-display: 'Lilita One', ui-sans-serif, system-ui, sans-serif; /* always uppercase */
+  --font-body: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+
+  /* The press curve. One spring, used by every block in the app. */
+  --spring: cubic-bezier(0.22, 1.18, 0.36, 1);
 }
 
-/* Accents are saturated enough to hold in both modes, so only the neutrals move. */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
-    --ink: #f0efea;
-    --paper: #14161b;
-    --card: #1e2129;
-    --ink-quiet: rgba(240, 239, 234, 0.15);
-    --ink-soft: rgba(240, 239, 234, 0.55);
-  }
-}
-
-:root[data-theme='dark'] {
-  --ink: #f0efea;
-  --paper: #14161b;
-  --card: #1e2129;
-  --ink-quiet: rgba(240, 239, 234, 0.15);
-  --ink-soft: rgba(240, 239, 234, 0.55);
-}
+/*
+ * No dark mode, and that is the design rather than an omission. Blocks is one
+ * committed look — a green table under warm plastic — and a dark variant of it
+ * would be a second table nobody asked for. `index.html` pins `color-scheme`
+ * to light and `devvit.json` paints the post's own frame the same green, so
+ * the app never sits in a strip of somebody else's background.
+ */
 
 /* ── Reset ──────────────────────────────────────────────────────────────── */
 
@@ -143,8 +146,8 @@ body {
 }
 
 body {
-  background: var(--paper);
-  color: var(--ink);
+  background: var(--felt);
+  color: var(--ink-on-felt);
   font-family: var(--font-body);
   font-size: 16px;
   line-height: 1.5;
@@ -158,35 +161,322 @@ button {
   cursor: pointer;
 }
 
+/* ── The block ──────────────────────────────────────────────────────────── */
+
+/*
+ * A moulded piece. The first shadow is the bottom face — hard-edged, no blur,
+ * in the fill's own darker shade — and the second is the soft shadow it casts
+ * on the felt. Everything is driven off `--face-h` so that pressing can be
+ * written once: travel down by exactly the height of the face, shrink the face
+ * to nothing, and pull the drop shadow in behind it.
+ */
+.block {
+  --face: var(--cream-face);
+  --fill: var(--cream);
+  --on-fill: var(--ink);
+  --face-h: 6px;
+  --drop: 0 12px 16px rgba(10, 40, 25, 0.24);
+  --drop-raised: 0 15px 20px rgba(10, 40, 25, 0.26);
+  --drop-pressed: 0 4px 7px rgba(10, 40, 25, 0.18);
+
+  border: 0;
+  border-radius: var(--r-block);
+  background: var(--fill);
+  color: var(--on-fill);
+  box-shadow: 0 var(--face-h) 0 var(--face), var(--drop);
+}
+
+.block--cream {
+  --fill: var(--cream);
+  --face: var(--cream-face);
+  --on-fill: var(--ink);
+}
+
+.block--yellow {
+  --fill: var(--yellow);
+  --face: var(--yellow-face);
+  --on-fill: var(--ink);
+}
+
+.block--orange {
+  --fill: var(--orange);
+  --face: var(--orange-face);
+  --on-fill: var(--cream);
+}
+
+.block--violet {
+  --fill: var(--violet);
+  --face: var(--violet-face);
+  --on-fill: var(--cream);
+}
+
+/* Three thicknesses: rows and chips, cards and buttons, hero cards and the
+   primary action. Nothing else is allowed a fourth. */
+.block--sm {
+  --face-h: 5px;
+  --drop: 0 10px 13px rgba(10, 40, 25, 0.2);
+  --drop-raised: 0 13px 17px rgba(10, 40, 25, 0.22);
+}
+
+.block--md {
+  --face-h: 6px;
+  --drop: 0 12px 16px rgba(10, 40, 25, 0.24);
+  --drop-raised: 0 15px 20px rgba(10, 40, 25, 0.26);
+}
+
+.block--lg {
+  --face-h: 8px;
+  --drop: 0 16px 20px rgba(10, 40, 25, 0.24);
+  --drop-raised: 0 19px 24px rgba(10, 40, 25, 0.26);
+}
+
+/* ── The well ───────────────────────────────────────────────────────────── */
+
+/*
+ * Cut into the felt. No bottom face, because there is nothing to be under: a
+ * well is a hole, and holes do not stand proud of anything.
+ */
+.well {
+  background: var(--well);
+  box-shadow: var(--well-inset);
+  border-radius: 11px;
+}
+
+.well--pill {
+  background: var(--well-pill);
+  box-shadow: var(--well-inset-sm);
+  border-radius: var(--r-pill);
+}
+
+/*
+ * A well cut into a cream block, which is what a text field is. The felt's
+ * wells are inert; these take text, and the difference in what they are cut
+ * into is the whole signal.
+ */
+.well--cut {
+  background: var(--well-cut);
+  box-shadow: var(--well-cut-inset);
+  border-radius: var(--r-well);
+}
+
+/* ── Buttons ────────────────────────────────────────────────────────────── */
+
+/*
+ * The base is only reset and layout. What a button looks like comes from the
+ * surface classes above, so a primary action and a card are the same object
+ * with the same press behaviour and no second idiom to keep in step.
+ */
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s2);
+  width: 100%;
+  border: 0;
+  padding: var(--s3);
+  font-family: var(--font-display);
+  font-size: 16px;
+  /* Lilita is a poster face: set solid, or every button carries half a line of
+     air it did not ask for and the rooms with a height budget lose a row. */
+  line-height: 1.15;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-align: center;
+  cursor: pointer;
+  transition:
+    transform 140ms var(--spring),
+    box-shadow 140ms var(--spring);
+}
+
+/*
+ * Pointing at a block raises it two pixels off the table and lengthens what it
+ * casts. No colour change: colour means something here, and hovering is not it.
+ * Guarded on a real pointer, or a phone leaves the last-tapped block hovering.
+ */
+@media (hover: hover) and (pointer: fine) {
+  .button.block:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 calc(var(--face-h) + 2px) 0 var(--face), var(--drop-raised);
+  }
+}
+
+/*
+ * The press, and the one piece of motion every control in the app shares: down
+ * by exactly the height of its own bottom face, in 70ms, with the face and the
+ * drop shadow shrinking to match. Nothing scales and nothing fades. After the
+ * hover rule, so pressing always wins over pointing.
+ */
+.button.block:active:not(:disabled) {
+  transform: translateY(var(--face-h));
+  box-shadow: 0 0 0 var(--face), var(--drop-pressed);
+  transition-duration: 70ms;
+}
+
+.button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.button:focus-visible {
+  outline: 3px solid var(--ink-on-felt);
+  outline-offset: 3px;
+}
+
+.block--cream .button:focus-visible,
+.button.block--cream:focus-visible,
+.button.block--yellow:focus-visible {
+  outline-color: var(--ink);
+}
+
+/*
+ * The quiet button: a well you may press. It is the only control that is not a
+ * block, and it is the shape of every "back" and every step away from the
+ * thing the screen is for. It does not move — wells never do — it deepens.
+ */
+.well-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  border: 0;
+  border-radius: 9px;
+  padding: 14px;
+  /*
+   * The well's own translucent fill over an opaque layer of the felt it is cut
+   * into — the same colour it would composite to anyway, but opaque. These sit
+   * below a scrolling room and pin themselves there, and a hole you can read
+   * the list through is not a hole.
+   */
+  background: linear-gradient(var(--well-button), var(--well-button)), var(--felt);
+  box-shadow: var(--well-inset-btn);
+  color: var(--ink-on-felt);
+  font-family: var(--font-display);
+  font-size: 16px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: box-shadow 140ms var(--spring);
+}
+
+.well-button:active:not(:disabled) {
+  box-shadow: inset 0 4px 7px rgba(8, 42, 25, 0.6);
+  transition-duration: 70ms;
+}
+
+.well-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.well-button:focus-visible {
+  outline: 3px solid var(--ink-on-felt);
+  outline-offset: 3px;
+}
+
+/* The one well-button written in the body face rather than the display one:
+   it sits under the primary action and should read as an aside to it. */
+.well-button--small {
+  width: auto;
+  padding: 9px 18px;
+  border-radius: var(--r-well);
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: rgba(255, 246, 231, 0.85);
+  box-shadow: inset 0 2px 4px rgba(8, 42, 25, 0.5);
+}
+
+/* ── Type ───────────────────────────────────────────────────────────────── */
+
+/*
+ * The workhorse. Every label in the app is this: Space Grotesk 700, small,
+ * widely tracked, uppercase. On the felt it is cream held back; on a cream
+ * block it is ink held back. Nothing else is ever a label.
+ */
+.label {
+  display: block;
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-soft-cream);
+}
+
+.label--felt {
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  color: rgba(255, 246, 231, 0.55);
+}
+
+/* A label with a counter or a second reading on the same line. Four counters
+   on four lines of their own is a quarter of a room spent on arithmetic. */
+.label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s2);
+}
+
+/* A screen title, on the felt rather than inside anything. */
+.screen__title {
+  margin: 18px 0 0;
+  font-family: var(--font-display);
+  font-size: 40px;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  color: var(--ink-on-felt);
+}
+
+.screen__lede {
+  margin: 10px 0 0;
+  max-width: 320px;
+  font-weight: 500;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--ink-body-felt);
+  flex: none;
+}
+
+/*
+ * The fine print at the bottom of a room: the rule that would clutter the
+ * substance above it but that somebody eventually wants. Body copy rather than
+ * a label — two sentences set in tracked-out caps is a thing nobody reads.
+ */
+.footnote {
+  margin: 16px 0 0;
+  font-weight: 400;
+  font-size: 11px;
+  line-height: 1.55;
+  color: rgba(255, 246, 231, 0.55);
+  flex: none;
+}
+
 /* ── Shell ──────────────────────────────────────────────────────────────── */
 
 /*
- * The shell owns the viewport. The card takes every pixel left under the
- * header, so its height comes from the screen rather than from whichever slide
- * happens to be showing — navigating between slides never resizes anything.
+ * The felt owns the viewport, edge to edge. There is no card: the header is on
+ * the table, the content is on the table, and the blocks are placed on top of
+ * it. Everything below still takes the height the screen gives it, so moving
+ * between slides never resizes anything.
  */
 .app {
   height: 100vh;
   height: 100dvh;
-  padding: var(--s3);
+  padding: 20px;
   display: flex;
   flex-direction: column;
-  gap: var(--s3);
-  max-width: 480px;
-  margin: 0 auto;
   overflow: hidden;
 }
 
-.card {
-  background: var(--card);
-  border: var(--stroke) solid var(--ink);
-  border-radius: var(--radius-card);
-  box-shadow: var(--drop);
-  padding: var(--s3);
+/* Where a screen's contents live under the header. Both the reveal's slides
+   and the menu's pages are this box, so the two are interchangeable. */
+.screen {
   display: flex;
   flex-direction: column;
   flex: 1;
-  /* Without this a tall child refuses to shrink and the card overflows. */
   min-height: 0;
 }
 
@@ -197,24 +487,29 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: var(--s2);
-  font-family: var(--font-mono);
-  font-size: 12px;
+  flex: none;
 }
 
 .header__mark {
   font-family: var(--font-display);
-  font-size: 16px;
-  font-weight: 500;
-  letter-spacing: -0.01em;
+  font-size: 22px;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--ink-on-felt);
 }
 
 /*
- * The one thing in the header that may be cut. The points tile grows a digit at
- * a time and the counters are never abbreviated, so on a narrow phone the date
- * gives up its width rather than pushing the wordmark off the row.
+ * Inside a menu room the wordmark gives way to the room's name, small and
+ * tracked out — the wordmark is the front door and you are past it.
  */
-.header__day {
-  color: var(--ink-soft);
+.header__label {
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(255, 246, 231, 0.7);
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -224,175 +519,118 @@ button {
 .stats {
   display: flex;
   align-items: center;
-  gap: var(--s2);
+  gap: 7px;
   flex: none;
 }
 
+/* A counter you have earned, so it is cut into the table rather than sitting
+   on it. This is the rule the whole system is built on. */
 .stat {
   display: inline-flex;
   align-items: center;
-  gap: var(--s1);
-  border: var(--stroke) solid var(--ink);
-  border-radius: var(--radius-button);
-  padding: 2px var(--s2);
-  background: var(--card);
-  font-family: var(--font-mono);
-  font-size: 12px;
+  gap: 5px;
+  padding: 5px 9px;
   white-space: nowrap;
 }
 
-.stat--live {
-  background: var(--sun);
-  color: #15181d;
+.stat__label {
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-soft-felt);
 }
 
 .stat__count {
-  font-weight: 500;
+  font-family: var(--font-display);
+  font-size: 15px;
+  line-height: 1.1;
+  color: var(--ink-on-felt);
   font-variant-numeric: tabular-nums;
 }
 
+/* The streak is the one number in the header that can be lit, and yellow is
+   the only thing it is ever lit with. */
+.stat--live .stat__count,
+.stat--coins .stat__count {
+  color: var(--yellow);
+}
 
-/* ── Question ───────────────────────────────────────────────────────────── */
+/* ── The question ───────────────────────────────────────────────────────── */
+
+/*
+ * The question is a cream block on the felt, and the block's bottom face is
+ * the separator that the hand-drawn rule under it used to be.
+ */
+.question-block {
+  padding: 17px 19px;
+  margin-top: 18px;
+  flex: none;
+}
 
 .question {
-  font-family: var(--font-body);
-  font-size: 22px;
-  line-height: 1.3;
-  font-weight: 600;
-  margin: 0;
-  letter-spacing: -0.01em;
+  margin: 9px 0 0;
+  font-family: var(--font-display);
+  font-size: 33px;
+  line-height: 1.04;
+  letter-spacing: 0.005em;
+  text-transform: uppercase;
+  color: var(--ink);
+  text-wrap: pretty;
 }
 
 /*
- * Who asked, with their blob in front of it.
- *
- * Aligned to the bottom rather than the middle. A blob's element is half again
- * as tall as the dot in it — the accessory lives inside the SVG's box rather
- * than overflowing it — so centring the row would centre the name against a
- * third of a box that is deliberately empty and leave it floating above the
- * head. The alternative, pulling the artwork out of its box with a negative
- * margin, is the thing the taller viewBox exists to avoid.
+ * Once an answer is picked the question compresses to a strip and stays there
+ * for the rest of the question's life — the guess screen and all three reveal
+ * slides — so nothing under it ever has to move to make room for it again.
+ */
+.question-block--strip {
+  padding: 12px 15px;
+  margin-top: 16px;
+  border-radius: var(--r-well);
+}
+
+.question--strip {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.14;
+  letter-spacing: 0.01em;
+}
+
+/*
+ * Who asked, with their counter in front of it. Aligned to the bottom: a
+ * counter's element is half again as tall as the piece in it, because the
+ * accessory lives inside the box rather than overflowing it.
  */
 .question__byline {
   display: flex;
   align-items: flex-end;
   gap: var(--s2);
-  margin: 0 0 var(--s2);
+  margin: 0 0 6px;
 }
 
 .question__meta {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--ink-soft);
-  margin: 0;
+  font-weight: 500;
+  font-size: 11px;
+  color: var(--ink-soft-cream);
 }
 
-.rule {
-  display: block;
-  width: 100%;
-  height: 8px;
-  margin: var(--s2) 0;
-  color: var(--ink);
-  overflow: visible;
-}
+/* ── The two answers ────────────────────────────────────────────────────── */
 
-/* ── Buttons ────────────────────────────────────────────────────────────── */
-
-.button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--s2);
-  width: 100%;
-  padding: var(--s3);
-  background: var(--card);
-  border: var(--stroke) solid var(--ink);
-  border-radius: var(--radius-button);
-  box-shadow: var(--drop);
-  font-family: var(--font-body);
-  font-size: 16px;
-  font-weight: 600;
-  text-align: center;
-  transition: box-shadow 100ms ease-out, transform 100ms ease-out,
-    background-color 100ms ease-out, color 100ms ease-out;
-}
-
-/*
- * Everything clickable lifts towards the cursor: up and left by two, with the
- * shadow lengthening by the same amount so the sticker looks peeled off the
- * page rather than moved across it. Guarded on a real pointer — a phone would
- * otherwise leave the last-tapped button stuck in the raised state.
- */
-@media (hover: hover) and (pointer: fine) {
-  .button:hover:not(:disabled),
-  .detail__tab:hover {
-    box-shadow: var(--drop-raised);
-    transform: translate(-2px, -2px);
-  }
-
-  /* Quiet buttons carry no shadow at rest, so theirs arrives on the lift. */
-  .button--quiet:hover:not(:disabled) {
-    box-shadow: var(--drop);
-  }
-}
-
-/* After the hover rules: pressing always wins over pointing. */
-.button:active:not(:disabled),
-.detail__tab:active {
-  box-shadow: var(--drop-pressed);
-  transform: translate(2px, 2px);
-}
-
-.button--quiet:active:not(:disabled) {
-  box-shadow: none;
-}
-
-.button:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.button:focus-visible {
-  outline: var(--stroke) solid var(--signal);
-  outline-offset: 3px;
-}
-
-.button--primary {
-  background: var(--signal);
-  color: #ffffff;
-}
-
-.button--quiet {
-  box-shadow: none;
-  border-style: solid;
-  font-weight: 400;
-  padding: var(--s2) var(--s3);
-  width: auto;
-}
-
+/* The whole game, so the biggest targets in it. */
 .choices {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: var(--s2);
+  gap: 13px;
+  margin-top: 10px;
+  flex: none;
 }
 
-/* The two answers are the whole game, so they are the biggest targets in it. */
-.choices .button {
-  padding: var(--s4) var(--s3);
-  font-size: 18px;
-  min-height: 88px;
-}
-
-/*
- * The answer under the cursor fills with `--signal` — the colour that means
- * "you" everywhere else in the app — so the side you are about to take reads as
- * already yours. Only one can be hovered, so the two-accent rule still holds.
- */
-@media (hover: hover) and (pointer: fine) {
-  .choices .button:hover:not(:disabled) {
-    background: var(--signal);
-    color: #ffffff;
-  }
+.choice {
+  min-height: 92px;
+  padding: var(--s3);
+  font-size: 29px;
 }
 
 .choice__label {
@@ -401,125 +639,167 @@ button {
   white-space: nowrap;
 }
 
-/* ── Guess step ─────────────────────────────────────────────────────────── */
+/* ── The guess ──────────────────────────────────────────────────────────── */
 
 .guess {
   display: flex;
   flex-direction: column;
-  gap: var(--s3);
   flex: 1;
   min-height: 0;
 }
 
 /*
- * Everything under the crowd on the guess screen. Picking an answer shrinks the
- * crowd to make room, and that contraction takes 600ms — so the controls hold
- * back a beat and fade in behind it rather than appearing under a crowd that is
- * still standing where they are about to be.
+ * Everything under the crowd on the guess screen. Picking an answer resizes
+ * the crowd, and that takes 600ms — so the controls hold back a beat and fade
+ * in behind it rather than appearing under a crowd still on its way.
  */
 .guess__controls {
   display: flex;
   flex-direction: column;
-  gap: var(--s3);
+  flex: none;
   animation: fade 260ms linear 160ms both;
 }
 
-.guess__prompt {
-  margin: 0;
-  font-size: 16px;
-}
-
-.guess__prompt strong {
-  font-weight: 600;
+.panel {
+  padding: 17px 19px 19px;
+  margin-top: 14px;
+  border-radius: 11px;
 }
 
 .guess__readout {
+  margin: var(--s2) 0 0;
   display: flex;
   align-items: baseline;
-  gap: var(--s2);
+  gap: 9px;
 }
 
 .bignum {
   font-family: var(--font-display);
-  font-weight: 500;
   font-size: 56px;
-  line-height: 1;
-  letter-spacing: -0.02em;
+  line-height: 0.9;
+  color: var(--ink);
   font-variant-numeric: tabular-nums;
 }
 
-.bignum--small {
-  font-size: 32px;
-}
-
 .guess__unit {
-  font-family: var(--font-mono);
+  font-family: var(--font-body);
+  font-weight: 700;
   font-size: 12px;
-  color: var(--ink-soft);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(34, 48, 31, 0.45);
 }
 
+/*
+ * The slider: a 12px well cut into the cream block, filled yellow to the left
+ * of the thumb, and an orange block for the thumb. The fill is a gradient stop
+ * driven by `--fill`, which the component sets from the guess — the value is
+ * data, and the only thing here that is.
+ *
+ * The thumb never rotates. It is a block, and blocks are square to the screen;
+ * the counters are the one thing on the table allowed to tilt.
+ */
 .slider {
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
-  height: 28px;
+  height: 32px;
+  margin: 16px 0 0;
   background: transparent;
-  margin: 0;
-}
-
-.slider:focus-visible {
-  outline: var(--stroke) solid var(--signal);
-  outline-offset: 4px;
-  border-radius: var(--radius-button);
+  display: block;
 }
 
 .slider::-webkit-slider-runnable-track {
-  height: 14px;
-  background: var(--card);
-  border: var(--stroke) solid var(--ink);
-  border-radius: var(--radius-button);
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(
+    to right,
+    var(--yellow) 0 var(--fill),
+    rgba(34, 48, 31, 0.14) var(--fill) 100%
+  );
+  box-shadow: inset 0 2px 3px rgba(34, 48, 31, 0.32);
 }
 
 .slider::-moz-range-track {
-  height: 14px;
-  background: var(--card);
-  border: var(--stroke) solid var(--ink);
-  border-radius: var(--radius-button);
+  height: 12px;
+  border-radius: 6px;
+  background: rgba(34, 48, 31, 0.14);
+  box-shadow: inset 0 2px 3px rgba(34, 48, 31, 0.32);
+}
+
+.slider::-moz-range-progress {
+  height: 12px;
+  border-radius: 6px;
+  background: var(--yellow);
 }
 
 .slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 28px;
-  height: 28px;
-  margin-top: -9px;
-  background: var(--signal);
-  border: var(--stroke) solid var(--ink);
-  border-radius: var(--radius-button);
-  box-shadow: var(--drop);
+  width: 32px;
+  height: 32px;
+  /* Centres a 32px thumb on a 12px track. */
+  margin-top: -10px;
+  border: 0;
+  border-radius: var(--r-well);
+  background: var(--orange);
+  box-shadow: 0 5px 0 var(--orange-face);
 }
 
 .slider::-moz-range-thumb {
-  width: 28px;
-  height: 28px;
-  background: var(--signal);
-  border: var(--stroke) solid var(--ink);
-  border-radius: var(--radius-button);
-  box-shadow: var(--drop);
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: var(--r-well);
+  background: var(--orange);
+  box-shadow: 0 5px 0 var(--orange-face);
+}
+
+.slider:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 2px;
+  border-radius: var(--r-well);
 }
 
 .slider__ticks {
   display: flex;
   justify-content: space-between;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--ink-soft);
-  margin-top: calc(var(--s1) * -1);
+  margin-top: 11px;
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: rgba(34, 48, 31, 0.4);
+}
+
+.guess__lock {
+  margin-top: 14px;
+  padding: 18px;
+  font-size: 24px;
+  border-radius: 11px;
+}
+
+.guess__change {
+  align-self: center;
+  margin-top: 14px;
 }
 
 /* ── The crowd ──────────────────────────────────────────────────────────── */
 
-/* Fills whatever the slide gives it; the field inside is measured from this. */
+/*
+ * The pack bleeds past the page's own padding on both sides, which is what
+ * stops a hundred counters tipped onto a table from reading as a diagram
+ * centred in a box.
+ */
+.stage {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  flex: 1;
+  min-height: 0;
+  margin: 16px -20px 0;
+}
+
 .crowd {
   position: relative;
   flex: 1;
@@ -531,26 +811,24 @@ button {
   touch-action: none;
 }
 
-/* The field is the whole box; the crowd is centered inside it by the component,
-   so that resizing the box moves the dots rather than teleporting them. */
+/* The field is the whole box; the crowd is centred inside it by the component,
+   so resizing the box moves the counters rather than teleporting them. */
 .crowd__field {
   position: absolute;
   inset: 0;
 }
 
 /*
- * Two layers per dot on purpose. The slot carries the journey from scatter to
- * camp (transform), the dot inside carries the idle bob (also transform) — one
- * element cannot animate transform two ways at once.
+ * Two layers per counter. The slot carries the journey from scatter to camp,
+ * and the piece inside carries its tilt — one element cannot hold two
+ * transforms at once.
  *
- * Size travels with position, on the same clock and the same curve. The crowd
- * resizes whenever the box does — picking an answer trades the tall question
- * screen for the shorter guess screen — and a dot that slides to its new place
+ * Size travels with position, on the same clock and the same curve: the crowd
+ * resizes whenever its box does, and a counter that slides to its new place
  * but snaps to its new size breaks the illusion that the crowd is one thing.
- * Moved together, the hundred dots read as a single group being scaled.
  */
 .dot-slot {
-  --travel: 600ms cubic-bezier(0.22, 1.18, 0.36, 1);
+  --travel: 600ms var(--spring);
   position: absolute;
   top: 0;
   left: 0;
@@ -558,89 +836,84 @@ button {
   will-change: transform;
 }
 
-.dot {
+/*
+ * A counter: a plastic piece tipped onto the felt. The inset is the light
+ * catching its rim; the soft shadow underneath is what lifts it off the table.
+ * No border — nothing in this design has one.
+ *
+ * The idle bob the old dots had is gone with them. A drawn dot could breathe;
+ * a moulded counter lying on a table cannot, and the reveal is the only moment
+ * this crowd is allowed.
+ */
+.counter {
   display: block;
   width: 100%;
   height: 100%;
   border-radius: 50%;
-  border: var(--stroke) solid var(--ink);
-  background: var(--ink-quiet);
+  background: var(--counter);
+  box-shadow: var(--counter-lift);
+  /* The tilt rides on the piece, never on the slot: the slot is carrying the
+     travel, and `rotate` is applied before `transform` about the same origin,
+     so a tilted slot would swing its whole journey around the field's corner. */
+  rotate: var(--tilt, 0deg);
   transition: background-color 300ms linear;
-  animation-name: bob;
-  animation-timing-function: ease-in-out;
-  animation-iteration-count: infinite;
 }
 
-/* A small, unsynchronised float. Amplitude stays under a dot's radius. */
-@keyframes bob {
-  0%,
-  100% {
-    transform: translateY(-6%);
-  }
-  50% {
-    transform: translateY(6%);
-  }
+/* Your camp. Cream is everybody else, on every screen. */
+.counter--mine {
+  background: var(--counter-mine);
+}
+
+/* Not a camp yet — a guess. Yellow says "these are the ones you think are with
+   you", and it is the same yellow as the fill under the slider's thumb. */
+.counter--guess {
+  background: var(--yellow);
 }
 
 /*
- * Your dot. Three-pixel ring, and a knockout in the card colour so it reads as
- * standing slightly out of the pack rather than as one more dot in it. The
- * knockout is a zero-blur ring, not a soft shadow.
+ * You. A white collar and the top of the pile, which is the same standing your
+ * counter has had since the crowd was drawn as dots.
  */
-.dot--mine {
-  border-width: 3px;
-  box-shadow: 0 0 0 2px var(--card);
+.counter--you {
+  box-shadow: var(--counter-lift), 0 0 0 3px #ffffff;
 }
 
-.dot-slot:has(.dot--mine) {
+.dot-slot:has(.counter--you) {
   z-index: 2;
 }
 
-.dot--signal {
-  background: var(--signal);
-}
-
-.dot--rare {
-  background: var(--rare);
-}
-
-.dot--hit {
-  background: var(--hit);
-}
-
-/* Eyes scale with the dot, so they stay right at any crowd size. */
-.dot__eye {
+/* Eyes scale with the piece, so they stay right at any crowd size. */
+.counter__eye {
   position: absolute;
-  width: 14%;
-  height: 14%;
+  width: 13%;
+  height: 13%;
   border-radius: 50%;
-  background: var(--ink);
-  top: 24%;
+  background: var(--counter-eye);
+  top: 32%;
 }
 
-.dot__eye--left {
-  left: 20%;
+.counter__eye--left {
+  left: 24%;
 }
 
-.dot__eye--right {
-  right: 20%;
+.counter__eye--right {
+  right: 24%;
 }
 
 /*
- * Your dot lands last and pops. This rides on the slot using the `scale`
- * property, which composes with the slot's `transform` travel and with the
- * dot's own bob instead of replacing either.
+ * Your counter lands last and settles. This rides on the slot using `scale`,
+ * which composes with the slot's travel rather than replacing it.
  */
 .dot-slot.is-landed {
-  animation: pop 260ms cubic-bezier(0.22, 1.4, 0.36, 1) 750ms both;
+  animation: land 260ms var(--spring) 750ms both;
 }
 
-@keyframes pop {
+@keyframes land {
   0% {
     scale: 1;
   }
   45% {
-    scale: 1.28;
+    scale: 1.22;
   }
   100% {
     scale: 1;
@@ -648,92 +921,142 @@ button {
 }
 
 /*
- * A cameo: one of the hundred, drawn as a player's blob.
+ * A cameo: one of the hundred, drawn as a player's own counter.
  *
- * The slot is the 2x2 block the layout gave it and the blob fills that slot, so
- * the travel out of the scatter grows the drawing on the same clock as
- * everything else — width and height are already transitioned above, and the
- * viewBox does the rest. Nothing about the size is set here, because the layout
- * is the only thing that knows how big a cell is.
- *
- * Above the pack so a neighbouring dot cannot sit on an accessory, below your
- * own dot, which outranks everything on this screen.
+ * Above the pack so a neighbour cannot sit on an accessory, below your own,
+ * which outranks everything on this screen.
  */
 .dot-slot--cameo {
   z-index: 1;
   cursor: pointer;
-  /* A tap here asks a question; it should not also be a candidate for a
-     double-tap zoom on the way. */
   touch-action: manipulation;
 }
 
 .dot-slot--cameo > .blob {
   width: 100%;
   height: 100%;
+  rotate: var(--tilt, 0deg);
   transition: translate 100ms ease-out;
 }
 
-/* The one being asked about lifts, the same two pixels every pressable thing in
-   the app lifts by. No colour: the crowd's colours mean sides. */
+/* The one being asked about lifts, the same two pixels a block lifts by. No
+   colour: the crowd's colours mean sides. */
 .dot-slot--cameo.is-asked > .blob {
-  translate: -2px -2px;
+  translate: 0 -2px;
+}
+
+/*
+ * The strip: your camp alone, in a fixed band under the header on the two
+ * slides that have already spent the crowd. The pieces overlap and are sized
+ * off how many there are, so a camp of ninety fits the same band as a camp of
+ * nine without measuring anything.
+ */
+.strip {
+  --counter-size: 30px;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  /* A ceiling rather than a height: a camp of ninety needs every row of the
+     band and a camp of nine should not be followed by 60px of empty felt. */
+  max-height: 86px;
+  margin: 16px 0 0;
+  overflow: hidden;
+  flex: none;
+}
+
+.strip--some {
+  --counter-size: 24px;
+}
+
+.strip--many {
+  --counter-size: 16px;
+}
+
+.strip__piece {
+  position: relative;
+  flex: none;
+  width: var(--counter-size);
+  height: var(--counter-size);
+  /* Tipped out of a cup, not laid out in a grid. */
+  margin: 0 calc(var(--counter-size) / -9) calc(var(--counter-size) / -9) 0;
 }
 
 .crowd__caption {
-  margin: var(--s2) 0 0;
-  font-family: var(--font-mono);
+  margin: 10px 0 0;
+  font-weight: 500;
   font-size: 12px;
-  color: var(--ink-soft);
-  text-align: center;
+  color: var(--ink-body-cream);
+}
+
+/* ── The verdict ────────────────────────────────────────────────────────── */
+
+.verdict {
+  padding: 16px 18px;
+  margin-top: 14px;
+  flex: none;
+}
+
+.verdict__line {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--s2);
+}
+
+.verdict__count {
+  font-family: var(--font-display);
+  font-size: 52px;
+  line-height: 0.9;
+  color: var(--orange);
+  font-variant-numeric: tabular-nums;
+}
+
+.verdict__unit {
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-soft-cream);
 }
 
 /*
- * The first-run notice about your own blob appearing in other people's crowds.
- *
- * It sits under the caption on the crowd slide, once ever. Bordered rather than
- * accented — the reveal already spends both of the accents it is allowed, and
- * this is not a verdict, it is a thing being said. One control, in the corner,
- * because it is a notice and not a question; the switch it points at lives in
- * Your record.
+ * The first-run notice about your own counter turning up in other people's
+ * crowds. A cream block, because it is a thing being said rather than a verdict
+ * being handed down — and one control, the same X that closes anything.
  */
 .blob-notice {
   position: relative;
-  margin-top: var(--s2);
-  padding: var(--s2);
-  /* Room for the X, so a third line of copy runs under it rather than into it. */
-  padding-right: calc(var(--s3) + 20px);
-  border: var(--stroke) solid var(--ink);
-  border-radius: var(--radius-card);
-  background: var(--card);
+  margin-top: 12px;
+  padding: 12px 14px;
+  /* Room for the X, so a third line runs under it rather than into it. */
+  padding-right: 44px;
+  flex: none;
 }
 
-/*
- * Every line here is a line the crowd above gave up, on the one reveal a player
- * is least able to afford it — their first. Hence the size, the tight leading,
- * and copy that says the whole thing in two sentences.
- */
 .blob-notice__copy {
   margin: 0;
-  font-size: 13px;
-  line-height: 1.35;
+  font-weight: 500;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ink-body-cream);
 }
 
 .blob-notice__close {
   position: absolute;
-  top: var(--s1);
-  right: var(--s1);
+  top: 6px;
+  right: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
-  /* Bigger than the glyph: a 16px X is not a target, and this one sits on a
-     phone in the corner of a small box. */
+  /* Bigger than the glyph: a 16px X is not a target. */
   width: 32px;
   height: 32px;
   padding: 0;
   border: 0;
-  border-radius: var(--radius-button);
+  border-radius: var(--r-well);
   background: none;
-  color: var(--ink-soft);
+  color: var(--ink-soft-cream);
   cursor: pointer;
   transition: color 100ms ease-out;
 }
@@ -750,170 +1073,219 @@ button {
 }
 
 .blob-notice__close:focus-visible {
-  outline: var(--stroke) solid var(--signal);
+  outline: 3px solid var(--ink);
   outline-offset: -2px;
 }
 
-/* ── Reveal ─────────────────────────────────────────────────────────────── */
+/* ── The reveal ─────────────────────────────────────────────────────────── */
 
 /*
- * The reveal is three slides, each fitting its screen: the crowd, the score,
- * the share. One slide is mounted at a time; the nav row underneath carries
- * back/next and the three indicator dots.
+ * Three slides, each fitting its screen: the crowd, the score, the share. One
+ * is mounted at a time and the nav underneath keeps its size, so the three are
+ * interchangeable without a pixel of movement.
  */
 .reveal {
   display: flex;
   flex-direction: column;
-  gap: var(--s2);
   flex: 1;
   min-height: 0;
 }
 
 /*
- * Every slide is the same box: it takes the space the card gives it and
- * distributes its own contents down that height. The nav underneath is the
- * only thing that keeps a fixed size, so the three slides are interchangeable
- * without a single pixel of movement.
+ * Every slide is the same box, and so is every menu page.
  *
- * The menu's pages are the same box for the same reason, so they share it.
+ * The padding and the equal negative margin are not decoration: this is a
+ * scroll container, a scroll container clips on both axes, and a block's drop
+ * shadow reaches well past its own box. The padding gives that shadow
+ * somewhere to be and the margin hands the space straight back.
  */
 .slide,
 .menu__body {
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  gap: var(--s3);
   flex: 1;
   min-height: 0;
-  /* Safety valve. Normally nothing here needs it. */
   overflow-y: auto;
-  /*
-   * A scroll container clips on both axes, and a button that lifts on hover
-   * puts its raised shadow outside its resting box — which is how the tabs and
-   * the compose buttons came to lose an edge against this boundary. The padding
-   * gives that shadow somewhere to be, and the equal negative margin hands the
-   * space straight back, so every slide's contents sit exactly where they did.
-   */
-  padding: var(--s1);
-  margin: calc(var(--s1) * -1);
+  overflow-x: hidden;
+  padding: 4px 10px 30px;
+  margin: -4px -10px -30px;
 }
 
 /*
- * The crowd's home on both the guess screen and the reveal.
- *
- * `align-items: stretch` matters: the crowd measures its own box to size the
- * dots, so if this centred instead, the box would collapse to the height of an
- * unmeasured field and the crowd would never resolve a size at all.
+ * The score slide's two halves. On a phone they are simply one column after
+ * the other; on a desktop they are the two sides of a grid, which is the only
+ * screen in the app whose parts move at all.
  */
-.stage {
+.score__left,
+.score__right {
   display: flex;
-  align-items: stretch;
-  justify-content: center;
-  flex: 1;
+  flex-direction: column;
   min-height: 0;
 }
 
-.verdict {
-  margin: 0;
-  font-size: 18px;
-  line-height: 1.35;
-  text-align: center;
-}
-
-.verdict strong {
-  font-weight: 600;
+.score__right {
+  flex: 1;
 }
 
 .figures {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: var(--s2);
+  gap: 9px;
+  margin-top: 16px;
+  flex: none;
 }
 
 /*
- * Four figures, in pairs. Three is the shape everywhere else — the reveal's
- * you-said/it-was/off-by is a sentence and has to stay on one line — but a
- * fourth tile dropped into a three-up grid sits alone on a second row looking
- * like a mistake. Two by two is a block.
+ * Four figures, in pairs. Three is the shape on the reveal, where you
+ * said / it was / off by is a sentence and has to stay on one line; a fourth
+ * tile dropped into a three-up grid sits alone on a second row looking like a
+ * mistake. Two by two is a block.
  */
 .figures--pairs {
   grid-template-columns: repeat(2, 1fr);
+  gap: 11px;
 }
 
+/* Numbers you have earned, so: wells. Every one of them. */
 .figure {
-  border: var(--stroke) solid var(--ink);
-  border-radius: var(--radius-button);
-  padding: var(--s2);
-  background: var(--card);
+  padding: 9px 11px;
+  border-radius: 9px;
 }
 
-.figure__label {
-  display: block;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--ink-soft);
+.figures--pairs .figure {
+  padding: 12px 14px;
 }
 
 .figure__value {
   display: block;
+  margin-top: 3px;
   font-family: var(--font-display);
-  font-weight: 500;
-  font-size: 32px;
-  line-height: 1.1;
+  font-size: 30px;
+  line-height: 1;
+  color: var(--ink-on-felt);
   font-variant-numeric: tabular-nums;
 }
 
-/* The unit rides along with the number without competing with it. */
-.figure__unit {
-  font-size: 0.6em;
-  color: var(--ink-soft);
-  margin-left: 1px;
+.figures--pairs .figure__value {
+  font-size: 32px;
+}
+
+.figure__value--orange {
+  color: var(--orange);
+}
+
+.figure__value--yellow {
+  color: var(--yellow);
 }
 
 /* ── The award ──────────────────────────────────────────────────────────── */
 
 /*
- * What the vote paid, on the score slide.
+ * What the vote paid, and the badge under it. Both are being handed to you, so
+ * both are blocks — the one place on the score slide where anything stands
+ * proud of the table.
  *
- * No accent: the badge stamp and the histogram beneath it already spend both of
- * the two the screen is allowed. It earns its place with the band word and the
- * count-up instead of with colour.
+ * The award slides in from the left and the badge lands on it a beat later.
+ * A block does not stamp; it arrives and stops.
  */
 .award {
-  border: var(--stroke) solid var(--ink);
-  border-radius: var(--radius-button);
-  padding: var(--s2) var(--s3);
-  background: var(--card);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 17px;
+  margin-top: 16px;
+  flex: none;
 }
 
 .award__head {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--s2);
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 
 .award__band {
   font-family: var(--font-display);
   font-size: 22px;
+  line-height: 1.15;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.award__breakdown {
   font-weight: 500;
-  letter-spacing: -0.01em;
+  font-size: 11px;
+  color: rgba(34, 48, 31, 0.65);
 }
 
 .award__total {
   font-family: var(--font-display);
-  font-size: 28px;
-  font-weight: 500;
+  font-size: 34px;
   line-height: 1;
+  color: var(--ink);
   /* Tabular, or every frame of the count-up shifts the band word beside it. */
   font-variant-numeric: tabular-nums;
 }
 
-.award__breakdown {
-  margin: 2px 0 0;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--ink-soft);
+.award.is-arriving {
+  animation: slide-in 260ms var(--spring) both;
+}
+
+@keyframes slide-in {
+  from {
+    transform: translateX(-24px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.badge {
+  padding: 13px 17px;
+  margin-top: 14px;
+  flex: none;
+}
+
+.badge__title {
+  display: block;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 21px;
+  line-height: 1.15;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--cream);
+}
+
+.badge__line {
+  display: block;
+  margin: 3px 0 0;
+  font-weight: 500;
+  font-size: 11.5px;
+  color: rgba(255, 246, 231, 0.85);
+}
+
+/* One thud, not a bounce sequence: it falls the last few pixels and stops. */
+.badge.is-landing {
+  animation: land-block 200ms var(--spring) 120ms both;
+}
+
+@keyframes land-block {
+  from {
+    transform: translateY(-14px);
+    opacity: 0;
+  }
+  60% {
+    transform: translateY(2px);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(0);
+  }
 }
 
 /* ── Slide navigation ───────────────────────────────────────────────────── */
@@ -923,50 +1295,47 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: var(--s2);
-  margin-top: var(--s1);
+  margin-top: 14px;
+  flex: none;
 }
 
-/* Fixed-width steps keep the indicator dots centered on every slide. */
+/* Fixed-width steps keep the bars centred on every slide. */
 .slides__step {
   width: 88px;
-  padding: var(--s2) var(--s3);
+  padding: 11px;
 }
 
-.slides__dots {
+.slides__bars {
   display: flex;
-  gap: var(--s2);
+  gap: 7px;
 }
 
-.slides__dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  border: var(--stroke) solid var(--ink);
-  background: var(--card);
+.slides__bar {
+  width: 22px;
+  height: 7px;
+  border-radius: 3px;
+  background: rgba(8, 42, 25, 0.3);
+  transition: background-color 140ms linear;
 }
 
-.slides__dot.is-active {
-  background: var(--ink);
+.slides__bar.is-active {
+  background: var(--cream);
 }
 
-/* ── Detail strip ───────────────────────────────────────────────────────── */
+/* ── The histogram ──────────────────────────────────────────────────────── */
 
-/*
- * The score slide's histogram, and the player leaderboard's two tabs, which
- * borrow this idiom rather than inventing a second one. The strip used to hold
- * either the histogram or the misjudged board behind a pair of tabs; the board
- * came off this screen with the room that shared it, so `.detail__tab` is now
- * `PlayerBoard`'s alone — it is not dead, and deleting it takes the week/all-time
- * tabs with it.
- */
-
-/* Takes the slack on the score slide so the bars grow with the screen. */
+/* Where everyone guessed: a chart of what has already happened, so it is cut
+   into the felt rather than sitting on it. */
 .detail {
   display: flex;
   flex-direction: column;
-  gap: var(--s2);
   flex: 1;
   min-height: 0;
+  margin-top: 14px;
+  padding: 12px 13px 10px;
+  /* Bars grow from the floor of the well and a squeezed well would let them
+     grow straight out of the top of it. Nothing paints outside a hole. */
+  overflow: hidden;
 }
 
 .histogram__wrap {
@@ -975,756 +1344,779 @@ button {
   justify-content: flex-end;
   flex: 1;
   min-height: 0;
+  margin-top: 11px;
 }
-
-.detail__tabs {
-  display: flex;
-  gap: var(--s2);
-}
-
-.detail__tab {
-  border: var(--stroke) solid var(--ink);
-  border-radius: var(--radius-button);
-  background: var(--card);
-  color: var(--ink-soft);
-  font-family: var(--font-mono);
-  font-size: 12px;
-  padding: 2px var(--s2);
-  transition: box-shadow 100ms ease-out, transform 100ms ease-out;
-}
-
-.detail__tab.is-active {
-  background: var(--ink);
-  color: var(--card);
-}
-
-.detail__tab:focus-visible {
-  outline: var(--stroke) solid var(--signal);
-  outline-offset: 2px;
-}
-
-.badge {
-  align-self: center;
-  border: var(--stroke) solid var(--ink);
-  border-radius: var(--radius-card);
-  box-shadow: var(--drop);
-  padding: var(--s2) var(--s3);
-  background: var(--card);
-  text-align: center;
-}
-
-.badge--signal {
-  background: var(--signal);
-  color: #ffffff;
-}
-
-.badge--rare {
-  background: var(--rare);
-  color: #15181d;
-}
-
-.badge--hit {
-  background: var(--hit);
-  color: #ffffff;
-}
-
-.badge__title {
-  font-family: var(--font-display);
-  font-weight: 500;
-  font-size: 22px;
-  line-height: 1.2;
-  margin: 0;
-}
-
-.badge__line {
-  margin: var(--s1) 0 0;
-  font-size: 14px;
-}
-
-/*
- * The stamp fires when the score slide mounts. It used to wait 900ms for the
- * crowd to land; on its own slide it only needs a beat.
- */
-.badge.is-stamping {
-  animation: stamp 240ms cubic-bezier(0.3, 1.3, 0.4, 1) 120ms both;
-}
-
-@keyframes stamp {
-  0% {
-    scale: 1.35;
-    opacity: 0;
-  }
-  100% {
-    scale: 1;
-    opacity: 1;
-  }
-}
-
-/* ── Histogram ──────────────────────────────────────────────────────────── */
 
 .histogram {
   display: flex;
   align-items: flex-end;
-  gap: var(--s1);
+  gap: 5px;
   flex: 1;
   min-height: 44px;
   /* Tall bars on a big screen read as a poster, not a chart. */
   max-height: 180px;
 }
 
+/* The bars have a bottom face of their own, which is what keeps them plastic
+   rather than painted — but they are inside a well, so it is an inset. */
 .histogram__bar {
   flex: 1;
-  border: var(--stroke) solid var(--ink);
-  border-radius: 4px 4px 0 0;
-  background: var(--ink-quiet);
+  border-radius: 3px;
+  background: rgba(255, 246, 231, 0.5);
+  box-shadow: inset 0 -3px 0 rgba(8, 42, 25, 0.22);
   min-height: 4px;
+  transform-origin: bottom;
+  animation: grow 260ms var(--spring) both;
 }
 
 .histogram__bar--yours {
-  background: var(--signal);
+  background: var(--yellow);
+  box-shadow: inset 0 -4px 0 var(--yellow-face);
 }
 
-.histogram__bar--yours.is-accent-rare {
-  background: var(--rare);
-}
-
-.histogram__bar--yours.is-accent-hit {
-  background: var(--hit);
+@keyframes grow {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
 }
 
 .histogram__axis {
   display: flex;
   justify-content: space-between;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--ink-soft);
-  margin-top: var(--s1);
+  margin-top: 7px;
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  color: rgba(255, 246, 231, 0.45);
 }
 
-/* ── Comment ────────────────────────────────────────────────────────────── */
+/* ── The share slide ────────────────────────────────────────────────────── */
 
 /*
- * Comment at the top, actions pinned to the bottom. The preview keeps its
- * natural height — stretching it to fill would just draw a big empty box.
+ * Comment at the top, actions pinned to the bottom. Both fields are wells cut
+ * into the cream block: they take text, and only a well cut into a block does.
  */
 .compose {
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  gap: var(--s3);
   flex: 1;
   min-height: 0;
 }
 
-/*
- * Takes the slack, so that when the note field grows the preview above it gives
- * up the room rather than the actions below it being pushed off the card.
- */
-.compose__body {
+.compose__card {
+  padding: 16px 18px;
+  margin-top: 18px;
+  border-radius: 11px;
   display: flex;
   flex-direction: column;
-  gap: var(--s2);
-  flex: 1;
   min-height: 0;
-}
-
-.compose__actions {
-  display: flex;
-  flex-direction: column;
-  gap: var(--s2);
 }
 
 .compose__preview {
-  font-family: var(--font-mono);
-  font-size: 12px;
+  margin: 9px 0 0;
+  padding: 12px 13px;
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 12.5px;
   line-height: 1.6;
+  color: rgba(34, 48, 31, 0.8);
   /* Keeps the comment's own line breaks, wraps everything else — including a
-     link or a run-on word long enough to push the card sideways. */
+     link long enough to push the block sideways. */
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  border: var(--stroke) solid var(--ink);
-  border-radius: var(--radius-button);
-  padding: var(--s2);
-  background: var(--paper);
-  margin: 0;
   min-height: 0;
-  /* Shrinks to make room for the note field, and never grows past its text. */
+  /* Shrinks to make room for the note field, never grows past its text. */
   flex: 0 1 auto;
-  /* Only the preview scrolls, and only when the comment genuinely outgrows it. */
   overflow-y: auto;
 }
 
-/*
- * The note field grows with what is typed into it — Compose sets its height
- * from the content on every keystroke — so the text never scrolls out of sight
- * inside a two-line box. It starts at two lines and stretches from there.
- */
-.compose__note {
-  width: 100%;
-  font: inherit;
-  font-size: 16px;
-  line-height: 1.5;
-  color: inherit;
-  background: var(--card);
-  border: var(--stroke) solid var(--ink);
-  border-radius: var(--radius-button);
-  padding: var(--s2);
-  resize: none;
-  overflow-wrap: anywhere;
-  overflow-y: hidden;
-  min-height: calc(3em + var(--s2) * 2 + var(--stroke) * 2);
-  flex: none;
-}
-
-.compose__note:focus-visible {
-  outline: var(--stroke) solid var(--signal);
-  outline-offset: 2px;
-}
-
-.compose__hint {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--ink-soft);
-  margin: 0;
-}
-
-/* ── Leaderboard ────────────────────────────────────────────────────────── */
-
-.board {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: var(--s2);
-  flex: 1;
-  min-height: 0;
-}
-
-.board__row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--s2);
-}
-
-/*
- * Player rows are three columns rather than two, and the middle one takes the
- * slack: rank and points are as wide as their digits and no wider, so the
- * numbers line up down the board however long the names between them are.
- *
- * No rank is accented, including the first. Position already says who is
- * winning, and the screen's two accents are spent elsewhere.
- */
-.board__row--player {
-  display: grid;
-  grid-template-columns: 1.75em 1fr auto;
-  align-items: baseline;
-}
-
-.board__rank,
-.board__points {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--ink-soft);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.board__points {
+/* What the thread will see in bold, drawn bold. */
+.compose__preview strong {
+  font-weight: 700;
   color: var(--ink);
 }
 
-.board__name {
-  font-size: 13px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.compose__label {
+  margin-top: 14px;
 }
 
 /*
- * The viewer's own row, pinned under the list. Separated by a rule rather than
- * a fill, because it is the same kind of row as the ones above it — it is just
- * not part of the ranking they form.
+ * The note field grows with what is typed into it — `Compose` sets its height
+ * from the content on every keystroke — so the text never scrolls out of sight
+ * inside a two-line box.
  */
-.board__you {
-  border-top: var(--stroke) solid var(--ink);
-  padding-top: var(--s2);
-  margin-top: var(--s2);
+.compose__note {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 12px 13px;
+  border: 0;
+  font-family: var(--font-body);
+  font-weight: 400;
+  /* 16px is not styling: it is what stops iOS zooming the page on focus. */
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--ink);
+  resize: none;
+  overflow-wrap: anywhere;
+  overflow-y: hidden;
+  min-height: 46px;
   flex: none;
 }
 
-.board__you .board__name {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--ink-soft);
+.compose__note::placeholder {
+  color: rgba(34, 48, 31, 0.35);
 }
 
-.section__title {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--ink-soft);
-  margin: 0 0 var(--s2);
+.compose__note:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 2px;
 }
 
-/* ── Main menu ──────────────────────────────────────────────────────────── */
+.compose__foot {
+  margin-top: 8px;
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  color: rgba(34, 48, 31, 0.4);
+}
+
+.compose__post {
+  margin-top: 16px;
+  padding: 17px;
+  font-size: 23px;
+  border-radius: 11px;
+  flex: none;
+}
+
+/* ── The menu ───────────────────────────────────────────────────────────── */
 
 /*
- * The menu is a screen rather than a sheet over one: same shell, same header,
- * same card, so arriving from the comment slide changes the contents of the card
- * and nothing else. `.menu__body` shares the slide box defined above; only what
- * goes inside it is new here.
- *
- * The root is one wrapper so the body's space-between has nothing to spread and
- * the list sits directly under the wordmark. A panel hands the body three
- * children — heading, substance, footnote — and lets them distribute.
+ * The menu is a screen and not a sheet over one: the same felt, the same
+ * header, so arriving from the share slide changes what is on the table and
+ * nothing else.
  */
 .menu__root,
 .menu__panel {
   display: flex;
   flex-direction: column;
-  gap: var(--s3);
+  flex: 1;
+  min-height: 0;
 }
 
-.menu__wordmark {
-  font-family: var(--font-display);
-  font-weight: 500;
-  font-size: 34px;
-  line-height: 1;
-  letter-spacing: -0.02em;
-  margin: 0;
-}
-
-.menu__tagline {
-  margin: var(--s2) 0 0;
-  font-size: 14px;
-  color: var(--ink-soft);
-}
-
-/*
- * The title's row. A room with one number worth carrying at all times puts it
- * here — the title is a short phrase and the rest of that line was going spare,
- * where a row of its own costs the card 44px it does not have.
- */
-.menu__title {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--s2);
-}
-
-.menu__aside {
-  display: flex;
-  align-items: baseline;
-  gap: var(--s1);
-  margin: 0;
+.menu__hero {
+  padding: 22px;
+  margin-top: 18px;
+  border-radius: var(--r-hero);
   flex: none;
 }
 
-.menu__aside-label {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--ink-soft);
-}
-
-.menu__aside-value {
-  font-family: var(--font-display);
-  font-weight: 500;
-  font-size: 22px;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-}
-
-.menu__heading {
-  font-size: 22px;
-  line-height: 1.3;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+.menu__wordmark {
   margin: 0;
+  font-family: var(--font-display);
+  font-size: 58px;
+  line-height: 0.94;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+/* The only thing in the app that says what the game is. */
+.menu__tagline {
+  margin: 12px 0 0;
+  font-weight: 400;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink-body-cream);
+}
+
+/*
+ * The one control on this screen that leaves the post. It is the orange block
+ * at the top of the list because it is the thing to do next, and everything
+ * under it opens in place.
+ */
+.menu__daily {
+  margin-top: 20px;
+  padding: 19px;
+  font-size: 25px;
+  border-radius: 11px;
+  flex: none;
+}
+
+/* The one state where there is nothing to press: no button, because a disabled
+   one invites a press and there is nothing to do until midnight. */
+.menu__daily-note {
+  margin-top: 20px;
 }
 
 .menu__list {
+  list-style: none;
+  margin: 22px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: none;
+}
+
+/* A row, not a label with a target beside it: the whole width is the block. */
+.menu__item {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 13px 15px;
+  border-radius: 9px;
+  text-align: left;
+}
+
+.menu__item-label {
+  font-family: var(--font-display);
+  font-size: 19px;
+  line-height: 1.2;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.menu__item-blurb {
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 11px;
+  line-height: 1.4;
+  letter-spacing: normal;
+  text-transform: none;
+  color: rgba(34, 48, 31, 0.55);
+}
+
+/* Pinned to the bottom of the table on every page that has one. */
+.menu__back {
+  margin-top: 22px;
+  flex: none;
+}
+
+.menu__back--pinned {
+  margin-top: auto;
+}
+
+/* ── Your record ────────────────────────────────────────────────────────── */
+
+/*
+ * Your counter and the one decision attached to it, side by side. The counter
+ * keeps its size and the setting takes the rest of the row: this room is a
+ * page of totals, and the setting should read as a footnote to the drawing
+ * rather than as a control the page is built around.
+ */
+.record__card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 18px;
+  margin-top: 18px;
+  border-radius: 11px;
+  flex: none;
+}
+
+/* The counter keeps its size; everything said about it takes the rest. */
+.record__side {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.record__title {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 22px;
+  line-height: 1.15;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.record__note {
+  display: block;
+  margin: 3px 0 0;
+  font-weight: 500;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--ink-body-cream);
+}
+
+.record__read {
+  padding: 16px 18px;
+  margin-top: 16px;
+  border-radius: 11px;
+  flex: none;
+}
+
+.record__line {
+  margin: 9px 0 0;
+  font-weight: 500;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: rgba(34, 48, 31, 0.8);
+}
+
+.record__line strong {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+/*
+ * The switch: a well cut into the cream block with a block for a knob. The
+ * knob keeps its bottom face the whole way across, so it reads as a piece
+ * sliding in a slot rather than as a light coming on — and the state is
+ * written out beside it, because colour is never the only channel.
+ */
+.switch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 11px;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.switch__track {
+  position: relative;
+  flex: none;
+  width: 48px;
+  height: 28px;
+  border-radius: 14px;
+  background: rgba(34, 48, 31, 0.12);
+  box-shadow: inset 0 2px 4px rgba(34, 48, 31, 0.28);
+}
+
+.switch__knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: var(--orange);
+  box-shadow: 0 3px 0 var(--orange-face);
+  transition: translate 140ms var(--spring);
+}
+
+.switch[aria-checked='true'] .switch__knob {
+  translate: 20px 0;
+}
+
+.switch__state {
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(34, 48, 31, 0.6);
+}
+
+.switch:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 3px;
+  border-radius: var(--r-well);
+}
+
+/* ── The leaderboard ────────────────────────────────────────────────────── */
+
+/*
+ * Two tabs, and selection is depth rather than colour: the one you are on is a
+ * yellow block, the other is pressed into the felt. That is the same rule the
+ * whole app runs on, and it is why neither tab needs a label saying which is
+ * which.
+ */
+.tabs {
+  display: flex;
+  gap: 10px;
+  margin-top: 18px;
+  flex: none;
+}
+
+.tab {
+  flex: 1;
+  padding: 12px;
+  border-radius: 9px;
+  font-size: 16px;
+}
+
+/*
+ * The tab you are not on. It keeps the block's geometry and loses its face:
+ * pressed into the felt, which is the only thing that distinguishes it. It
+ * cannot travel on a press because it has nowhere left to go — a well never
+ * moves, and this one is already at the bottom of its hole.
+ */
+.tab--off {
+  background: var(--well-button);
+  box-shadow: inset 0 3px 5px rgba(8, 42, 25, 0.5);
+  color: rgba(255, 246, 231, 0.8);
+}
+
+.button.block.tab--off:active:not(:disabled) {
+  transform: none;
+  box-shadow: inset 0 5px 8px rgba(8, 42, 25, 0.6);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .button.block.tab--off:hover:not(:disabled) {
+    transform: none;
+    box-shadow: inset 0 3px 5px rgba(8, 42, 25, 0.5);
+  }
+}
+
+/*
+ * One tall well with the rows cut into it, and your own row pinned to its
+ * floor. The list inside scrolls and the well does not — which is the whole
+ * reason your row is a sibling of the list rather than the last thing in it.
+ * On a wide table the same list reads across in two columns and stops
+ * scrolling altogether.
+ */
+.board {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  margin-top: 18px;
+  padding: 16px 16px 14px;
+  border-radius: 11px;
+  background: var(--well);
+  box-shadow: var(--well-inset);
+  overflow: hidden;
+}
+
+.board__rows {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--s2);
-}
-
-/* A row, not a label with a target next to it: the whole width is the button. */
-.menu__item {
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0;
-  padding: var(--s2) var(--s3);
-  text-align: left;
-}
-
-.menu__item-label {
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.menu__item-blurb {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  font-weight: 400;
-  color: var(--ink-soft);
-}
-
-/* Sits where the slide nav sits on the reveal, one step clear of the footnote. */
-.menu__back {
-  margin-top: var(--s3);
+  gap: 13px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 /*
- * The one control on this screen that leaves the post, so it sits above the
- * rule and clear of the list — everything below the rule opens in place.
+ * Rank, counter, name, points. The name takes the slack so the numbers line up
+ * down the board however long the names between them are.
  */
-.menu__daily {
-  margin-top: var(--s3);
-}
-
-.axis__line {
-  margin: 0;
-  font-size: 14px;
-}
-
-/*
- * Your blob and the one decision attached to it, side by side.
- *
- * The blob keeps its size and the setting takes the rest of the row, because
- * this room is a page of totals and the setting should read as a footnote to
- * the drawing rather than as a control the page is built around.
- */
-.record__blob {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--s3);
-}
-
-.show-blob {
-  display: flex;
-  flex-direction: column;
-  gap: var(--s1);
-  min-width: 0;
-}
-
-.show-blob__note {
-  margin: 0;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  line-height: 1.4;
-  color: var(--ink-soft);
-}
-
-/*
- * A switch, built the way everything else here is: 2px of ink around a solid
- * fill, and no gradient anywhere near it. The knob slides rather than fading, so
- * the state is legible from the shape at a glance and not only from the colour —
- * `--signal` means "you", which is exactly what this is about, and it is the
- * only accent on the screen.
- */
-.switch {
-  display: flex;
+.board__row {
+  display: grid;
+  grid-template-columns: 26px 28px 1fr auto;
   align-items: center;
-  gap: var(--s2);
-  padding: 0;
-  border: 0;
-  background: none;
+  gap: 11px;
+}
+
+.board__rank {
   font-family: var(--font-body);
-  font-size: 14px;
-  font-weight: 600;
-  text-align: left;
-  color: var(--ink);
-  cursor: pointer;
+  font-weight: 700;
+  font-size: 12px;
+  color: rgba(255, 246, 231, 0.5);
+  font-variant-numeric: tabular-nums;
 }
 
-.switch__track {
-  flex: none;
+.board__counter {
   position: relative;
-  width: 40px;
-  height: 24px;
-  border: var(--stroke) solid var(--ink);
-  border-radius: 999px;
-  background: var(--card);
-  transition: background-color 140ms ease-out;
-}
-
-.switch[aria-checked='true'] .switch__track {
-  background: var(--signal);
-}
-
-.switch__knob {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 16px;
-  height: 16px;
-  border: var(--stroke) solid var(--ink);
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
-  background: var(--card);
-  transition: translate 140ms cubic-bezier(0.22, 1.18, 0.36, 1);
+  background: var(--counter);
+  /* Inside a well, so no drop shadow: nothing casts a shadow into a hole. */
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.14);
 }
 
-.switch[aria-checked='true'] .switch__knob {
-  translate: 16px 0;
+.board__counter--cream {
+  background: var(--counter);
 }
 
-.switch:focus-visible {
-  outline: var(--stroke) solid var(--signal);
-  outline-offset: 3px;
-  border-radius: var(--radius-button);
+.board__counter--orange {
+  background: var(--counter-mine);
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.18);
 }
 
-/* ── Blobs and the wardrobe ─────────────────────────────────────────────── */
+.board__counter--yellow {
+  background: var(--yellow);
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.18);
+}
+
+.board__name {
+  font-weight: 500;
+  font-size: 14px;
+  color: var(--ink-on-felt);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.board__points {
+  font-family: var(--font-display);
+  font-size: 19px;
+  line-height: 1.1;
+  color: var(--ink-on-felt);
+  font-variant-numeric: tabular-nums;
+}
 
 /*
- * A blob is a dot with more shape, drawn as one SVG so the accessory and the
- * head scale together. Its box is `size` wide and half again as tall: the
- * accessory is inside the viewBox rather than painted outside the element, which
- * is what keeps it out of trouble with `.slide` and `.menu__body` above.
- *
- * `overflow: visible` covers the hairline case only. The circle's outer edge is
- * exactly the edge of the viewBox — that is what makes the element `size` across
- * including its ink, the same as `.dot` — so antialiasing has half a pixel of
- * nowhere to go at the extreme left and right.
+ * Your own row, pinned to the floor of the same well while the list above it
+ * swaps. Yellow, and the counter takes a yellow collar rather than the white
+ * one it wears in a crowd — white on cream in a dark well is a smudge.
  */
-.blob {
-  display: block;
+.board__you {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 2px solid rgba(255, 246, 231, 0.22);
   flex: none;
-  overflow: visible;
 }
 
-/*
- * The wardrobe used to take the slack under the heading and centre in it, back
- * when it held a blob and two steppers and had slack to take. With a balance
- * above and the gift box below, it is taller than the card on a phone — and a
- * flex child told to fill a box it no longer fits inside is squashed to that
- * box while its contents carry on past it, which is how the box button came to
- * sit on top of the footnote under it. So it hangs from the top like every
- * other panel and lets `.menu__body` scroll, which is what that container is
- * for.
- */
+.board__you .board__rank,
+.board__you .board__points {
+  color: var(--yellow);
+}
+
+.board__you .board__counter {
+  background: var(--counter-mine);
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.18), 0 0 0 3px var(--yellow);
+}
+
+.board__you .board__name {
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-soft-felt);
+}
+
+/* Rows cross-fade in place on a tab switch. The ranking is not the story when
+   the board itself changed, so nothing reorders. */
+.board__rows.is-swapping {
+  animation: fade 120ms linear both;
+}
+
+/* ── The wardrobe ───────────────────────────────────────────────────────── */
+
 /*
  * The one room built to a height budget.
  *
- * Everything in it is a control except the blob, and the last control is at the
- * bottom — so a wardrobe that scrolls is a wardrobe whose gift box nobody finds.
- * It has to fit the card at 512px, which is as short as Devvit's inline post
- * view gets (the short-viewport note further down says the same of the reveal).
- *
- * Three things pay for that: the balance sits on the title's line rather than a
- * row of its own, each layer is one row rather than a label above a stepper, and
- * the gift box is exactly two rows whatever state it is in. Below 560px the
- * gaps, the layers and the blob each give up a little more on top. Measured at
- * 320/360/430 wide by 512/560/640 tall, opened and closed — 58px to spare in
- * the tightest of them.
+ * Everything in it is a control except the counter, and the last control is at
+ * the bottom — so a wardrobe that scrolls is a wardrobe whose gift box nobody
+ * finds. It has to fit at 512px, which is as short as Devvit's inline post view
+ * gets. Three things pay for that: the balance sits in the header pill rather
+ * than on a row of its own, each layer is one row, and the gift box is exactly
+ * two rows whatever state it is in.
  */
 .wardrobe {
   display: flex;
   flex-direction: column;
-  gap: var(--s3);
+  flex: 1;
+  min-height: 0;
 }
 
-/* The blob being made, and the only thing on this screen that is not a control. */
+/* The counter being made, and the only thing here that is not a control. */
 .wardrobe__preview {
   display: flex;
   justify-content: center;
+  margin-top: 24px;
+  flex: none;
 }
 
 /*
- * One layer of the blob. Two of these, stacked in the order they draw in — the
- * face above the accessory — so the screen is laid out the way the picture is.
- *
- * Flat, like `.figure` and unlike `.button`. The arrows inside it are what press;
- * a drop shadow on the box around them would offer a target that is not there.
+ * The counter is the one thing in this design allowed to rotate, and this is
+ * the only place it does anything with the permission: a short tip as the item
+ * swaps, so the new piece reads as physically re-seated rather than as a
+ * picture being replaced. It replays because the drawing is keyed on the pair.
  */
-.wardrobe__layer {
-  border: var(--stroke) solid var(--ink);
-  border-radius: var(--radius-button);
-  padding: var(--s1) var(--s2);
-  background: var(--card);
+.wardrobe__preview .blob {
+  animation: tip 220ms var(--spring) both;
+}
+
+@keyframes tip {
+  0% {
+    rotate: 0deg;
+  }
+  40% {
+    rotate: -7deg;
+  }
+  100% {
+    rotate: 0deg;
+  }
+}
+
+.wardrobe__layers {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 28px;
+  margin-bottom: 14px;
+  flex: none;
 }
 
 /*
- * Rarity, in the border colour and in the word beside the count. The weight
- * stays at `--stroke` for all three: a border that is both a different colour
- * and a different thickness makes the rarer layer look like a different kind of
- * control rather than the same control holding something scarcer.
+ * One layer of the counter, and the two arrows that walk it. The row is a
+ * cream block and the arrows are yellow blocks on top of it — the row does not
+ * press, so it is the arrows that carry the target.
  */
-.wardrobe__layer--common {
-  border-color: var(--rarity-common);
-}
-
-.wardrobe__layer--uncommon {
-  border-color: var(--rarity-uncommon);
-}
-
-.wardrobe__layer--rare {
-  border-color: var(--rarity-rare);
-}
-
-.wardrobe__stepper {
+.stepper {
   display: flex;
   align-items: center;
-  gap: var(--s2);
+  gap: 11px;
+  padding: 11px 12px;
+}
+
+.stepper__arrow {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: var(--r-well);
+  /* Its own face, shallower than a card's: a small piece is a thin piece. */
+  --face-h: 4px;
+  --drop: 0 0 0 rgba(0, 0, 0, 0);
+  --drop-raised: 0 4px 8px rgba(10, 40, 25, 0.2);
+  --drop-pressed: 0 0 0 rgba(0, 0, 0, 0);
+  font-size: 19px;
 }
 
 /*
  * The name takes the slack, so both arrows sit hard against the edges of the
- * layer however long the word between them is — a stepper whose controls move
- * as you step it is a stepper you have to re-aim at every press.
+ * row however long the word between them is — a stepper whose controls move as
+ * you step it is a stepper you have to re-aim at every press.
  */
-.wardrobe__pick {
+.stepper__pick {
   flex: 1;
   min-width: 0;
   text-align: center;
 }
 
-.wardrobe__name {
+.stepper__name {
   display: block;
-  font-size: 16px;
-  font-weight: 600;
-  line-height: 1.2;
-}
-
-.wardrobe__meta {
-  display: block;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--ink-soft);
-}
-
-/*
- * Borderless on purpose. These live inside a box that already has an outline,
- * and a bordered button inside a bordered row inside a bordered card is three
- * rectangles saying the same thing.
- */
-.wardrobe__arrow {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--s2);
-  border: none;
-  background: none;
+  font-family: var(--font-display);
+  font-size: 20px;
+  line-height: 1.15;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
   color: var(--ink);
-  transition: scale 100ms ease-out, opacity 100ms ease-out;
 }
 
-.wardrobe__arrow:active:not(:disabled) {
-  scale: 0.86;
-}
-
-.wardrobe__arrow:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-}
-
-.wardrobe__arrow:focus-visible {
-  outline: var(--stroke) solid var(--signal);
-  outline-offset: 2px;
-  border-radius: var(--radius-button);
-}
-
-.chevron {
+/* Rarity, in the word beside the count. The other half of it is on the
+   accessory's own bottom face, up in the drawing. */
+.stepper__meta {
   display: block;
-  overflow: visible;
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-soft-cream);
+}
+
+.stepper__meta--uncommon {
+  color: var(--rarity-uncommon);
+}
+
+.stepper__meta--rare {
+  color: var(--violet-face);
 }
 
 /* ── The gift box ───────────────────────────────────────────────────────── */
 
 /*
  * The only sink for coins, and the only control in the app that spends
- * anything. It sits under the two layers because the order of the room is:
- * here is what you have on, here is what you own, here is how to own more.
- *
- * Separated by a rule rather than a card. A second bordered box inside the
- * bordered card would be the third rectangle on this screen saying the same
- * thing, which is the same reason `.wardrobe__arrow` has no border of its own.
- *
- * Exactly two rows, always: a status line and the button. The result takes the
- * status line's place rather than pushing it down, and the shortfall is spoken
- * by the button itself rather than by a notice under it — a room with a height
- * budget cannot afford a section that grows when something happens in it.
+ * anything. A well, because what it holds is a count of what you own — and
+ * exactly two rows, always: the result takes the status line's place rather
+ * than pushing it down, and the shortfall is spoken by the button itself.
  */
 .box {
-  display: flex;
-  flex-direction: column;
-  gap: var(--s2);
-  padding-top: var(--s2);
-  border-top: var(--stroke) solid var(--ink-quiet);
+  margin-top: auto;
+  padding: 13px 15px;
+  flex: none;
 }
 
-.box__head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--s2);
-}
-
-.box__label,
-.box__owned {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--ink-soft);
+.box__open {
+  margin-top: 11px;
+  padding: 16px;
+  font-size: 21px;
 }
 
 /*
- * What came out, and the one moment in this room.
- *
- * The badge stamp is the reference: a verdict arriving. 240ms of scale and
- * opacity and then it stops — under a second, no rotation (the app has its three
- * deliberate imperfections and this is not a fourth), no burst, no shake.
- *
- * One row, standing exactly where the status line it replaced stood, because
- * this room has no spare row to grow into. The border is the rarity ladder the
- * two layers above already use — the one exception to the two-accents rule, kept
- * an exception by never leaving this screen.
+ * What came out, standing exactly where the status line it replaced stood.
+ * The rarity ladder is the block's own colour here — the one exception to
+ * everything else in this app meaning one thing per colour, kept an exception
+ * by never leaving this screen.
  */
 .box__result {
   display: flex;
   align-items: center;
-  gap: var(--s2);
-  border: var(--stroke) solid var(--rarity-common);
-  border-radius: var(--radius-button);
-  padding: var(--s1) var(--s2);
-  background: var(--card);
-  animation: stamp 240ms cubic-bezier(0.3, 1.3, 0.4, 1) both;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 13px;
+  border-radius: var(--r-well);
+  --face-h: 5px;
+  --drop: 0 0 0 rgba(0, 0, 0, 0);
+  animation: land-block 200ms var(--spring) both;
+}
+
+.box__result--common {
+  --fill: var(--cream);
+  --face: var(--rarity-common);
+  --on-fill: var(--ink);
 }
 
 .box__result--uncommon {
-  border-color: var(--rarity-uncommon);
+  --fill: var(--cream);
+  --face: var(--rarity-uncommon);
+  --on-fill: var(--ink);
 }
 
 .box__result--rare {
-  border-color: var(--rarity-rare);
+  --fill: var(--violet);
+  --face: var(--violet-face);
+  --on-fill: var(--cream);
 }
 
-/*
- * The name takes the slack and the receipt is what gives way when the row runs
- * out of width — the name and the rarity are what the moment is about, and the
- * refund is already counted in the balance at the top of the screen.
- */
-.box__result-name {
-  flex: 1;
+.box__result-head {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
   min-width: 0;
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 1.2;
+}
+
+.box__result-name {
+  font-family: var(--font-display);
+  font-size: 18px;
+  line-height: 1.15;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--on-fill);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .box__result-meta {
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+
+/* The count is the last thing and the first to give way: the name and the
+   rarity are what the moment is about. */
+.box__result-count {
   flex: none;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--ink-soft);
+  font-family: var(--font-display);
+  font-size: 15px;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
   white-space: nowrap;
 }
 
@@ -1732,170 +2124,218 @@ button {
 
 /*
  * The one room in the menu that is a form, and the second built to a height
- * budget: four fields, a preview and a button have to fit the card at the 512px
- * Devvit's inline post view can be, without scrolling, because a form whose
- * submit button is below the fold is a form that looks finished before it is.
+ * budget: four fields, a preview and a button have to fit at 512px without
+ * scrolling, because a form whose submit button is below the fold is a form
+ * that looks finished before it is.
  *
  * What pays for it is that every field is one line. A single-line box that
- * scrolls sideways holds a question of any length in the height of one row —
- * where a box that grows downward reflows the whole room on the keystroke that
- * wraps, and moves the button out from under a thumb already on its way to it.
- * The trade is real and it is deliberate: a long question is read by scrolling
- * it, and the preview underneath is where the whole thing can be checked.
- *
- * The boxes borrow the share slide's note field — same border, same radius, same
- * 16px, which is also what stops iOS zooming the page on focus.
+ * scrolls sideways holds a question of any length in the height of one row,
+ * where a box that grows downward reflows the room on the keystroke that wraps
+ * and moves the button out from under a thumb already on its way to it.
  */
 .ask {
   display: flex;
   flex-direction: column;
-  gap: var(--s2);
-  flex: 1;
-  min-height: 0;
+  gap: 14px;
+  padding: 16px 18px;
+  margin-top: 18px;
+  border-radius: 11px;
+  flex: none;
 }
 
 .ask__field {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-/* Label and counter share a line, because four counters on four lines of their
-   own is a quarter of the room spent on arithmetic. */
-.ask__head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--s2);
-}
-
-.ask__label {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--ink-soft);
-}
-
-.ask__hint {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--ink-soft);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
+  min-width: 0;
 }
 
 /*
- * One line, always. A text input scrolls its own content horizontally and keeps
- * the caret in view while it does, so the height of this box is the height of
- * one row whatever is typed into it — which is what keeps the room on one
- * screen.
+ * One line, always. A text input scrolls its own content horizontally and
+ * keeps the caret in view while it does, so this box is the height of one row
+ * whatever is typed into it.
  */
 .ask__input {
+  display: block;
   width: 100%;
   min-width: 0;
-  font: inherit;
+  margin-top: 7px;
+  padding: 11px 12px;
+  border: 0;
+  font-family: var(--font-body);
+  font-weight: 500;
+  /* Same 16px as the note field, for the same iOS reason. */
   font-size: 16px;
   line-height: 1.4;
-  color: inherit;
-  background: var(--card);
-  border: var(--stroke) solid var(--ink);
-  border-radius: var(--radius-button);
-  padding: var(--s2);
+  color: var(--ink);
   text-overflow: ellipsis;
 }
 
-/* The ellipsis is for the resting state only — while the field has focus the
-   end of the line has to be readable, not summarised. */
+.ask__input::placeholder {
+  color: rgba(34, 48, 31, 0.35);
+}
+
+/* The ellipsis is for the resting state only — with focus, the end of the line
+   has to be readable rather than summarised. */
 .ask__input:focus {
   text-overflow: clip;
 }
 
 .ask__input:focus-visible {
-  outline: var(--stroke) solid var(--signal);
+  outline: 3px solid var(--ink);
   outline-offset: 2px;
 }
 
 .ask__input:disabled {
-  color: var(--ink-soft);
-  background: var(--paper);
+  color: var(--ink-soft-cream);
 }
 
 /* The two answers are one thing, so they sit on one line. */
 .ask__pair {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: var(--s2);
+  gap: 11px;
 }
 
 /*
- * The post as it will appear. On paper rather than card, and outlined, because
- * it is the one block here that is not a control — it is what the controls add
- * up to, and the difference has to be visible before the button is pressed.
- *
- * Its lines scroll sideways for the same reason the fields do: this block is
- * three rows tall whatever is typed, so the button under it does not move while
- * somebody is still writing.
+ * The post as it will appear, and the one block here that is not a control: a
+ * well cut into the felt, holding what the controls above add up to. Its lines
+ * scroll sideways for the same reason the fields do — the room must not reflow
+ * while somebody is still writing.
  */
 .ask__preview {
-  border: var(--stroke) solid var(--ink);
-  border-radius: var(--radius-button);
-  background: var(--paper);
-  padding: var(--s2);
+  margin-top: 16px;
+  padding: 14px 16px;
   flex: none;
 }
 
 .ask__preview-title,
-.ask__preview-text,
-.ask__preview-answers {
+.ask__preview-text {
   white-space: nowrap;
   overflow-x: auto;
-  /* No scrollbar gutter under three short lines: the overflow is there to be
+  /* No scrollbar gutter under two short lines: the overflow is there to be
      dragged, and on a phone that is what a finger does to it anyway. */
   scrollbar-width: none;
 }
 
 .ask__preview-title::-webkit-scrollbar,
-.ask__preview-text::-webkit-scrollbar,
-.ask__preview-answers::-webkit-scrollbar {
+.ask__preview-text::-webkit-scrollbar {
   display: none;
 }
 
 .ask__preview-title {
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 1.25;
-  margin: 0;
+  display: block;
+  margin: 8px 0 0;
+  font-family: var(--font-display);
+  font-size: 19px;
+  line-height: 1.12;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  color: var(--ink-on-felt);
 }
 
 .ask__preview-text {
-  font-size: 13px;
-  line-height: 1.4;
-  margin: var(--s1) 0 0;
+  margin: 6px 0 0;
+  font-weight: 500;
+  font-size: 12px;
+  color: var(--ink-body-felt);
 }
 
+/* Flat chips rather than blocks: this is a picture of two buttons, not two
+   buttons, and nothing in a preview should look pressable. */
 .ask__preview-answers {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--ink-soft);
-  margin: var(--s2) 0 0;
+  display: flex;
+  gap: 9px;
+  margin-top: 11px;
+}
+
+.ask__preview-answer {
+  flex: 1;
+  min-width: 0;
+  padding: 8px;
+  text-align: center;
+  border-radius: var(--r-pill);
+  background: rgba(255, 246, 231, 0.16);
+  font-family: var(--font-display);
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255, 246, 231, 0.9);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Never shrinks. Everything above it can scroll; the one irreversible control
    in the app does not get to be half a button. */
 .ask__post {
+  margin-top: 16px;
+  padding: 17px;
+  font-size: 22px;
+  border-radius: 11px;
   flex: none;
+}
+
+/* ── Counters, everywhere else ──────────────────────────────────────────── */
+
+/*
+ * A counter drawn as art rather than as a member of a crowd: in the wardrobe,
+ * on your record, in front of an author line. The SVG carries the whole
+ * drawing — head, bottom face, accessory blocks, face — so it scales as one
+ * thing from 18px to 172px.
+ */
+/*
+ * The two glyphs the app draws rather than types: the wardrobe's arrows and the
+ * notice's X. Blocks — inline SVGs sit on a text baseline, which inside a 40px
+ * arrow is half a line of air the piece is not centred in.
+ */
+.chevron,
+.cross {
+  display: block;
+  overflow: visible;
+}
+
+.blob {
+  display: block;
+  flex: none;
+  overflow: visible;
+  /* What a counter casts. It is a filter rather than a box-shadow because the
+     shape is the artwork's, accessory and all, not the element's box. */
+  filter: drop-shadow(0 4px 7px rgba(18, 32, 24, 0.32));
+}
+
+/* The one being worked on, and the only counter in the app drawn big enough to
+   throw a real shadow. */
+.wardrobe__preview .blob {
+  filter: drop-shadow(0 12px 20px rgba(10, 40, 25, 0.34));
+}
+
+.record__card .blob {
+  filter: drop-shadow(0 6px 10px rgba(10, 40, 25, 0.24));
 }
 
 /* ── States ─────────────────────────────────────────────────────────────── */
 
 .notice {
-  font-size: 16px;
   margin: 0;
+  font-weight: 500;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-on-felt);
 }
 
 .notice--quiet {
-  color: var(--ink-soft);
-  font-family: var(--font-mono);
-  font-size: 12px;
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-soft-felt);
+}
+
+/* The same notice, said inside a cream block rather than on the table. */
+.notice--cream {
+  color: var(--ink-soft-cream);
+}
+
+.notice--spaced {
+  margin-top: 12px;
 }
 
 .fade-in {
@@ -1923,146 +2363,451 @@ button {
   border: 0;
 }
 
+/* ── Desktop ────────────────────────────────────────────────────────────── */
+
+/*
+ * No sidebar and no new navigation: the table simply gets wider, and the
+ * blocks keep their thickness — a piece does not get thicker because the room
+ * did. Type steps up 15-25%, the faces go from 6/8 to 7/9, and that is all.
+ */
+@media (min-width: 900px) {
+  .app {
+    padding: 26px 34px;
+  }
+
+  .header__mark {
+    font-size: 26px;
+  }
+
+  .stat {
+    padding: 6px 11px;
+    gap: 6px;
+  }
+
+  .stat__label {
+    font-size: 10px;
+  }
+
+  .stat__count {
+    font-size: 17px;
+  }
+
+  .block--md {
+    --face-h: 7px;
+  }
+
+  .block--lg {
+    --face-h: 9px;
+  }
+
+  .stage {
+    margin: 20px -34px 0;
+  }
+
+  /* The question hangs off the left edge rather than stretching to a line
+     nobody can read across. */
+  .question-block {
+    align-self: flex-start;
+    max-width: 720px;
+    padding: 20px 26px;
+    margin-top: 22px;
+  }
+
+  .question {
+    font-size: 46px;
+    line-height: 1.02;
+  }
+
+  .question-block--strip {
+    align-self: stretch;
+    max-width: none;
+    padding: 14px 18px;
+  }
+
+  .choices {
+    gap: 20px;
+    margin-top: 18px;
+  }
+
+  .choice {
+    min-height: 104px;
+    font-size: 36px;
+    border-radius: var(--r-hero);
+  }
+
+  /* The score slide splits: the crowd, the figures and the two awards on the
+     left, the histogram and the nav on the right. */
+  .slide--score {
+    display: grid;
+    grid-template-columns: 520px 1fr;
+    gap: 26px;
+    align-items: start;
+  }
+
+  .slide--score .strip {
+    max-height: 120px;
+  }
+
+  /* The cap exists so a tall phone does not turn ten bars into a poster. A
+     desktop well is the size it is on purpose, so the bars fill it. */
+  .slide--score .histogram {
+    max-height: none;
+  }
+
+  .slide--score .detail {
+    height: 100%;
+    margin-top: 24px;
+    padding: 18px 20px 14px;
+  }
+
+  .score__left,
+  .score__right {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    height: 100%;
+  }
+
+  .figure__value {
+    font-size: 36px;
+  }
+
+  .award__band {
+    font-size: 26px;
+  }
+
+  .award__total {
+    font-size: 42px;
+  }
+
+  .badge__title {
+    font-size: 24px;
+  }
+
+  .slides__step {
+    width: 120px;
+    padding: 14px;
+    font-size: 18px;
+  }
+
+  .menu__wordmark {
+    font-size: 72px;
+  }
+
+  .screen__title {
+    font-size: 54px;
+    margin-top: 22px;
+  }
+
+  /* The board reads across in two columns rather than scrolling, and your own
+     row stays where it is: on the floor of the well, under both of them. */
+  .tabs {
+    max-width: 560px;
+  }
+
+  .board {
+    margin-top: 22px;
+    padding: 20px 22px 16px;
+  }
+
+  .board__rows {
+    display: block;
+    column-count: 2;
+    column-gap: 30px;
+    overflow: visible;
+  }
+
+  .board__row {
+    /* `gap` does not apply to a multi-column flow, and a row split across the
+       column break would be a rank in one column and a score in the other. */
+    margin-bottom: 16px;
+    break-inside: avoid;
+  }
+
+  .board__rows {
+    gap: 16px;
+  }
+
+  .board__row {
+    grid-template-columns: 30px 30px 1fr auto;
+    gap: 13px;
+  }
+
+  .board__counter {
+    width: 30px;
+    height: 30px;
+  }
+
+  .board__name {
+    font-size: 15px;
+  }
+
+  .board__points {
+    font-size: 21px;
+  }
+
+  .board__you {
+    margin-top: auto;
+    padding-top: 16px;
+  }
+
+  .menu__back,
+  .ask__post,
+  .compose__post,
+  .guess__lock {
+    align-self: flex-start;
+    width: auto;
+    min-width: 280px;
+  }
+}
+
 /* ── Short viewports ────────────────────────────────────────────────────── */
 
 /*
- * The reveal must fit without scrolling even in Devvit's inline post view,
- * which can be as short as 512px. Two tiers: tighten first, then drop the
- * detail strip. `zoom` is used rather than `transform: scale` because it
- * participates in layout, so the shrunken crowd gives its space back.
+ * The reveal, the wardrobe and the ask room must all fit without scrolling
+ * even in Devvit's inline post view, which can be as short as 512px. Two
+ * tiers: tighten first, then give up the things that are decoration before the
+ * things that are controls. `zoom` is used rather than `transform: scale`
+ * because it participates in layout, so a shrunken crowd gives its space back.
  */
 @media (max-height: 700px) {
   .app {
-    padding: var(--s2);
-    gap: var(--s2);
-  }
-
-  .card {
-    padding: var(--s2);
+    padding: 12px;
   }
 
   .stage {
     zoom: 0.85;
+    margin: 12px -12px 0;
   }
 
-  /* The blob gives up size before the two layers under it do — it is the result,
-     they are the controls, and a control that has shrunk is harder to hit. */
   .wardrobe__preview {
-    zoom: 0.85;
+    zoom: 0.7;
+    margin-top: 12px;
+  }
+
+  .wardrobe__layers {
+    margin-top: 16px;
+  }
+
+  .question-block {
+    padding: 13px 15px;
+    margin-top: 12px;
   }
 
   .question {
-    font-size: 18px;
+    font-size: 26px;
+  }
+
+  .question-block--strip {
+    padding: 10px 13px;
+    margin-top: 12px;
+  }
+
+  .question--strip {
+    font-size: 17px;
   }
 
   .bignum {
     font-size: 40px;
   }
 
+  .panel {
+    padding: 13px 15px;
+    margin-top: 12px;
+  }
+
   .slider__ticks {
     display: none;
   }
 
-  .badge {
-    padding: var(--s1) var(--s2);
+  .choice {
+    min-height: 72px;
+    font-size: 24px;
   }
 
-  .badge__title {
-    font-size: 18px;
+  .strip {
+    max-height: 62px;
+    margin-top: 12px;
   }
 
-  .badge__line {
-    font-size: 13px;
+  .menu__hero {
+    padding: 16px;
+    margin-top: 12px;
   }
 
   .menu__wordmark {
-    font-size: 26px;
+    font-size: 40px;
   }
 
-  /* The boxes lose vertical padding before anything else in the room does. The
-     16px inside them is not styling — it is what stops iOS zooming the page when
-     a field takes focus — so it is the last thing to go and it does not go. */
+  .menu__daily {
+    margin-top: 14px;
+    padding: 15px;
+    font-size: 21px;
+  }
+
+  .menu__list {
+    margin-top: 14px;
+    gap: 9px;
+  }
+
+  .screen__title {
+    font-size: 32px;
+    margin-top: 12px;
+  }
+
+  /* The boxes lose vertical padding before anything else does. The 16px inside
+     them is not styling — it is what stops iOS zooming the page when a field
+     takes focus — so it is the last thing to go, and it does not go. */
   .ask {
-    gap: var(--s1);
+    gap: 9px;
+    padding: 12px 14px;
+    margin-top: 12px;
   }
 
   .ask__input {
-    padding: var(--s1) var(--s2);
+    padding: 8px 10px;
+    margin-top: 5px;
+  }
+
+  .ask__preview {
+    margin-top: 12px;
+    padding: 11px 13px;
+  }
+
+  .ask__post {
+    margin-top: 12px;
+    padding: 13px;
+    font-size: 19px;
+  }
+
+  .compose__card {
+    padding: 13px 15px;
+    margin-top: 12px;
+  }
+
+  .compose__post {
+    margin-top: 12px;
+    padding: 13px;
+    font-size: 19px;
   }
 }
 
 @media (max-height: 560px) {
-  /* The last things the wardrobe gives up: the room closes up and the layers
-     lose their padding. The arrows keep their own, so the targets do not shrink
-     with the boxes around them. */
-  .wardrobe {
-    gap: var(--s2);
-  }
-
-  .wardrobe__layer {
-    padding: 0 var(--s2);
-  }
-
   .stage {
     zoom: 0.72;
   }
 
   /*
-   * The blob keeps the 0.85 it took at 700px and shrinks no further, unlike the
-   * crowd above it. The crowd is a hundred dots and reads at any size; this is
-   * one blob and it is the subject of the room — and now that the layers are one
-   * row each, the height it costs is height the room has.
+   * The two rooms with a height budget are both spending it here, and what
+   * they give up says which part of each is the point.
+   *
+   * The wardrobe gives up the size of the counter. It is the subject of the
+   * room, but it is also the only thing in it that is not a control, and a
+   * control that has shrunk is harder to hit than a drawing that has.
    */
-  .verdict {
+  .wardrobe__preview {
+    zoom: 0.55;
+    margin-top: 6px;
+  }
+
+  .wardrobe__layers {
+    gap: 8px;
+    margin-top: 10px;
+    margin-bottom: 10px;
+  }
+
+  .stepper {
+    padding: 7px 9px;
+  }
+
+  .stepper__arrow {
+    width: 34px;
+    height: 34px;
     font-size: 16px;
   }
 
-  .guess,
-  .guess__controls {
-    gap: var(--s2);
+  .stepper__name {
+    font-size: 17px;
+  }
+
+  .box__open {
+    margin-top: 8px;
+    padding: 11px;
+    font-size: 17px;
+  }
+
+  .screen__title {
+    font-size: 26px;
+    margin-top: 10px;
+  }
+
+  /*
+   * The ask room gives up its guidance, and then its own title.
+   *
+   * Everything else on that screen is either a field, the preview of what the
+   * fields add up to, or the button that posts it — advice about what makes a
+   * good question is the only line there that is not part of asking one. The
+   * title goes second and costs nothing: the header is already saying which
+   * room this is, two lines above where the heading was.
+   */
+  .screen__lede {
+    display: none;
+  }
+
+  .menu__panel > .screen__title {
+    display: none;
+  }
+
+  .ask {
+    gap: 7px;
+    padding: 10px 12px;
+    margin-top: 10px;
+  }
+
+  .ask__input {
+    padding: 6px 9px;
+    margin-top: 4px;
+  }
+
+  .ask__preview-answers {
+    gap: 7px;
+  }
+
+  .ask__preview-answer {
+    padding: 6px;
+    font-size: 13px;
+  }
+
+  .ask__post {
+    margin-top: 10px;
+    padding: 12px;
+    font-size: 17px;
+  }
+
+  .menu__back {
+    margin-top: 12px;
+  }
+
+  .question {
+    font-size: 22px;
   }
 
   .bignum {
     font-size: 32px;
   }
 
-  .button {
-    padding: var(--s2) var(--s3);
+  .choice {
+    min-height: 60px;
+    font-size: 20px;
   }
 
-  .choices .button {
-    padding: var(--s3);
-    font-size: 16px;
-    min-height: 64px;
+  .figure__value,
+  .figures--pairs .figure__value {
+    font-size: 24px;
   }
 
-  .slide,
-  .menu__body {
-    gap: var(--s2);
-  }
-
-  .menu__root,
-  .menu__panel {
-    gap: var(--s2);
-  }
-
-  .menu__back,
-  .menu__daily {
-    margin-top: var(--s2);
-  }
-
-  .menu__tagline {
-    font-size: 13px;
-  }
-
-  .compose__hint {
-    display: none;
-  }
-
-  /* The award gives up its padding and a few points of size before the badge
-     stamp does — the stamp is the moment, this is the receipt. */
-  .award {
-    padding: var(--s1) var(--s2);
+  .verdict__count {
+    font-size: 38px;
   }
 
   .award__band {
@@ -2070,31 +2815,78 @@ button {
   }
 
   .award__total {
-    font-size: 22px;
+    font-size: 26px;
   }
 
+  /* The receipt goes before the moment does. */
   .award__breakdown {
     display: none;
   }
 
-  /* The last thing the ask room gives up is the preview's air. The preview
-     itself stays: it is the only place the whole post can be read at once now
-     that the fields are single lines, and it is what the button is confirming. */
-  .ask__preview {
-    padding: var(--s1) var(--s2);
+  .badge__title {
+    font-size: 17px;
   }
 
-  .ask__preview-title {
+  .badge__line {
+    font-size: 11px;
+  }
+
+  .strip {
+    max-height: 46px;
+  }
+
+  .compose__foot {
+    display: none;
+  }
+
+  /*
+   * And the score slide gives up the histogram. It is the one thing on that
+   * screen that is neither your result nor what it paid — it is everybody
+   * else's — and at this height the choice is between showing it as a 40px
+   * smear and showing the four things above it properly.
+   */
+  .detail {
+    display: none;
+  }
+
+  .box {
+    padding: 9px 11px;
+  }
+
+  .box__open {
+    margin-top: 8px;
+    padding: 11px;
+    font-size: 18px;
+  }
+
+  .menu__wordmark {
+    font-size: 32px;
+  }
+
+  .menu__tagline {
+    font-size: 11.5px;
+    margin-top: 8px;
+  }
+
+  .well-button {
+    padding: 10px;
     font-size: 14px;
   }
 
-  .ask__preview-answers {
-    margin-top: var(--s1);
+  /* The last thing the ask room gives up is the preview's air. The preview
+     itself stays: it is the only place the whole post can be read at once now
+     that the fields are single lines, and it is what the button confirms. */
+  .ask__preview {
+    padding: 9px 11px;
   }
 
-  .ask__label,
-  .ask__hint {
-    font-size: 11px;
+  .ask__preview-title {
+    font-size: 16px;
+    margin-top: 6px;
+  }
+
+  .ask__preview-answers {
+    margin-top: 8px;
   }
 }
 
@@ -2102,8 +2894,8 @@ button {
 
 /*
  * The reveal is the one orchestrated moment in the app. With motion reduced it
- * becomes a straight cross-fade to the same final state — no travel, no stagger,
- * no pop, no stamp.
+ * becomes a straight cross-fade to the same final state — no travel, no
+ * stagger, no landing — and a press becomes an instant state change.
  */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -2116,19 +2908,14 @@ button {
     transition-delay: 0ms !important;
   }
 
-  /* The idle bob is removed outright rather than run once at 0.01ms, which
-     would leave every dot frozen at a random point in its cycle. */
-  .dot {
-    animation: none !important;
-    transform: none !important;
-  }
-
   .reveal {
     animation: fade 220ms linear both;
   }
 
-  /* The box's one moment gets the same treatment as the reveal's: a cross-fade
-     to the state the stamp would have landed on. */
+  /* The two things that arrive rather than move get the state they would have
+     landed on, faded in. */
+  .award.is-arriving,
+  .badge.is-landing,
   .box__result {
     animation: fade 220ms linear both;
   }

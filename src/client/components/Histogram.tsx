@@ -1,22 +1,27 @@
 /**
  * What everyone else guessed. Ten buckets of ten points, with the bucket the
- * player landed in taking the accent.
+ * player landed in taking the yellow.
  *
- * Reads as a tally sheet rather than a chart: flat bars, 2px outlines, no axis
- * furniture beyond the two end labels.
+ * It is a record of what has already happened rather than anything being
+ * awarded, so it lives in a well cut into the felt — and the bars have a bottom
+ * face of their own, inset, because a bar in a hole cannot stand proud of it.
+ *
+ * The bars grow from the floor of the well in sequence and yours arrives last,
+ * so the eye is walked across the distribution before it is told where in it
+ * you landed.
  */
 
-import type { BadgeAccent } from '../../shared/badges.js';
 import { HISTOGRAM_BUCKETS } from '../../shared/config.js';
+
+/** How far apart the bars arrive. Ten of them, so this has to stay small. */
+const STEP_MS = 40;
 
 export function Histogram({
   buckets,
   yourGuess,
-  accent,
 }: {
   buckets: number[];
   yourGuess: number;
-  accent: BadgeAccent;
 }): React.JSX.Element | null {
   const total = buckets.reduce((sum, count) => sum + count, 0);
   if (total === 0) return null;
@@ -32,16 +37,19 @@ export function Histogram({
           return (
             <div
               key={index}
-              className={`histogram__bar${yours ? ` histogram__bar--yours is-accent-${accent}` : ''}`}
-              style={{ height: `${Math.max(4, (count / peak) * 100)}%` }}
+              className={`histogram__bar${yours ? ' histogram__bar--yours' : ''}`}
+              style={{
+                height: `${Math.max(4, (count / peak) * 100)}%`,
+                animationDelay: `${(yours ? HISTOGRAM_BUCKETS : index) * STEP_MS}ms`,
+              }}
               title={`${index * 10}-${index === HISTOGRAM_BUCKETS - 1 ? 100 : index * 10 + 9}%: ${count}`}
             />
           );
         })}
       </div>
       <div className="histogram__axis">
-        <span>0%</span>
-        <span>100%</span>
+        <span>0</span>
+        <span>100</span>
       </div>
     </div>
   );

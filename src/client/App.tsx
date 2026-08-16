@@ -8,21 +8,20 @@
 import { context } from '@devvit/web/client';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { getBadge } from '../shared/badges.js';
-import { BLOB_SIZE, CROWD_SIZE } from '../shared/config.js';
+import { CROWD_SIZE } from '../shared/config.js';
 import type { Equipped } from '../shared/items.js';
 import { getBand, type Award } from '../shared/points.js';
 import type { Choice, Question, QuestionState, Reveal, StateResponse } from '../shared/types.js';
 import { ApiFailure, castVote, fetchState, saveShowBlob } from './api.js';
-import { randomGroupColors } from './colors.js';
 import { BadgeStamp } from './components/BadgeStamp.js';
 import { Blob } from './components/Blob.js';
 import { Compose } from './components/Compose.js';
+import { CounterStrip } from './components/CounterStrip.js';
 import { DotCrowd } from './components/DotCrowd.js';
 import { Histogram } from './components/Histogram.js';
 import { Menu } from './components/Menu.js';
 import { StatBar } from './components/StatBar.js';
-import { WobbleRule } from './components/WobbleRule.js';
+import { COUNTER_SIZE } from './counterArt.js';
 import { useCountUp } from './countUp.js';
 
 const DEFAULT_GUESS = 50;
@@ -76,9 +75,7 @@ export function App(): React.JSX.Element {
   if (phase.name === 'error') {
     return (
       <main className="app">
-        <div className="card">
-          <p className="notice">{phase.message}</p>
-        </div>
+        <p className="notice">{phase.message}</p>
       </main>
     );
   }
@@ -152,55 +149,116 @@ function Game({
 }): React.JSX.Element {
   const { question, reveal, stats, canVote, authorAvatar } = state;
 
+  // The felt is the page. There is no card between the header and the table,
+  // which is what the whole screen is now — blocks placed on green.
   return (
     <main className="app">
       <header className="header">
         <span className="header__mark">Outlier</span>
-        <span className="header__day">
-          {question.isDaily ? question.dailyDate : 'open question'}
-        </span>
         <StatBar stats={stats} />
       </header>
 
-      <section className="card">
-        {question.source === 'community' && question.authorName && (
-          <Byline name={question.authorName} avatar={authorAvatar} />
-        )}
-        <h1 className="question">{question.text}</h1>
-        <WobbleRule />
-
-        {reveal ? (
-          <RevealView
-            postId={postId}
-            question={question}
-            reveal={reveal}
-            animate={justVoted}
-            slide={slide}
-            onSlide={onSlide}
-            onOpenMenu={onOpenMenu}
-            onBlobNoticed={onBlobNoticed}
-          />
-        ) : (
-          <PlayView
-            postId={postId}
-            question={question}
-            canVote={canVote}
-            locked={question.locked}
-            onReveal={onReveal}
-          />
-        )}
-      </section>
+      {reveal ? (
+        <RevealView
+          postId={postId}
+          question={question}
+          reveal={reveal}
+          animate={justVoted}
+          slide={slide}
+          onSlide={onSlide}
+          onOpenMenu={onOpenMenu}
+          onBlobNoticed={onBlobNoticed}
+        />
+      ) : (
+        <PlayView
+          postId={postId}
+          question={question}
+          avatar={authorAvatar}
+          canVote={canVote}
+          locked={question.locked}
+          onReveal={onReveal}
+        />
+      )}
     </main>
   );
 }
 
 /**
+ * The question, full size, on the cream block it is asked from.
+ *
+ * The block's bottom face is the separator that the hand-drawn rule under the
+ * question used to be — one of the three deliberate imperfections the old UI
+ * had, and the only one this design keeps no version of. Depth does that job
+ * now, everywhere, so a second device for it would be a second idiom.
+ */
+function QuestionCard({
+  question,
+  avatar,
+}: {
+  question: Question;
+  avatar: Equipped | null;
+}): React.JSX.Element {
+  return (
+    <div className="question-block block block--cream block--md">
+      {question.source === 'community' && question.authorName && (
+        <Byline name={question.authorName} avatar={avatar} />
+      )}
+      <span className="label">
+        {question.isDaily && question.dailyDate
+          ? `daily · ${formatDay(question.dailyDate)}`
+          : question.isDaily
+            ? 'daily'
+            : 'open question'}
+      </span>
+      <h1 className="question">{question.text}</h1>
+    </div>
+  );
+}
+
+/**
+ * The same question once it has been answered, compressed to a strip.
+ *
+ * It stays there for the rest of the question's life — the guess screen and all
+ * three reveal slides — so nothing under it ever has to move to make room for
+ * it a second time.
+ */
+function QuestionStrip({ question }: { question: Question }): React.JSX.Element {
+  return (
+    <div className="question-block question-block--strip block block--cream block--sm">
+      <h1 className="question question--strip">{question.text}</h1>
+    </div>
+  );
+}
+
+/** `2026-08-15` as `15 aug 2026`. The stylesheet does the shouting. */
+function formatDay(day: string): string {
+  const MONTHS = [
+    'jan',
+    'feb',
+    'mar',
+    'apr',
+    'may',
+    'jun',
+    'jul',
+    'aug',
+    'sep',
+    'oct',
+    'nov',
+    'dec',
+  ];
+  const [year, month, date] = day.split('-');
+  const name = MONTHS[Number(month) - 1];
+  if (!year || !date || name === undefined) return day;
+  return `${Number(date)} ${name} ${year}`;
+}
+
+/**
  * Who asked, and what they look like.
  *
- * The single highest-value blob in the app: it is the one a player sees before
- * they have one, on somebody else, attached to a name — which is what makes
- * wanting one make sense. It costs one avatar lookup on an id the server was
- * already holding.
+ * The single highest-value counter in the app: it is the one a player sees
+ * before they have one, on somebody else, attached to a name — which is what
+ * makes wanting one make sense. It costs one avatar lookup on an id the server
+ * was already holding.
  *
  * House questions never reach here; they have no author line at all.
  */
@@ -216,7 +274,7 @@ function Byline({
       <Blob
         face={avatar?.face}
         accessory={avatar?.accessory}
-        size={BLOB_SIZE.inline}
+        size={COUNTER_SIZE.inline}
       />
       <span className="question__meta">asked by u/{name}</span>
     </p>
@@ -227,12 +285,14 @@ function Byline({
 function PlayView({
   postId,
   question,
+  avatar,
   canVote,
   locked,
   onReveal,
 }: {
   postId: string;
   question: Question;
+  avatar: Equipped | null;
   canVote: boolean;
   locked: boolean;
   onReveal: (reveal: Reveal) => void;
@@ -241,17 +301,14 @@ function PlayView({
   const [guess, setGuess] = useState(DEFAULT_GUESS);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Drawn once per question, not per frame: the pair has to hold still while
-  // the slider moves, or the crowd strobes.
-  const [groupColors] = useState(randomGroupColors);
 
   if (locked) {
     // Only reachable for a question closed by hand, which may have no summary in
     // the thread to point at. Old Dailies are never closed.
-    return <p className="notice">Voting is closed on this one.</p>;
+    return <p className="notice notice--spaced">Voting is closed on this one.</p>;
   }
   if (!canVote) {
-    return <p className="notice">Sign in to play.</p>;
+    return <p className="notice notice--spaced">Sign in to play.</p>;
   }
 
   async function lockIn(): Promise<void> {
@@ -272,20 +329,29 @@ function PlayView({
     }
   }
 
-  // The crowd is on screen from the first frame, undifferentiated: a hundred
-  // people, not a split. The reveal then reorganises these same dots, which is
-  // the whole point of the moment.
+  // The crowd is on the table from the first frame, undifferentiated: a hundred
+  // people, not a split. The reveal then sweeps these same counters into two
+  // piles, which is the whole point of the moment.
   if (choice === null) {
     return (
       <div className="guess">
+        <QuestionCard question={question} avatar={avatar} />
         <div className="stage">
-          <DotCrowd withYou={null} accent="signal" />
+          <DotCrowd withYou={null} />
         </div>
         <div className="choices">
-          <button type="button" className="button" onClick={() => setChoice('a')}>
+          <button
+            type="button"
+            className="button block block--yellow block--lg choice"
+            onClick={() => setChoice('a')}
+          >
             <span className="choice__label">{question.labelA}</span>
           </button>
-          <button type="button" className="button" onClick={() => setChoice('b')}>
+          <button
+            type="button"
+            className="button block block--orange block--lg choice"
+            onClick={() => setChoice('b')}
+          >
             <span className="choice__label">{question.labelB}</span>
           </button>
         </div>
@@ -295,21 +361,22 @@ function PlayView({
 
   const label = choice === 'a' ? question.labelA : question.labelB;
   const otherLabel = choice === 'a' ? question.labelB : question.labelA;
-  // The slider is a percentage; the crowd is dots. Same number today, but the
-  // conversion is what is meant.
+  // The slider is a percentage; the crowd is counters. Same number today, but
+  // the conversion is what is meant.
   const dotsGuessed = (guess / 100) * CROWD_SIZE;
 
-  // Now that there is a side, the crowd answers the slider: the guess splits it
-  // into two coloured groups in place. Nothing has moved yet — the travel into
-  // camps is the reveal's, and spending it here would spend it twice.
+  // Now that there is a side, the crowd answers the slider: the guess turns the
+  // counters standing with you yellow, in place. Nothing has moved yet — the
+  // travel into camps is the reveal's, and spending it here would spend it
+  // twice.
   return (
     <div className="guess">
+      <QuestionStrip question={question} />
+
       <div className="stage">
         <DotCrowd
           withYou={null}
-          accent="signal"
           split={dotsGuessed}
-          groupColors={groupColors}
           yourLabel={label}
           otherLabel={otherLabel}
         />
@@ -318,44 +385,53 @@ function PlayView({
       {/* One group, so the controls arrive together and after the crowd has
           made room for them. */}
       <div className="guess__controls">
-        <p className="guess__prompt">
-          You said <strong>{label}</strong>. How many out of {CROWD_SIZE} agree?
-        </p>
+        <div className="panel block block--cream block--lg">
+          <span className="label">
+            You said {label} — how many out of {CROWD_SIZE} agree?
+          </span>
 
-        <div className="guess__readout">
-          <span className="bignum">{guess}</span>
-          <span className="guess__unit">out of {CROWD_SIZE}</span>
-        </div>
+          <p className="guess__readout">
+            <span className="bignum">{guess}</span>
+            <span className="guess__unit">out of {CROWD_SIZE}</span>
+          </p>
 
-        <input
-          className="slider"
-          type="range"
-          min={0}
-          max={100}
-          step={1}
-          value={guess}
-          aria-label={`Percentage of people who also said ${label}`}
-          onChange={(event) => setGuess(Number(event.target.value))}
-        />
-        <div className="slider__ticks">
-          <span>0</span>
-          <span>100</span>
+          <input
+            className="slider"
+            type="range"
+            min={0}
+            max={100}
+            step={1}
+            value={guess}
+            aria-label={`Percentage of people who also said ${label}`}
+            // The fill under the thumb is the value, so it is the one thing on
+            // this screen a stylesheet cannot know.
+            style={{ '--fill': `${guess}%` } as React.CSSProperties}
+            onChange={(event) => setGuess(Number(event.target.value))}
+          />
+          <div className="slider__ticks">
+            <span>0</span>
+            <span>100</span>
+          </div>
         </div>
 
         <button
           type="button"
-          className="button button--primary"
+          className="button block block--yellow block--lg guess__lock"
           onClick={lockIn}
           disabled={submitting}
         >
           {submitting ? 'Locking in...' : 'Lock it in'}
         </button>
 
-        <button type="button" className="button button--quiet" onClick={() => setChoice(null)}>
+        <button
+          type="button"
+          className="well-button well-button--small guess__change"
+          onClick={() => setChoice(null)}
+        >
           Change answer
         </button>
 
-        {error && <p className="notice notice--quiet">{error}</p>}
+        {error && <p className="notice notice--quiet notice--spaced">{error}</p>}
       </div>
     </div>
   );
@@ -365,12 +441,12 @@ function PlayView({
  * The verdict, told in three slides. Each one fits its screen, and each one
  * makes a single point:
  *
- *   1. The crowd — the dots split into camps, and how many stand with you.
+ *   1. The crowd — the counters sweep into camps, and how many stand with you.
  *   2. The score — your guess against the number, the badge, the histogram.
  *   3. The share — the pre-written comment, an optional line, one tap to post.
  *
- * The travel animation belongs to slide one and the stamp to slide two, so
- * each slide keeps its own moment instead of everything firing at once.
+ * The sweep belongs to slide one and the award's arrival to slide two, so each
+ * slide keeps its own moment instead of everything firing at once.
  *
  * The share slide is the end of the question, so the step that carried "next"
  * on the way here carries "menu" instead of nothing.
@@ -394,22 +470,21 @@ function RevealView({
   onOpenMenu: () => void;
   onBlobNoticed: () => void;
 }): React.JSX.Element {
-  const accent = getBadge(reveal.badge).accent;
   const mine = reveal.choice === 'a' ? question.labelA : question.labelB;
   const theirs = reveal.choice === 'a' ? question.labelB : question.labelA;
   const rest = CROWD_SIZE - reveal.dotsWithYou;
 
   const captionBits = [
-    `${reveal.dotsWithYou} ${mine} \u00b7 ${rest} ${theirs}`,
+    `${reveal.dotsWithYou} ${mine} · ${rest} ${theirs}`,
     votesCaption(reveal, question),
   ];
 
   // Which camp each cameo stands in is decided here, where the viewer's own
   // choice is known, so the crowd never has to learn what a choice is.
   //
-  // Held across renders because pointing at a blob is a render: without this
+  // Held across renders because pointing at a counter is a render: without this
   // the crowd would be handed a new list on every hover and would re-pack a
-  // hundred dots to answer a question about one of them.
+  // hundred pieces to answer a question about one of them.
   const cameos = useMemo(
     () =>
       reveal.cameos.map((cameo) => ({
@@ -426,15 +501,17 @@ function RevealView({
   const [named, setNamed] = useState<string | null>(null);
 
   const SLIDE_COUNT = 3;
+  const campLabel = `${reveal.dotsWithYou} of ${CROWD_SIZE} answered ${mine}`;
 
   return (
     <div className="reveal">
+      <QuestionStrip question={question} />
+
       {slide === 0 && (
         <div className="slide" key="crowd">
           <div className="stage">
             <DotCrowd
               withYou={reveal.dotsWithYou}
-              accent={accent}
               yourLabel={mine}
               otherLabel={theirs}
               animate={animate}
@@ -442,71 +519,74 @@ function RevealView({
               onName={setNamed}
             />
           </div>
-          <p className="verdict">
-            {reveal.minority ? 'Only ' : ''}
-            <strong>
-              {reveal.dotsWithYou} out of {CROWD_SIZE}
-            </strong>{' '}
-            are with you.
-          </p>
-          {/* One line, two jobs. The split and the sample size are what it says
-              at rest; a name takes the whole line while one is being asked for,
-              because the alternative is a second line that is empty most of the
-              time and moves everything under it when it is not. */}
-          <p className="crowd__caption">{named ? `u/${named}` : captionBits.join(' \u00b7 ')}</p>
+
+          <div className="verdict block block--cream block--md">
+            <p className="verdict__line">
+              <span className="verdict__count">{reveal.dotsWithYou}</span>
+              <span className="verdict__unit">
+                out of {CROWD_SIZE} with you
+              </span>
+            </p>
+            {/* One line, two jobs. The split and the sample size are what it
+                says at rest; a name takes the whole line while one is being
+                asked for, because the alternative is a second line that is
+                empty most of the time and moves everything under it when it is
+                not. */}
+            <p className="crowd__caption">
+              {named ? `u/${named}` : captionBits.join(' · ')}
+            </p>
+          </div>
+
           {reveal.blobNotice && <BlobNotice onAnswered={onBlobNoticed} />}
         </div>
       )}
 
       {slide === 1 && (
-        <div className="slide fade-in" key="score">
-          <div className="figures">
-            <div className="figure">
-              <span className="figure__label">you said</span>
-              <span className="figure__value">
-                {reveal.guess}
-                <span className="figure__unit">%</span>
-              </span>
+        <div className="slide slide--score fade-in" key="score">
+          <div className="score__left">
+            {/* What is left of the crowd on a page of numbers: the pieces that
+                stood with you, and nothing else. */}
+            <CounterStrip count={reveal.dotsWithYou} label={campLabel} />
+
+            <div className="figures">
+              <div className="figure well">
+                <span className="label label--felt">you said</span>
+                <span className="figure__value">{reveal.guess}</span>
+              </div>
+              <div className="figure well">
+                <span className="label label--felt">it was</span>
+                <span className="figure__value figure__value--orange">{reveal.actual}</span>
+              </div>
+              <div className="figure well">
+                <span className="label label--felt">off by</span>
+                <span className="figure__value figure__value--yellow">{reveal.error}</span>
+              </div>
             </div>
-            <div className="figure">
-              <span className="figure__label">it was</span>
-              <span className="figure__value">
-                {reveal.actual}
-                <span className="figure__unit">%</span>
-              </span>
-            </div>
-            <div className="figure">
-              <span className="figure__label">off by</span>
-              <span className="figure__value">
-                {reveal.error}
-                <span className="figure__unit">%</span>
-              </span>
-            </div>
+
+            <PointsAward award={reveal.award} animate={animate} />
+
+            <BadgeStamp id={reveal.badge} animate={animate} />
           </div>
 
-          <PointsAward award={reveal.award} animate={animate} />
-
-          <BadgeStamp id={reveal.badge} animate={animate} />
-
-          {/* Where everyone guessed, and nothing else. This slot used to be two
-              tabs; the misjudged board went with the room that shared it, and
-              one tab is not a tab strip.
-
-              The wrapper stays whether or not there are bars — it is what takes
-              the slack on this slide — but the label goes with them. `Histogram`
-              renders nothing at all on a question with no guesses banked, and a
-              heading over an empty box is a heading for nothing. */}
-          <div className="detail">
-            {reveal.histogram.some((count) => count > 0) && (
-              <p className="section__title">where everyone guessed</p>
-            )}
-            <Histogram buckets={reveal.histogram} yourGuess={reveal.guess} accent={accent} />
+          {/* Where everyone guessed, and nothing else. The well stays whether or
+              not there are bars — it is what takes the slack on this slide —
+              but the label goes with them. `Histogram` renders nothing at all on
+              a question with no guesses banked, and a heading over an empty hole
+              is a heading for nothing. */}
+          <div className="score__right">
+            <div className="detail well">
+              {reveal.histogram.some((count) => count > 0) && (
+                <span className="label label--felt">where everyone guessed</span>
+              )}
+              <Histogram buckets={reveal.histogram} yourGuess={reveal.guess} />
+            </div>
           </div>
         </div>
       )}
 
       {slide === 2 && (
         <div className="slide fade-in" key="share">
+          <CounterStrip count={reveal.dotsWithYou} label={campLabel} />
           <Compose postId={postId} question={question} reveal={reveal} />
         </div>
       )}
@@ -514,7 +594,7 @@ function RevealView({
       <nav className="slides__nav" aria-label="Reveal pages">
         <button
           type="button"
-          className="button button--quiet slides__step"
+          className="well-button slides__step"
           onClick={() => onSlide(slide - 1)}
           disabled={slide === 0}
           style={{ visibility: slide === 0 ? 'hidden' : 'visible' }}
@@ -522,11 +602,11 @@ function RevealView({
           Back
         </button>
 
-        <div className="slides__dots" aria-hidden="true">
+        <div className="slides__bars" aria-hidden="true">
           {Array.from({ length: SLIDE_COUNT }, (_, index) => (
             <span
               key={index}
-              className={`slides__dot${index === slide ? ' is-active' : ''}`}
+              className={`slides__bar${index === slide ? ' is-active' : ''}`}
             />
           ))}
         </div>
@@ -534,13 +614,13 @@ function RevealView({
         {slide < SLIDE_COUNT - 1 ? (
           <button
             type="button"
-            className="button slides__step"
+            className="button block block--yellow block--md slides__step"
             onClick={() => onSlide(slide + 1)}
           >
             Next
           </button>
         ) : (
-          <button type="button" className="button slides__step" onClick={onOpenMenu}>
+          <button type="button" className="well-button slides__step" onClick={onOpenMenu}>
             Menu
           </button>
         )}
@@ -550,7 +630,8 @@ function RevealView({
 }
 
 /**
- * The first time this player's own blob could turn up in somebody else's crowd.
+ * The first time this player's own counter could turn up in somebody else's
+ * crowd.
  *
  * The setting ships on, and that is a real change to what the game discloses:
  * until now the only way your answer became public was if you tapped share and
@@ -588,12 +669,12 @@ function BlobNotice({ onAnswered }: { onAnswered: () => void }): React.JSX.Eleme
   }
 
   return (
-    <div className="blob-notice" role="status">
+    <div className="blob-notice block block--cream block--sm" role="status">
       {/* Short on purpose. This lands on somebody's first reveal, and the
           crowd gives up height for every line of it. */}
       <p className="blob-notice__copy">
-        Your blob can turn up in other players&rsquo; crowds now, on the side you answered.
-        Turn that off any time in Your record.
+        Your counter can turn up in other players&rsquo; crowds now, on the side you
+        answered. Turn that off any time in Your record.
       </p>
       <button
         type="button"
@@ -604,7 +685,9 @@ function BlobNotice({ onAnswered }: { onAnswered: () => void }): React.JSX.Eleme
       >
         <Cross />
       </button>
-      {failed && <p className="notice notice--quiet">That did not save. It will ask again.</p>}
+      {failed && (
+        <p className="notice notice--quiet notice--cream">That did not save. It will ask again.</p>
+      )}
     </div>
   );
 }
@@ -632,33 +715,36 @@ function Cross(): React.JSX.Element {
 /**
  * What the vote paid.
  *
- * The band label leads and the number follows it: "Bullseye" is the thing worth
- * saying and "+60" is the receipt. The total counts up on arrival because it is
- * the one figure here that was earned rather than reported.
- *
- * Deliberately unaccented. The badge stamp and the histogram on this slide
- * already spend both of the two accents the screen is allowed.
+ * A block, and one of only two on the score slide: this is being handed to you,
+ * and everything else on that screen is a record of what already happened and
+ * sits in a well. The band label leads and the number follows it — "Bullseye"
+ * is the thing worth saying and "+60" is the receipt — and the total counts up
+ * on arrival because it is the one figure here that was earned rather than
+ * reported.
  */
 function PointsAward({ award, animate }: { award: Award; animate: boolean }): React.JSX.Element {
   const band = getBand(award.band);
   const total = useCountUp(award.total, animate);
 
   return (
-    <div className="award">
-      <div className="award__head">
+    <div
+      className={`award block block--yellow block--md${animate ? ' is-arriving' : ''}`}
+      role="status"
+    >
+      <span className="award__head">
         <span className="award__band">{band.label}</span>
-        {/* The count-up is decoration, so it is hidden and the settled total is
-            announced instead — a screen reader should not be read a number
-            still in flight. */}
-        <span className="award__total" aria-hidden="true">
-          +{total}
+        <span className="award__breakdown">
+          {award.base} for playing
+          {award.bonus > 0 ? ` · ${award.bonus} for landing within ${band.maxError}` : ''}
         </span>
-        <span className="visually-hidden">{award.total} points</span>
-      </div>
-      <p className="award__breakdown">
-        {award.base} for playing
-        {award.bonus > 0 ? ` · ${award.bonus} for landing within ${band.maxError}` : ''}
-      </p>
+      </span>
+      {/* The count-up is decoration, so it is hidden and the settled total is
+          announced instead — a screen reader should not be read a number still
+          in flight. */}
+      <span className="award__total" aria-hidden="true">
+        +{total}
+      </span>
+      <span className="visually-hidden">{award.total} points</span>
     </div>
   );
 }
