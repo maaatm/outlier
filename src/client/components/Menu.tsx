@@ -11,30 +11,24 @@
  * has not already earned.
  *
  * Two rooms write, and they are not the same kind of writing. The wardrobe
- * changes what a blob looks like, which is undone by pressing the other arrow.
- * Ask a question creates a real post on the subreddit under the player's own
- * name: public, permanent, and not undone by anything in this app. It leads the
- * list because it is the only entry that adds to the subreddit rather than
- * reading it back, and what guards it is not its position — it is that the panel
- * is the confirmation step, with one deliberate button instead of the wardrobe's
- * saving as it goes.
+ * changes what a counter looks like, which is undone by pressing the other
+ * arrow. Ask a question creates a real post on the subreddit under the player's
+ * own name: public, permanent, and not undone by anything in this app. It leads
+ * the list because it is the only entry that adds to the subreddit rather than
+ * reading it back, and what guards it is not its position — it is that the room
+ * is the confirmation step, with one deliberate button instead of the
+ * wardrobe's saving as it goes.
  *
  * The one exception is the Daily action at the top, which is not a room: every
- * entry below it opens in place, and that one leaves the post entirely. It sits
- * above the rule for exactly that reason — a player should be able to tell which
- * way a control goes before tapping it.
+ * entry below it opens in place, and that one leaves the post entirely. It is
+ * the orange block for exactly that reason — a player should be able to tell
+ * which way a control goes before tapping it.
  */
 
 import { navigateTo } from '@devvit/web/client';
 import { useEffect, useRef, useState } from 'react';
 
-import {
-  BLOB_SIZE,
-  BOX_PRICE,
-  CROWD_SIZE,
-  HIT_THRESHOLD,
-  TITLE_MAX_LENGTH,
-} from '../../shared/config.js';
+import { BOX_PRICE, CROWD_SIZE, HIT_THRESHOLD, TITLE_MAX_LENGTH } from '../../shared/config.js';
 import {
   ACCESSORIES,
   type Equipped,
@@ -64,13 +58,14 @@ import {
   submitQuestion,
 } from '../api.js';
 import { coalescingWriter } from '../coalesce.js';
+import { COUNTER_SIZE } from '../counterArt.js';
 import { Blob } from './Blob.js';
 import { PlayerBoard } from './PlayerBoard.js';
-import { StatBar } from './StatBar.js';
-import { WobbleRule } from './WobbleRule.js';
+import { StatBar, StatPill } from './StatBar.js';
 
 type PanelId = 'record' | 'wardrobe' | 'board' | 'ask';
 
+/** What the header calls each room. The felt titles below are their own. */
 const TITLES: Record<PanelId, string> = {
   record: 'Your record',
   wardrobe: 'Wardrobe',
@@ -88,16 +83,13 @@ type Entry = {
  * Ask a question is first, because it is the only entry here that adds anything
  * to the subreddit and the only one worth putting in front of somebody who has
  * just arrived on the pinned menu post. The three below it are all readings of
- * what has already happened, in the usual order: you, your blob, everyone else.
- *
- * It is still the one room that cannot be undone. Being first does not change
- * that — what guards it is that the panel is the confirmation step and nothing
- * in it posts without a deliberate press.
+ * what has already happened, in the usual order: you, your counter, everyone
+ * else.
  */
 const ENTRIES: Entry[] = [
   { id: 'ask', blurb: 'write one for the subreddit and post it' },
-  { id: 'record', blurb: 'your blob, your streak, and how often you read the room' },
-  { id: 'wardrobe', blurb: 'change the face and the accessory your blob wears' },
+  { id: 'record', blurb: 'your counter, streak, and how you read the room' },
+  { id: 'wardrobe', blurb: 'change the face and accessory your counter wears' },
   { id: 'board', blurb: 'who has banked the most points' },
 ];
 
@@ -156,39 +148,71 @@ export function Menu({
 
   return (
     <main className="app">
-      {/* The same header as the game, down to the counters, so opening the menu
-          moves nothing on the way in or back out. */}
+      {/*
+        The same header as the game, down to the pills, so opening the menu
+        moves nothing on the way in or back out. Inside a room the wordmark
+        gives way to the room's name: you are past the front door.
+      */}
       <header className="header">
-        <span className="header__mark">Outlier</span>
-        <span className="header__day">menu</span>
-        <StatBar stats={stats} />
+        {panel === null ? (
+          <span className="header__mark">Outlier</span>
+        ) : (
+          <span className="header__label">{TITLES[panel]}</span>
+        )}
+        <HeaderStats panel={panel} stats={stats} avatar={avatar} />
       </header>
 
-      <section className="card">
-        {/* Keyed so a page change remounts and cross-fades, and so a panel
-            opened after a long one starts at the top rather than mid-scroll. */}
-        <div className="menu__body fade-in" key={panel ?? 'root'}>
-          {panel === null && <Root onOpen={setPanel} daily={daily} />}
-          {panel === 'record' && <Record stats={stats} avatar={avatar} onShow={show} />}
-          {panel === 'wardrobe' && (
-            <Wardrobe avatar={avatar} onEquip={equip} onOpened={absorb} />
-          )}
-          {panel === 'board' && <Board />}
-          {panel === 'ask' && <Ask canSubmit={canSubmit} />}
-        </div>
-
-        {showBack && (
-          <button
-            type="button"
-            className="button menu__back"
-            onClick={() => (panel === null ? onExit?.() : setPanel(null))}
-          >
-            {panel === null ? 'Back to the question' : 'Back to the menu'}
-          </button>
+      {/* Keyed so a page change remounts and cross-fades, and so a room opened
+          after a long one starts at the top rather than mid-scroll. */}
+      <div className="menu__body fade-in" key={panel ?? 'root'}>
+        {panel === null && <Root onOpen={setPanel} daily={daily} />}
+        {panel === 'record' && <Record stats={stats} avatar={avatar} onShow={show} />}
+        {panel === 'wardrobe' && (
+          <Wardrobe avatar={avatar} onEquip={equip} onOpened={absorb} />
         )}
-      </section>
+        {panel === 'board' && <Board />}
+        {panel === 'ask' && <Ask canSubmit={canSubmit} />}
+      </div>
+
+      {showBack && (
+        <button
+          type="button"
+          className="well-button menu__back"
+          onClick={() => (panel === null ? onExit?.() : setPanel(null))}
+        >
+          {panel === null ? 'Back to the question' : 'Back to menu'}
+        </button>
+      )}
     </main>
   );
+}
+
+/**
+ * What the header carries in each room.
+ *
+ * A room is already about one number, and the other one is noise in it: the
+ * wardrobe is about coins, and everywhere you are only reading, points. The
+ * list is the one place both counters belong, because from there you might be
+ * going anywhere.
+ */
+function HeaderStats({
+  panel,
+  stats,
+  avatar,
+}: {
+  panel: PanelId | null;
+  stats: PlayerStats;
+  avatar: AvatarResponse | null;
+}): React.JSX.Element | null {
+  if (panel === null || panel === 'record') return <StatBar stats={stats} />;
+
+  // Absent rather than zero when signed out: a balance of nothing reads as an
+  // account with nothing in it, and there is no account.
+  if (panel === 'wardrobe') {
+    return avatar?.canSave ? <StatPill label="coins" value={avatar.coins} lit /> : null;
+  }
+
+  return <StatPill label="pts" value={stats.points} />;
 }
 
 /**
@@ -197,8 +221,8 @@ export function Menu({
  *
  * It lives up in `Menu` rather than inside `Record`, which unmounts on the way
  * into the wardrobe: state held in either room would refetch on every trip
- * between the two and flash the starter blob in the gap. The menu root never
- * pays for it at all, because nothing there shows a blob.
+ * between the two and flash the starter counter in the gap. The menu root never
+ * pays for it at all, because nothing there shows a counter.
  */
 function useAvatar(needed: boolean): {
   avatar: AvatarResponse | null;
@@ -265,7 +289,7 @@ function useAvatar(needed: boolean): {
   }
 
   /**
-   * Show the blob to other players, or stop.
+   * Show the counter to other players, or stop.
    *
    * Its own write rather than a field on the coalescing one above. That writer
    * exists because a stepper can be pressed faster than a round trip completes;
@@ -297,24 +321,23 @@ function Root({
 }): React.JSX.Element {
   return (
     <div className="menu__root">
-      <div>
+      {/* The wordmark alone. The paragraph explaining the game used to live
+          under it and it was the tallest thing on the screen — four rooms, the
+          Daily and the way out all have to fit under this, and they now do. */}
+      <div className="menu__hero block block--cream block--lg">
         <h1 className="menu__wordmark">Outlier</h1>
-        {/* With the rules gone to the sidebar, this is the only thing in the app
-            that says what the game is. It has to name both things being scored
-            without turning into a rules page. */}
-        <p className="menu__tagline">
-          One question a day about ordinary behavior. Answer it, then guess how many
-          people out of {CROWD_SIZE} answered the same way. You are scored on both &mdash;
-          how unusual your answer was, and how close the guess landed.
-        </p>
-        <DailyAction daily={daily} />
-        <WobbleRule salt={11} />
       </div>
+
+      <DailyAction daily={daily} />
 
       <ul className="menu__list">
         {ENTRIES.map((entry) => (
           <li key={entry.id}>
-            <button type="button" className="button menu__item" onClick={() => onOpen(entry.id)}>
+            <button
+              type="button"
+              className="button block block--cream block--sm menu__item"
+              onClick={() => onOpen(entry.id)}
+            >
               <span className="menu__item-label">{TITLES[entry.id]}</span>
               <span className="menu__item-blurb">{entry.blurb}</span>
             </button>
@@ -328,17 +351,17 @@ function Root({
 /**
  * The trip out to today's Daily.
  *
- * Inert while the pointer is in flight rather than absent: this sits at the top
- * of the screen, so a control that arrives a moment late shifts everything under
- * it just as the reader settles on it.
+ * Inert while the pointer is in flight rather than absent: this sits near the
+ * top of the screen, so a control that arrives a moment late shifts everything
+ * under it just as the reader settles on it.
  *
- * `none` is the one state that is not a button at all. There is nothing to press
- * until midnight, and a disabled button invites a press.
+ * `none` is the one state that is not a button at all. There is nothing to
+ * press until midnight, and a disabled button invites a press.
  */
 function DailyAction({ daily }: { daily: DailyPointer | null }): React.JSX.Element {
   if (daily?.state === 'none') {
     return (
-      <p className="notice notice--quiet menu__daily">
+      <p className="footnote menu__daily-note">
         Tomorrow&rsquo;s question posts at midnight UTC.
       </p>
     );
@@ -346,7 +369,7 @@ function DailyAction({ daily }: { daily: DailyPointer | null }): React.JSX.Eleme
 
   if (daily?.state === 'here') {
     return (
-      <button type="button" className="button menu__daily" disabled>
+      <button type="button" className="button block block--cream block--lg menu__daily" disabled>
         You&rsquo;re on today&rsquo;s question
       </button>
     );
@@ -359,8 +382,8 @@ function DailyAction({ daily }: { daily: DailyPointer | null }): React.JSX.Eleme
     <button
       type="button"
       // Answered already, so it still travels — it just stops being the thing to
-      // do next, and gives up the primary fill accordingly.
-      className={`button menu__daily${played ? '' : ' button--primary'}`}
+      // do next, and gives up the orange accordingly.
+      className={`button block block--${played ? 'cream' : 'orange'} block--lg menu__daily`}
       disabled={!permalink}
       onClick={() => permalink && navigateTo(new URL(permalink, REDDIT_ORIGIN).toString())}
     >
@@ -370,52 +393,25 @@ function DailyAction({ daily }: { daily: DailyPointer | null }): React.JSX.Eleme
 }
 
 /**
- * Every panel is the same shape: a title with its substance under it, flowing
- * from the top, and one quiet footnote pinned to the bottom of the card. The
- * footnote is where the fine print goes — the rule that would clutter the
- * substance above it but that somebody will eventually want.
+ * The fine print, on the felt at the bottom of a room.
  *
- * The wardrobe is the one room without one. It is the only panel taller than the
- * card it sits in — a balance, a blob, two steppers and the box — and fine print
- * under all of that is a line nobody scrolls to and something for the box button
- * to collide with on the way.
+ * It is the rule that would clutter the substance above it but that somebody
+ * will eventually want. Body copy rather than a label: two sentences set in
+ * tracked-out caps is a thing nobody reads.
  */
-function Panel({
-  title,
-  aside,
-  note,
-  children,
-}: {
-  title: string;
-  /** One figure on the title's own line. The wardrobe's balance, and nothing
-   *  else so far — a room that has a single number worth carrying at all times
-   *  gets it here rather than spending a row of the card on it. */
-  aside?: React.ReactNode;
-  note?: React.ReactNode;
-  children: React.ReactNode;
-}): React.JSX.Element {
-  return (
-    <>
-      <div className="menu__panel">
-        <div className="menu__title">
-          <h1 className="menu__heading">{title}</h1>
-          {aside}
-        </div>
-        {children}
-      </div>
-      {note !== undefined && <p className="notice notice--quiet">{note}</p>}
-    </>
-  );
+function Footnote({ children }: { children: React.ReactNode }): React.JSX.Element {
+  return <p className="footnote">{children}</p>;
 }
 
 /**
- * Banked state, read off the same counters the header shows — and the blob those
- * counters belong to.
+ * Banked state, read off the same counters the header shows — and the counter
+ * those numbers belong to.
  *
- * The blob is here to say whose record this is. The one thing on this page that
- * can be pressed sits beside it, and it is not about what the blob looks like —
- * that is the wardrobe's job — but about who else gets to see it. It belongs
- * here for the same reason the blob does: this is the page about you.
+ * The counter is here to say whose record this is. The one thing on this page
+ * that can be pressed sits beside it, and it is not about what the counter
+ * looks like — that is the wardrobe's job — but about who else gets to see it.
+ * It belongs here for the same reason the drawing does: this is the page about
+ * you.
  */
 function Record({
   stats,
@@ -430,77 +426,80 @@ function Record({
     stats.totalPlayed > 0 ? Math.round((stats.totalHits / stats.totalPlayed) * 100) : 0;
 
   return (
-    <Panel
-      title={TITLES.record}
-      note={
-        <>
-          streak counts days you answered something, not questions &mdash; a second one the
-          same day pays points but does not move it. Miss a day and it goes back to zero;
-          best keeps the number it reached. The day turns over at midnight UTC. Points are
-          the score and are never spent; coins are, in the wardrobe.
-        </>
-      }
-    >
-      <div className="record__blob">
-        <Blob
-          face={avatar?.face}
-          accessory={avatar?.accessory}
-          size={BLOB_SIZE.panel}
-          label="Your blob"
-        />
-        {avatar?.canSave && (
-          <ShowBlob showBlob={avatar.showBlob} onShow={onShow} />
-        )}
+    <div className="menu__panel">
+      <div className="record__card block block--cream block--lg">
+        {/* The wrapper is what the counter's shadow is cast from — see the
+            note on `.dot-slot--cameo::before` in the stylesheet. */}
+        <span className="record__cast">
+          <Blob
+            face={avatar?.face}
+            accessory={avatar?.accessory}
+            size={COUNTER_SIZE.panel}
+            fill="var(--counter-mine)"
+            label="Your counter"
+          />
+        </span>
+        <div className="record__side">
+          <span className="record__title">You, on the table</span>
+          {avatar?.canSave && <ShowBlob showBlob={avatar.showBlob} onShow={onShow} />}
+        </div>
       </div>
 
       {/* Four figures rather than three, in pairs: the coin balance belongs
           beside the totals it is earned alongside, and a fourth tile in a
           three-up grid would sit on a row of its own looking like an
-          afterthought. */}
+          afterthought. Every one of them is a well, because every one of them
+          is already banked. */}
       <div className="figures figures--pairs">
-        <div className="figure">
-          <span className="figure__label">streak</span>
+        <div className="figure well">
+          <span className="label label--felt">streak</span>
           <span className="figure__value">{stats.streak}</span>
         </div>
-        <div className="figure">
-          <span className="figure__label">best</span>
-          <span className="figure__value">{stats.bestStreak}</span>
+        <div className="figure well">
+          <span className="label label--felt">best streak</span>
+          <span className="figure__value figure__value--yellow">{stats.bestStreak}</span>
         </div>
-        <div className="figure">
-          <span className="figure__label">points</span>
+        <div className="figure well">
+          <span className="label label--felt">points</span>
           <span className="figure__value">{stats.points}</span>
         </div>
-        <div className="figure">
-          <span className="figure__label">coins</span>
-          <span className="figure__value">{stats.coins}</span>
+        <div className="figure well">
+          <span className="label label--felt">coins</span>
+          <span className="figure__value figure__value--orange">{stats.coins}</span>
         </div>
       </div>
 
-      {stats.totalPlayed > 0 ? (
-        <p className="axis__line">
-          {stats.totalPlayed} {stats.totalPlayed === 1 ? 'question' : 'questions'} answered.
-          You landed within {HIT_THRESHOLD} points on {stats.totalHits} of them &mdash;{' '}
-          {rate}%.
-        </p>
-      ) : (
-        <p className="axis__line">Nothing banked yet. Answer anything and the counters start.</p>
-      )}
-    </Panel>
+      <div className="record__read block block--cream block--lg">
+        <span className="label">how you read the room</span>
+        {stats.totalPlayed > 0 ? (
+          <p className="record__line">
+            {stats.totalPlayed} {stats.totalPlayed === 1 ? 'question' : 'questions'} answered.
+            You landed within {HIT_THRESHOLD} points on {stats.totalHits} of them &mdash;{' '}
+            <strong>{rate}%</strong>.
+          </p>
+        ) : (
+          <p className="record__line">
+            Nothing banked yet. Answer anything and the counters start.
+          </p>
+        )}
+      </div>
+    </div>
   );
 }
 
 /**
- * Whether your blob stands in other people's crowds.
+ * Whether your counter stands in other people's crowds.
  *
  * One line of plain copy, because the thing it decides is not obvious from the
- * label and is worth being unambiguous about: turning it off is retroactive. It
- * is a filter applied every time a crowd is drawn rather than a flag stamped on
- * a vote, so switching it off takes the blob out of questions answered months
- * ago as well as the next one.
+ * switch and is worth being unambiguous about: turning it off is retroactive.
+ * It is a filter applied every time a crowd is drawn rather than a flag stamped
+ * on a vote, so switching it off takes the counter out of questions answered
+ * months ago as well as the next one.
  *
  * A switch rather than two buttons, because this is a setting being read as
  * often as it is changed, and a setting should show its state without being
- * pressed.
+ * pressed. The state is written out beside it as well: the knob's position is
+ * the signal and the word is the confirmation, and neither is a colour.
  */
 function ShowBlob({
   showBlob,
@@ -510,45 +509,46 @@ function ShowBlob({
   onShow: (showBlob: boolean) => void;
 }): React.JSX.Element {
   return (
-    <div className="show-blob">
+    <>
+      <span className="record__note">
+        Other players see your counter in the crowd on questions you have both answered, on
+        the side you picked. Turn it off and it comes out of every crowd, including the ones
+        it is already in.
+      </span>
       <button
         type="button"
         className="switch"
         role="switch"
         aria-checked={showBlob}
+        aria-label="Show my counter to other players"
         onClick={() => onShow(!showBlob)}
       >
         <span className="switch__track" aria-hidden="true">
           <span className="switch__knob" />
         </span>
-        <span className="switch__label">Show my blob to other players</span>
+        <span className="switch__state" aria-hidden="true">
+          {showBlob ? 'on' : 'off'}
+        </span>
       </button>
-      <p className="show-blob__note">
-        Other players see your blob in the crowd on questions you have both answered, on the
-        side you picked. Turn it off and it comes out of every crowd, including the ones it
-        is already in.
-      </p>
-    </div>
+    </>
   );
 }
 
 /**
- * The blob you are making, and the two layers it is made of.
+ * The counter you are making, and the two layers it is made of.
  *
- * A blob is a face with an accessory over it, so the wardrobe is that same pair
- * of layers with a way to step through each — the face above, the accessory
- * below, in the order they stack. Everything is on one screen at one time: the
- * grid this replaced put nine tiles under nine more and made choosing an
- * accessory a scroll away from seeing what it looked like on.
+ * A counter is a face with an accessory over it, so the wardrobe is that same
+ * pair of layers with a way to step through each — the face above, the
+ * accessory below, in the order they stack. Everything is on one screen at one
+ * time: the grid this replaced put nine tiles under nine more and made choosing
+ * an accessory a scroll away from seeing what it looked like on.
  *
- * There is no save button and no confirm. Stepping *is* equipping, and the blob
- * at the top redrawing is the whole receipt — this is a two-tap game and the
- * wardrobe should not be the heaviest screen in it.
+ * There is no save button and no confirm. Stepping *is* equipping, and the
+ * counter at the top re-seating itself is the whole receipt — this is a two-tap
+ * game and the wardrobe should not be the heaviest screen in it.
  *
- * Rarity is the colour of the layer's border and the word beside the count. The
- * colours are their own tokens rather than any of the four the rest of the app
- * assigns meanings to, and they appear on this screen and no other — see the
- * note on the ladder in `styles.css`.
+ * Rarity is the colour of the accessory's own bottom face and the word beside
+ * the count. It appears on this screen and no other.
  */
 function Wardrobe({
   avatar,
@@ -560,51 +560,47 @@ function Wardrobe({
   onOpened: (box: BoxResponse) => void;
 }): React.JSX.Element {
   return (
-    <Panel
-      title={TITLES.wardrobe}
-      /* The balance sits on the heading's line rather than on a row of its own.
-         This room has to fit a 512px card without scrolling — see the note on
-         `.wardrobe` in the stylesheet — and the title row was the one line here
-         with space going spare.
+    /* The wrapper is unconditional so the room keeps its shape while the pair
+       is in flight — a room that re-lays-out the moment the counter arrives
+       moves everything under the reader. */
+    <div className="wardrobe">
+      <h1 className="screen__title">Your counter</h1>
 
-         Absent rather than zero when signed out: a balance of nothing reads as
-         an account with nothing in it, and there is no account. */
-      aside={
-        avatar?.canSave ? (
-          <p className="menu__aside">
-            <span className="menu__aside-label">coins</span>
-            <span className="menu__aside-value">{avatar.coins}</span>
-          </p>
-        ) : undefined
-      }
-    >
-      {/* The wrapper is unconditional so the room keeps its shape while the pair
-          is in flight — a panel that re-lays-out the moment the blob arrives
-          moves everything under the reader. */}
-      <div className="wardrobe">
-        {avatar === null ? (
-          <p className="notice notice--quiet">Loading.</p>
-        ) : (
-          <>
-            <div className="wardrobe__preview">
+      {avatar === null ? (
+        <p className="notice notice--quiet notice--spaced">Loading.</p>
+      ) : (
+        <>
+          <div className="wardrobe__preview">
+            {/* The tip rides on this wrapper rather than on the drawing.
+                The drawing carries a drop shadow, and an element that is both
+                filtered and the target of an animation is the one shape a
+                browser is liable to rasterise into a rectangle — which is a
+                soft dark box around your counter every time you step it.
+                Keyed on the pair, so the tip still replays on a swap. */}
+            <span className="wardrobe__tip" key={`${avatar.face}:${avatar.accessory}`}>
               <Blob
                 face={avatar.face}
                 accessory={avatar.accessory}
-                size={BLOB_SIZE.wardrobe}
-                label={`Your blob: ${resolveFace(avatar.face).name}, ${resolveAccessory(
+                size={COUNTER_SIZE.wardrobe}
+                fill="var(--counter-mine)"
+                label={`Your counter: ${resolveFace(avatar.face).name}, ${resolveAccessory(
                   avatar.accessory
                 ).name}`}
               />
-            </div>
+            </span>
+          </div>
 
-            {!avatar.canSave && (
-              <p className="notice notice--quiet">Sign in to change your blob.</p>
-            )}
+          {!avatar.canSave && (
+            <p className="notice notice--quiet notice--spaced">
+              Sign in to change your counter.
+            </p>
+          )}
 
-            {/* The steppers walk what this player owns and nothing else, using
-                the same rule the equip endpoint enforces. A ring that includes
-                items the server will refuse is a ring where most steps do
-                nothing. */}
+          {/* The steppers walk what this player owns and nothing else, using
+              the same rule the equip endpoint enforces. A ring that includes
+              items the server will refuse is a ring where most steps do
+              nothing. */}
+          <div className="wardrobe__layers">
             <Layer
               kind="face"
               items={ownedItems(FACES, avatar.owned)}
@@ -619,12 +615,12 @@ function Wardrobe({
               locked={!avatar.canSave}
               onPick={(id) => onEquip({ face: avatar.face, accessory: id })}
             />
+          </div>
 
-            {avatar.canSave && <GiftBox avatar={avatar} onOpened={onOpened} />}
-          </>
-        )}
-      </div>
-    </Panel>
+          {avatar.canSave && <GiftBox avatar={avatar} onOpened={onOpened} />}
+        </>
+      )}
+    </div>
   );
 }
 
@@ -632,14 +628,12 @@ function Wardrobe({
  * The box, and the one moment in this room.
  *
  * It sits under the layers because it is what fills them: the reader sees what
- * they have, then the way to have more. The count of the catalogue lives here
- * rather than beside the steppers — those now walk what you own, so this is the
- * only place left that can say how much there is to want.
- *
- * Two rows, always exactly two, because this room has a height budget and the
- * bottom of it is a button that has to stay pressable without scrolling. The
- * result takes the status row's place rather than pushing it down, and the
- * shortfall is spoken by the button itself rather than by a notice under it.
+ * they have, then the way to have more. A well, because what it holds is a
+ * count of what you already own — and exactly two rows, always, because this
+ * room has a height budget and the bottom of it is a button that has to stay
+ * pressable without scrolling. The result takes the status row's place rather
+ * than pushing it down, and the shortfall is spoken by the button itself rather
+ * than by a notice under it.
  */
 function GiftBox({
   avatar,
@@ -669,44 +663,51 @@ function GiftBox({
   }
 
   return (
-    <div className="box">
-      {result ? (
-        <BoxResult result={result} avatar={avatar} />
-      ) : (
-        <div className="box__head">
-          <span className="box__label">gift box</span>
-          <span className="box__owned">
-            you own {avatar.owned.length} of {ITEMS.length}
-          </span>
-        </div>
-      )}
+    <div className="box well">
+      {/* The head is one fixed slot whichever state it is in. A result is
+          taller than the status line it replaces, and a box that grew by fifty
+          pixels the moment it was opened pushed its own button down onto the
+          way out of the room. */}
+      <div className="box__head">
+        {result ? (
+          <BoxResult result={result} avatar={avatar} />
+        ) : (
+          <div className="label label--felt label-row">
+            <span>gift box</span>
+            <span>
+              you own {avatar.owned.length} of {ITEMS.length}
+            </span>
+          </div>
+        )}
+      </div>
 
       <button
         type="button"
-        className={`button box__open${affordable ? ' button--primary' : ''}`}
+        className="button block block--orange block--md box__open"
         disabled={!affordable || opening}
         onClick={() => void open()}
       >
         {opening
           ? 'Opening...'
           : affordable
-            ? `Open a box · ${BOX_PRICE}`
+            ? `${result ? 'Open another' : 'Open a box'} · ${BOX_PRICE}`
             : `${BOX_PRICE - avatar.coins} more coins`}
       </button>
 
-      {error && <p className="notice notice--quiet">{error}</p>}
+      {error && <p className="notice notice--quiet notice--spaced">{error}</p>}
     </div>
   );
 }
 
 /**
- * What came out, on one line.
+ * What came out, on one row, standing exactly where the status line it replaced
+ * stood.
  *
- * The item is drawn on the player's own blob rather than alone, because an
- * accessory is a change to a silhouette and a silhouette needs the head it
- * breaks. Rarity is the word beside the name and the colour of the row's border
- * — the same three-step ladder the layers use, which lives on this screen and no
- * other.
+ * The rarity ladder is the block's own colour here — the one exception to
+ * everything else in this app meaning one thing per colour, kept an exception
+ * by never leaving this screen. A duplicate says so in the same row rather than
+ * adding one, because a room with a height budget cannot afford a section that
+ * grows when something happens in it.
  *
  * Keyed on the item and the balance together, so opening two of the same
  * duplicate in a row still replays the moment rather than sitting still.
@@ -731,21 +732,18 @@ function BoxResult({
 
   return (
     <div
-      className={`box__result box__result--${item.rarity}`}
+      className={`box__result block box__result--${item.rarity}`}
       key={`${result.item}:${result.coins}`}
       role="status"
     >
-      <Blob
-        face={item.kind === 'face' ? item.id : avatar.face}
-        accessory={item.kind === 'accessory' ? item.id : avatar.accessory}
-        size={BLOB_SIZE.inline}
-      />
-      <span className="box__result-name">{item.name}</span>
-      <span className="box__result-meta">
-        {/* The receipt is the last thing and the first thing to be cut when the
-            row runs out of width: the name and the rarity are what the moment is
-            about, and the refund is already in the balance above. */}
-        {item.rarity} &middot; {result.duplicate ? `+${result.refunded} back` : 'new'}
+      <span className="box__result-head">
+        <span className="box__result-name">{item.name}</span>
+        <span className="box__result-meta">
+          {item.rarity} · {result.duplicate ? `duplicate · +${result.refunded} coins` : 'new'}
+        </span>
+      </span>
+      <span className="box__result-count">
+        {avatar.owned.length} of {ITEMS.length}
       </span>
     </div>
   );
@@ -754,10 +752,13 @@ function BoxResult({
 /**
  * One layer, and the two arrows that walk it.
  *
+ * The row is a cream block and the arrows are yellow blocks sitting on it. The
+ * row itself does not press — only the arrows do, and a block that looks
+ * pressable and is not is the one lie this system can tell.
+ *
  * The count is spelled out beside the rarity because the arrows alone say
- * nothing about how far there is to go, and a ring with no end needs some other
- * way to tell you that you have seen all of it. It counts what you *own* now, so
- * it grows as boxes are opened — how big the catalogue is is the box's line to
+ * nothing about how far there is to go. It counts what you *own* now, so it
+ * grows as boxes are opened — how big the catalogue is is the box's line to
  * deliver, once, rather than a reproach attached to both steppers.
  */
 function Layer({
@@ -779,43 +780,40 @@ function Layer({
   const stuck = locked || items.length < 2;
 
   return (
-    <div className={`wardrobe__layer wardrobe__layer--${item.rarity}`}>
-      <div className="wardrobe__stepper">
-        <button
-          type="button"
-          className="wardrobe__arrow"
-          aria-label={`Previous ${kind}`}
-          disabled={stuck}
-          onClick={() => onPick(stepItem(items, current, -1).id)}
-        >
-          <Chevron back />
-        </button>
+    <div className="stepper block block--cream block--md">
+      <button
+        type="button"
+        className="button block block--yellow stepper__arrow"
+        aria-label={`Previous ${kind}`}
+        disabled={stuck}
+        onClick={() => onPick(stepItem(items, current, -1).id)}
+      >
+        <Chevron back />
+      </button>
 
-        {/* Announced as one string on change, so a reader hears "Wink, face,
-            rare, 7 of 8" rather than four separate updates racing each other.
+      {/* Announced as one string on change, so a reader hears "Wink, face,
+          rare, 7 of 8" rather than four separate updates racing each other.
 
-            Which layer this is used to be a line of its own above the stepper.
-            It moved into the meta because the room has a height budget and that
-            line was a whole row per layer to carry one word — and the word is
-            the least of what this line says. */}
-        <span className="wardrobe__pick" aria-live="polite">
-          <span className="wardrobe__name">{item.name}</span>
-          <span className="wardrobe__meta">
-            {kind} &middot; {item.rarity} &middot; {itemIndex(items, current) + 1} of{' '}
-            {items.length}
-          </span>
+          Which layer this is used to be a line of its own above the stepper. It
+          moved into the meta because the room has a height budget and that line
+          was a whole row per layer to carry one word — and the word is the least
+          of what this line says. */}
+      <span className="stepper__pick" aria-live="polite">
+        <span className="stepper__name">{item.name}</span>
+        <span className={`stepper__meta stepper__meta--${item.rarity}`}>
+          {kind} · {item.rarity} · {itemIndex(items, current) + 1} of {items.length}
         </span>
+      </span>
 
-        <button
-          type="button"
-          className="wardrobe__arrow"
-          aria-label={`Next ${kind}`}
-          disabled={stuck}
-          onClick={() => onPick(stepItem(items, current, 1).id)}
-        >
-          <Chevron back={false} />
-        </button>
-      </div>
+      <button
+        type="button"
+        className="button block block--yellow stepper__arrow"
+        aria-label={`Next ${kind}`}
+        disabled={stuck}
+        onClick={() => onPick(stepItem(items, current, 1).id)}
+      >
+        <Chevron back={false} />
+      </button>
     </div>
   );
 }
@@ -825,8 +823,7 @@ function Layer({
  *
  * The bundled fonts are subsetted to the Latin ranges they need, so an arrow
  * glyph would fall through to whatever the device happens to have. A stroked
- * path is two lines of markup, always the same shape, and is the drawing
- * language the rest of the app is already in.
+ * path is two lines of markup and always the same shape.
  */
 function Chevron({ back }: { back: boolean }): React.JSX.Element {
   return (
@@ -846,18 +843,15 @@ function Chevron({ back }: { back: boolean }): React.JSX.Element {
 /** Players by points banked, weekly by default. */
 function Board(): React.JSX.Element {
   return (
-    <Panel
-      title={TITLES.board}
-      note={
-        <>
-          Points are banked per vote, so every question pays &mdash; the Daily, an open
-          question, or one from the archive. The weekly board starts over on Monday at
-          midnight UTC; all time never resets.
-        </>
-      }
-    >
+    <div className="menu__panel">
+      <h1 className="screen__title">Who&rsquo;s ahead</h1>
       <PlayerBoard />
-    </Panel>
+      <Footnote>
+        Points are banked per vote, so every question pays &mdash; the Daily, an open
+        question, or one from the archive. The weekly board starts over on Monday at
+        midnight UTC; all time never resets.
+      </Footnote>
+    </div>
   );
 }
 
@@ -880,14 +874,14 @@ function Board(): React.JSX.Element {
  * field with a limit left — Reddit's, on titles, which is a post that will not
  * be created rather than a matter of taste.
  *
- * **One primary button, and the panel is the confirm.** Nothing here submits on
+ * **One primary button, and the room is the confirm.** Nothing here submits on
  * blur or on the last keystroke. The wardrobe can afford to save as it goes
  * because the way to undo the wardrobe is to press the other arrow; there is no
  * other arrow for a post.
  *
  * **The client's validation is a courtesy.** Every rule below is re-run on the
  * server before anything is created, and that is the gate — this copy exists to
- * say why the button is dark, not to decide whether the question is allowed.
+ * say why the button is inert, not to decide whether the question is allowed.
  */
 function Ask({ canSubmit }: { canSubmit: boolean }): React.JSX.Element {
   const [text, setText] = useState('');
@@ -921,19 +915,25 @@ function Ask({ canSubmit }: { canSubmit: boolean }): React.JSX.Element {
   }
 
   return (
-    <Panel title={TITLES.ask}>
-      <div className="ask">
-        {!canSubmit && (
-          <p className="notice notice--quiet">
-            Sign in to ask the subreddit something. You can read the rest of the menu either
-            way.
-          </p>
-        )}
+    <div className="menu__panel">
+      <h1 className="screen__title">Ask the room</h1>
+      <p className="screen__lede">
+        A good one splits the room and takes two words to answer. Yours goes in the pile
+        the moderators draw tomorrow&rsquo;s question from.
+      </p>
 
-        <Field id="ask-text" label="Your question">
+      {!canSubmit && (
+        <p className="notice notice--spaced">
+          Sign in to ask the subreddit something. You can read the rest of the menu either
+          way.
+        </p>
+      )}
+
+      <div className="ask block block--cream block--lg">
+        <Field id="ask-text" label="the question">
           <input
             id="ask-text"
-            className="ask__input"
+            className="ask__input well--cut"
             type="text"
             value={text}
             placeholder="Do you eat the pizza crust?"
@@ -943,20 +943,20 @@ function Ask({ canSubmit }: { canSubmit: boolean }): React.JSX.Element {
         </Field>
 
         <div className="ask__pair">
-          <Field id="ask-a" label="First answer">
+          <Field id="ask-a" label="first answer">
             <input
               id="ask-a"
-              className="ask__input"
+              className="ask__input well--cut"
               type="text"
               value={labelA}
               disabled={!canSubmit}
               onChange={(event) => setLabelA(event.target.value)}
             />
           </Field>
-          <Field id="ask-b" label="Second answer">
+          <Field id="ask-b" label="second answer">
             <input
               id="ask-b"
-              className="ask__input"
+              className="ask__input well--cut"
               type="text"
               value={labelB}
               disabled={!canSubmit}
@@ -970,12 +970,12 @@ function Ask({ canSubmit }: { canSubmit: boolean }): React.JSX.Element {
             thing to invent. */}
         <Field
           id="ask-title"
-          label="Post title (optional)"
-          hint={`${TITLE_MAX_LENGTH - title.length} left`}
+          label="post title — optional"
+          hint={`${title.length} / ${TITLE_MAX_LENGTH}`}
         >
           <input
             id="ask-title"
-            className="ask__input"
+            className="ask__input well--cut"
             type="text"
             maxLength={TITLE_MAX_LENGTH}
             value={title}
@@ -984,25 +984,25 @@ function Ask({ canSubmit }: { canSubmit: boolean }): React.JSX.Element {
             onChange={(event) => setTitle(event.target.value)}
           />
         </Field>
-
-        <AskPreview text={text} labelA={labelA} labelB={labelB} title={title} />
-
-        <button
-          type="button"
-          className="button button--primary ask__post"
-          disabled={!ready}
-          onClick={() => void post()}
-        >
-          {posting ? 'Posting...' : 'Post this question'}
-        </button>
-
-        {error ? (
-          <p className="notice notice--quiet">{error}</p>
-        ) : (
-          started && !check.ok && <p className="notice notice--quiet">{check.reason}</p>
-        )}
       </div>
-    </Panel>
+
+      <AskPreview text={text} labelA={labelA} labelB={labelB} title={title} />
+
+      <button
+        type="button"
+        className="button block block--orange block--lg ask__post"
+        disabled={!ready}
+        onClick={() => void post()}
+      >
+        {posting ? 'Posting...' : 'Post it'}
+      </button>
+
+      {error ? (
+        <p className="notice notice--quiet notice--spaced">{error}</p>
+      ) : (
+        started && !check.ok && <p className="notice notice--quiet notice--spaced">{check.reason}</p>
+      )}
+    </div>
   );
 }
 
@@ -1026,11 +1026,9 @@ function Field({
 }): React.JSX.Element {
   return (
     <div className="ask__field">
-      <div className="ask__head">
-        <label className="ask__label" htmlFor={id}>
-          {label}
-        </label>
-        {hint !== undefined && <span className="ask__hint">{hint}</span>}
+      <div className="label label-row">
+        <label htmlFor={id}>{label}</label>
+        {hint !== undefined && <span>{hint}</span>}
       </div>
       {children}
     </div>
@@ -1039,6 +1037,9 @@ function Field({
 
 /**
  * The post as it will appear, which is the part nobody can take back.
+ *
+ * A well cut into the felt: it is the one block in this room that is not a
+ * control, and the difference has to be visible before the button is pressed.
  *
  * It resolves the title the same way the server does — `normalizeTitle` with the
  * question as the fallback — so an untouched title field shows what it will
@@ -1058,13 +1059,14 @@ function AskPreview({
   const shown = normalizeTitle(title, text);
 
   return (
-    <div className="ask__preview">
-      <p className="section__title">what the subreddit sees</p>
-      <p className="ask__preview-title">{shown || 'Your question, as its own post.'}</p>
+    <div className="ask__preview well">
+      <span className="label label--felt">how it will look</span>
+      <span className="ask__preview-title">{shown || 'Your question, as its own post.'}</span>
       <p className="ask__preview-text">{text || 'The question goes here.'}</p>
-      <p className="ask__preview-answers">
-        {labelA} &middot; {labelB}
-      </p>
+      <div className="ask__preview-answers">
+        <span className="ask__preview-answer">{labelA}</span>
+        <span className="ask__preview-answer">{labelB}</span>
+      </div>
     </div>
   );
 }

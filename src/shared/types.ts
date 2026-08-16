@@ -281,6 +281,20 @@ export type PlayerBoardEntry = {
   name: string;
   /** Points banked — this week on the weekly board, lifetime on the other. */
   points: number;
+  /**
+   * What their counter is wearing, so the board draws the player rather than a
+   * disc standing in for one.
+   *
+   * Not gated on `showBlob`, and deliberately: that setting is about standing
+   * anonymously in somebody else's crowd, on a question you both answered,
+   * where the counter says something about how you voted. A leaderboard row is
+   * already a name and a score the player put there on purpose, and the
+   * drawing beside it discloses nothing the row does not.
+   *
+   * Absent equipment is the starter pair rather than an empty slot — see
+   * `unpackAvatar` — so this is never null.
+   */
+  avatar: Equipped;
 };
 
 /**

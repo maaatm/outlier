@@ -1,33 +1,35 @@
 /**
- * One hundred dots. Each dot is a person. One of them is you.
+ * One hundred counters, tipped onto the table. Each one is a person. One of
+ * them is you.
  *
- * This replaces the percentage bar. The count *is* the visual: nineteen dots
+ * This replaces the percentage bar. The count *is* the visual: nineteen pieces
  * against eighty-one lands harder than "19%". It is the one place in the app
  * worth spending effort on, so everything else on the screen stays quiet.
  *
  * The crowd sizes itself to whatever box it is given — it measures its parent
- * and derives the cell from that, so the dots grow to fill the slide rather
+ * and derives the cell from that, so the counters grow to fill the slide rather
  * than sitting at a fixed size in the middle of it. When the box changes, and it
  * does the moment an answer is picked, the crowd travels to its new size instead
- * of snapping: every dot moves and resizes on one clock, so a hundred of them
+ * of snapping: every piece moves and resizes on one clock, so a hundred of them
  * read as a single group being scaled.
  *
  * While the player drags the slider the crowd previews their guess: the first
- * `split` dots take one colour and the rest take the other, so the two groups
- * appear without anything moving. The grid is the same grid — colour is the only
- * thing that travels, which leaves the reveal's journey still to come.
+ * `split` counters go yellow and the rest stay cream, so the two groups appear
+ * without anything moving. The grid is the same grid — colour is the only thing
+ * that travels, which leaves the reveal's journey still to come.
  *
- * On reveal the dots travel from a neutral scatter into two camps over ~600ms
- * with a 6ms stagger and a light spring overshoot. Your dot lands last, ~150ms
- * behind the pack, with a small pop. Underneath all of that they bob gently and
- * out of step with each other, so the crowd reads as alive rather than parked.
+ * On reveal the counters sweep from a neutral scatter into two piles over
+ * ~600ms with a 6ms stagger and a light spring overshoot. Yours lands last,
+ * ~150ms behind the pack, and settles. They do not otherwise move: these are
+ * moulded pieces lying on felt, and the sweep is the only moment the crowd is
+ * allowed.
  *
  * ## The cameos
  *
- * On the reveal, and nowhere else, up to ten of the dots are real players drawn
- * as their blobs, each standing in the camp they actually answered in. They are
- * *of* the hundred rather than added to it — a cameo is one of the dots drawn
- * larger, so the count on screen is still the count — and they are scattered
+ * On the reveal, and nowhere else, up to ten of the counters are real players
+ * drawn as their own, each standing in the camp they actually answered in. They
+ * are *of* the hundred rather than added to it — a cameo is one of the pieces
+ * drawn larger, so the count on screen is still the count — and they are scattered
  * through their camp rather than lined up at the front of it, so the difference
  * in size reads as "some of these people are ones we know" rather than as a cast
  * standing in front of an audience.
@@ -35,11 +37,11 @@
  * Three things they deliberately do not get. They do not travel on their own
  * clock: they leave the scatter with everybody else and grow into place over the
  * same 600ms, because the reveal is one moment and not two. They do not take the
- * top-left cell of your camp, which belongs to your dot. And they get no extra
- * imperfection — the same seeded jitter as everyone else, and nothing more.
+ * top-left cell of your camp, which belongs to you. And they get no extra
+ * imperfection — the same seeded tilt as everyone else, and nothing more.
  *
- * A blob with no name is decoration, and ten names printed under ten blobs is a
- * wall of text on the most carefully composed screen in the app. So a name is
+ * A counter with no name is decoration, and ten names printed under ten of them
+ * is a wall of text on the most carefully composed screen in the app. So a name is
  * something you ask for: hover where a hover means something, tap where it does
  * not, and the name appears in the caption slot the crowd already has. For a
  * reader who can do neither, the field keeps its one-breath summary and the
@@ -48,10 +50,8 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
-import type { BadgeAccent } from '../../shared/badges.js';
 import { CROWD_SIZE } from '../../shared/config.js';
 import type { Equipped } from '../../shared/items.js';
-import type { GroupColors } from '../colors.js';
 import {
   DOT_RATIO,
   PER_ROW,
@@ -64,17 +64,14 @@ import {
   cellFor,
   scatterLayout,
 } from '../crowdLayout.js';
-import { facedDots, hashUnit, jitterFor, scatterFor } from '../jitter.js';
+import { counterTilt } from '../counterArt.js';
+import { facedDots, jitterFor, scatterFor } from '../jitter.js';
 import { Blob } from './Blob.js';
 
 const FACES = 8;
 const STAGGER_MS = 6;
-/** Your dot lands this far behind the pack. */
+/** Your counter lands this far behind the pack. */
 const MINE_DELAY_MS = 150;
-
-/** Idle bob, in seconds. Each dot picks its own from a seeded hash. */
-const BOB_MIN = 1.9;
-const BOB_MAX = 3.4;
 
 /**
  * One player in the crowd.
@@ -93,16 +90,13 @@ export type CrowdCameo = {
 type Props = {
   /** How many of the hundred stand with you. Null before the reveal. */
   withYou: number | null;
-  accent: BadgeAccent;
   /**
-   * The guess being previewed: this many dots take one colour, the rest the
-   * other. The crowd stays in its scatter — only the colours move. Null when
-   * there is nothing to preview, and ignored once `withYou` arrives, because the
-   * reveal has its own arrangement and its own accent.
+   * The guess being previewed: this many counters go yellow and the rest stay
+   * cream. The crowd stays in its scatter — only the colour moves. Null when
+   * there is nothing to preview, and ignored once `withYou` arrives, because
+   * the reveal has its own arrangement and its own colours.
    */
   split?: number | null;
-  /** The pair the preview is drawn in. Without it there is no preview. */
-  groupColors?: GroupColors | null;
   /** The label of the side the player picked, for the accessible summary. */
   yourLabel?: string;
   otherLabel?: string;
@@ -126,9 +120,7 @@ type Props = {
 
 export function DotCrowd({
   withYou,
-  accent,
   split = null,
-  groupColors = null,
   yourLabel,
   otherLabel,
   animate = true,
@@ -136,12 +128,10 @@ export function DotCrowd({
   onName,
 }: Props): React.JSX.Element {
   const revealed = withYou !== null;
-  // The preview exists only before the reveal, and only once there is a pair of
-  // colours to draw it in.
-  const preview =
-    !revealed && groupColors !== null && split !== null
-      ? { colors: groupColors, count: Math.min(CROWD_SIZE, Math.max(0, Math.round(split))) }
-      : null;
+  // The preview exists only before the reveal, and only once a side has been
+  // picked — there is nothing to be with until then.
+  const previewCount =
+    !revealed && split !== null ? Math.min(CROWD_SIZE, Math.max(0, Math.round(split))) : null;
   const boxRef = useRef<HTMLDivElement>(null);
   const [box, setBox] = useState({ width: 0, height: 0 });
 
@@ -246,9 +236,9 @@ export function DotCrowd({
             ? `${withYou} of ${CROWD_SIZE} people answered ${yourLabel ?? 'the same as you'}, ` +
               `${CROWD_SIZE - (withYou ?? 0)} answered ${otherLabel ?? 'the other way'}.` +
               namesSummary(cameoAt.size)
-            : preview
-              ? `Your guess: ${preview.count} of ${CROWD_SIZE} answered ` +
-                `${yourLabel ?? 'the same as you'}, ${CROWD_SIZE - preview.count} ` +
+            : previewCount !== null
+              ? `Your guess: ${previewCount} of ${CROWD_SIZE} answered ` +
+                `${yourLabel ?? 'the same as you'}, ${CROWD_SIZE - previewCount} ` +
                 `answered ${otherLabel ?? 'the other way'}.`
               : 'A hundred people, undecided.'
         }
@@ -263,7 +253,7 @@ export function DotCrowd({
             const target = settledHere ? layout.places[index]! : scatter[index]!;
             const cameo = settledHere ? cameoAt.get(index) : undefined;
 
-            // Your dot sits slightly proud of the pack.
+            // Your counter sits slightly proud of the pack.
             const proud = mine && revealed ? -cell * PROUD_CELLS : 0;
 
             const slotClasses = ['dot-slot'];
@@ -271,22 +261,22 @@ export function DotCrowd({
             if (cameo) slotClasses.push('dot-slot--cameo');
             if (cameo && asked === index) slotClasses.push('is-asked');
 
-            const dotClasses = ['dot'];
-            if (mine && revealed) dotClasses.push('dot--mine', `dot--${accent}`);
-            else if (onYourSide) dotClasses.push(`dot--${accent}`);
+            // Orange is your camp and cream is everyone else, on every screen.
+            // While the slider is moving there is no camp yet, only a guess, so
+            // the counters standing with you go yellow instead — the same
+            // yellow the fill under the thumb is, and a colour the reveal never
+            // uses on a piece.
+            const counterClasses = ['counter'];
+            if (mine && revealed) counterClasses.push('counter--mine', 'counter--you');
+            else if (onYourSide) counterClasses.push('counter--mine');
+            else if (previewCount !== null && index < previewCount) {
+              // The counters fill in index order, so a group is always a
+              // contiguous run of the grid rather than a colour sprayed across
+              // it.
+              counterClasses.push('counter--guess');
+            }
 
-            // Which group this dot is in while the slider moves. The dots fill
-            // in index order, so a group is always a contiguous run of the grid
-            // rather than a colour sprayed across it.
-            const groupColor = preview
-              ? index < preview.count
-                ? preview.colors.yours
-                : preview.colors.theirs
-              : undefined;
-
-            const bob = BOB_MIN + hashUnit(index, 21) * (BOB_MAX - BOB_MIN);
-
-            // A cameo's blob is drawn to fit its block, so the whole shape —
+            // A cameo's counter is drawn to fit its block, so the whole shape —
             // accessory included — stays inside the crowd's measured box. The
             // block is wider than the drawing, so it is centred across it.
             const centering = cameo ? blob.inset * cell : 0;
@@ -305,8 +295,14 @@ export function DotCrowd({
                     revealed && animate
                       ? `${index * STAGGER_MS + (mine ? MINE_DELAY_MS : 0)}ms`
                       : '0ms',
-                  rotate: cameo ? `${jitter.rotation.toFixed(2)}deg` : undefined,
-                }}
+                  // Handed down rather than applied here. The slot carries the
+                  // travel, and CSS applies the `rotate` property *before* the
+                  // `transform` one about the same origin — so tilting the slot
+                  // would spin its journey around the top-left of the field
+                  // instead of tipping the piece where it landed. The counter
+                  // inside takes it, which is what a plain one does too.
+                  '--tilt': counterTilt(index),
+                }as React.CSSProperties}
                 // A pointer affordance and nothing more: this sits inside a
                 // `role="img"`, which prunes its own subtree, so anything
                 // focusable in here would be a tab stop a screen reader could
@@ -321,29 +317,17 @@ export function DotCrowd({
                     face={cameo.avatar.face}
                     accessory={cameo.avatar.accessory}
                     size={blob.width * cell}
-                    // Their camp's colour, not their own: a neutral blob
-                    // standing in an accented camp reads as being on the other
+                    // Their camp's colour, not their own: a cream counter
+                    // standing in an orange camp reads as being on the other
                     // side, which is the one thing a cameo must never do.
-                    fill={cameo.withYou ? `var(--${accent})` : undefined}
+                    fill={cameo.withYou ? 'var(--counter-mine)' : undefined}
                   />
                 ) : (
-                  <span
-                    className={dotClasses.join(' ')}
-                    style={{
-                      // The dot's own transition carries this, so a dot crossing
-                      // the boundary fades rather than flicks.
-                      backgroundColor: groupColor,
-                      rotate: `${jitter.rotation.toFixed(2)}deg`,
-                      // Out of step on purpose: a crowd bobbing in unison reads
-                      // as a machine, not as people.
-                      animationDuration: `${bob.toFixed(2)}s`,
-                      animationDelay: `${(hashUnit(index, 22) * -bob).toFixed(2)}s`,
-                    }}
-                  >
+                  <span className={counterClasses.join(' ')}>
                     {faces.has(index) && (
                       <>
-                        <span className="dot__eye dot__eye--left" />
-                        <span className="dot__eye dot__eye--right" />
+                        <span className="counter__eye counter__eye--left" />
+                        <span className="counter__eye counter__eye--right" />
                       </>
                     )}
                   </span>
