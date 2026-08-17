@@ -145,7 +145,7 @@ api.post('/api/vote', async (c) => {
   const question = await getQuestion(questionId);
   if (!question) return c.json<ApiError>({ error: 'That question is gone.' }, 404);
   if (question.lockedAt > 0) {
-    return c.json<ApiError>({ error: 'Voting closed on this one.' }, 423);
+    return c.json<ApiError>({ error: 'This one is closed for voting.' }, 423);
   }
 
   const result = await castVote(questionId, userId, body.choice, body.guess);
@@ -279,7 +279,7 @@ api.get('/api/avatar', async (c) => {
  */
 api.post('/api/avatar', async (c) => {
   const userId = context.userId;
-  if (!userId) return c.json<ApiError>({ error: 'Sign in to change your blob.' }, 401);
+  if (!userId) return c.json<ApiError>({ error: 'Sign in to change your counter.' }, 401);
 
   const body = await c.req.json<Partial<AvatarRequest>>().catch(() => null);
   if (!body) return c.json<ApiError>({ error: 'Malformed request.' }, 400);
@@ -303,7 +303,7 @@ api.post('/api/avatar', async (c) => {
   const face = typeof faceId === 'string' ? getItem(faceId, 'face') : undefined;
   const accessory = typeof accessoryId === 'string' ? getItem(accessoryId, 'accessory') : undefined;
   if (wantsPair && (!face || !accessory)) {
-    return c.json<ApiError>({ error: 'That is not something you can wear there.' }, 400);
+    return c.json<ApiError>({ error: 'That does not go in that slot.' }, 400);
   }
 
   // One wave, whichever half of the request arrived: the response says what the
@@ -359,7 +359,7 @@ api.post('/api/box/open', async (c) => {
     );
   }
   if (outcome.status === 'busy') {
-    return c.json<ApiError>({ error: 'Something moved while that was opening. Try again.' }, 409);
+    return c.json<ApiError>({ error: 'Something changed while the box was opening. Try again.' }, 409);
   }
 
   return c.json<BoxResponse>({

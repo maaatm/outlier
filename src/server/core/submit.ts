@@ -130,7 +130,7 @@ export async function submitOpenQuestion(input: {
   if ((await remainingSubmissions(userId)) <= 0) {
     return {
       status: 'limited',
-      reason: `That is ${SUBMISSIONS_PER_DAY} today, which is the lot. The allowance turns over at midnight UTC.`,
+      reason: `That is ${SUBMISSIONS_PER_DAY} for today. The count starts over at midnight UTC.`,
     };
   }
 
@@ -163,7 +163,7 @@ export async function submitOpenQuestion(input: {
   if (!(await claimSubmission(userId, submissionFingerprint(text, labelA, labelB)))) {
     return {
       status: 'duplicate',
-      reason: 'That question is already on its way up. Ask a different one.',
+      reason: 'That one is already on its way up. Try a different question.',
     };
   }
 
@@ -219,7 +219,7 @@ export async function submitOpenQuestion(input: {
     await redis.del(keys.question(questionId));
     return {
       status: 'rejected',
-      reason: 'Reddit would not take that post. Nothing was published — try again in a moment.',
+      reason: 'Reddit would not take that post. Nothing went up, so try again in a moment.',
     };
   }
 

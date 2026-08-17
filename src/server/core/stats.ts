@@ -66,8 +66,8 @@ export function renderLeaderboardPost(entries: MisjudgedEntry[]): string {
   }
 
   const lines = [
-    'The questions this subreddit read worst. Average error is how far the typical',
-    'guess landed from the real split.',
+    'The questions this subreddit read worst. Average error is how far the average',
+    'guess sat from the real split.',
     '',
     '| # | Question | Avg error | Votes |',
     '|---|---|---|---|',
@@ -79,6 +79,6 @@ export function renderLeaderboardPost(entries: MisjudgedEntry[]): string {
     );
   });
 
-  lines.push('', 'A high number here is a compliment to the question, not to anyone who missed it.');
+  lines.push('', 'A high number says the question was hard to read, not that anyone played it badly.');
   return lines.join('\n');
 }

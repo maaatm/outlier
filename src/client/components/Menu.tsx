@@ -99,10 +99,10 @@ type Entry = {
  * else.
  */
 const ENTRIES: Entry[] = [
-  { id: 'ask', blurb: 'write one for the subreddit and post it' },
-  { id: 'record', blurb: 'your counter, streak, and how you read the room' },
-  { id: 'wardrobe', blurb: 'change the face and accessory your counter wears' },
-  { id: 'board', blurb: 'who has banked the most points' },
+  { id: 'ask', blurb: 'write one and post it to the subreddit' },
+  { id: 'record', blurb: 'your streak, your points, how well you call it' },
+  { id: 'wardrobe', blurb: "your counter's face and what it wears" },
+  { id: 'board', blurb: 'who has the most points' },
 ];
 
 /**
@@ -381,7 +381,7 @@ function DailyAction({ daily }: { daily: DailyPointer | null }): React.JSX.Eleme
   if (daily?.state === 'none') {
     return (
       <p className="footnote menu__daily-note">
-        Tomorrow&rsquo;s question posts at midnight UTC.
+        The next question goes up at midnight UTC.
       </p>
     );
   }
@@ -406,7 +406,7 @@ function DailyAction({ daily }: { daily: DailyPointer | null }): React.JSX.Eleme
       disabled={!permalink}
       onClick={() => permalink && navigateTo(new URL(permalink, REDDIT_ORIGIN).toString())}
     >
-      {played ? "You've played today's" : "Today's question"}
+      {played ? 'Already played today' : "Today's question"}
     </button>
   );
 }
@@ -447,9 +447,11 @@ function Record({
   return (
     <div className="menu__panel">
       <div className="record__card block block--cream block--lg">
-        {/* The wrapper is what the counter's shadow is cast from — see the
-            note on `.dot-slot--cameo::before` in the stylesheet. */}
-        <span className="record__cast">
+        {/* The counter stands in a slot cut into the block. Most accessories
+            are moulded in cream and this block is cream, so without something
+            cut behind it half the drawing is invisible on the one page that is
+            about it. */}
+        <span className="record__slot">
           <Blob
             face={avatar?.face}
             accessory={avatar?.accessory}
@@ -459,7 +461,7 @@ function Record({
           />
         </span>
         <div className="record__side">
-          <span className="record__title">You, on the table</span>
+          <span className="record__title">This is you</span>
           {avatar?.canSave && <ShowBlob showBlob={avatar.showBlob} onShow={onShow} />}
         </div>
       </div>
@@ -492,13 +494,14 @@ function Record({
         <span className="label">how you read the room</span>
         {stats.totalPlayed > 0 ? (
           <p className="record__line">
-            {stats.totalPlayed} {stats.totalPlayed === 1 ? 'question' : 'questions'} answered.
-            You landed within {HIT_THRESHOLD} points on {stats.totalHits} of them &mdash;{' '}
+            You have answered {stats.totalPlayed}{' '}
+            {stats.totalPlayed === 1 ? 'question' : 'questions'} and come within{' '}
+            {HIT_THRESHOLD} points on {stats.totalHits} of them. That is{' '}
             <strong>{rate}%</strong>.
           </p>
         ) : (
           <p className="record__line">
-            Nothing banked yet. Answer anything and the counters start.
+            Nothing to show yet. Answer a question and these start filling in.
           </p>
         )}
       </div>
@@ -530,9 +533,9 @@ function ShowBlob({
   return (
     <>
       <span className="record__note">
-        Other players see your counter in the crowd on questions you have both answered, on
-        the side you picked. Turn it off and it comes out of every crowd, including the ones
-        it is already in.
+        Other players see your counter in the crowd on questions you have both answered,
+        standing on the side you picked. Switch it off and it leaves every crowd, old ones
+        included.
       </span>
       <button
         type="button"
@@ -586,7 +589,7 @@ function Wardrobe({
       <h1 className="screen__title">Your counter</h1>
 
       {avatar === null ? (
-        <p className="notice notice--quiet notice--spaced">Loading.</p>
+        <p className="notice notice--quiet notice--spaced">Loading...</p>
       ) : (
         <>
           <div className="wardrobe__preview">
@@ -710,7 +713,7 @@ function GiftBox({
           ? 'Opening...'
           : affordable
             ? `${result ? 'Open another' : 'Open a box'} · ${BOX_PRICE}`
-            : `${BOX_PRICE - avatar.coins} more coins`}
+            : `${BOX_PRICE - avatar.coins} coins short`}
       </button>
 
       {error && <p className="notice notice--quiet notice--spaced">{error}</p>}
@@ -744,7 +747,7 @@ function BoxResult({
   if (!item) {
     return (
       <p className="notice notice--quiet" key={`${result.item}:${result.coins}`}>
-        Something arrived, but the wardrobe does not recognise it.
+        Something came out, but the wardrobe does not know what it is.
       </p>
     );
   }
@@ -866,9 +869,9 @@ function Board(): React.JSX.Element {
       <h1 className="screen__title">Who&rsquo;s ahead</h1>
       <PlayerBoard />
       <Footnote>
-        Points are banked per vote, so every question pays &mdash; the Daily, an open
-        question, or one from the archive. The weekly board starts over on Monday at
-        midnight UTC; all time never resets.
+        Every question you answer pays points, whether it is the Daily, an open question or
+        something out of the archive. The weekly board clears every Monday at midnight UTC.
+        All time never clears.
       </Footnote>
     </div>
   );
@@ -937,14 +940,13 @@ function Ask({ canSubmit }: { canSubmit: boolean }): React.JSX.Element {
     <div className="menu__panel">
       <h1 className="screen__title">Ask the room</h1>
       <p className="screen__lede">
-        A good one splits the room and takes two words to answer. Yours goes in the pile
-        the moderators draw tomorrow&rsquo;s question from.
+        The good ones split the room and take two words to answer. Yours joins the pile the
+        moderators pick tomorrow&rsquo;s question from.
       </p>
 
       {!canSubmit && (
         <p className="notice notice--spaced">
-          Sign in to ask the subreddit something. You can read the rest of the menu either
-          way.
+          Sign in to post a question. The rest of the menu works either way.
         </p>
       )}
 
@@ -989,7 +991,7 @@ function Ask({ canSubmit }: { canSubmit: boolean }): React.JSX.Element {
             thing to invent. */}
         <Field
           id="ask-title"
-          label="post title — optional"
+          label="post title (optional)"
           hint={`${title.length} / ${TITLE_MAX_LENGTH}`}
         >
           <input
@@ -998,7 +1000,7 @@ function Ask({ canSubmit }: { canSubmit: boolean }): React.JSX.Element {
             type="text"
             maxLength={TITLE_MAX_LENGTH}
             value={title}
-            placeholder={text || 'The question, unless you write one.'}
+            placeholder={text || 'Leave this blank to use the question.'}
             disabled={!canSubmit}
             onChange={(event) => setTitle(event.target.value)}
           />
@@ -1080,7 +1082,7 @@ function AskPreview({
   return (
     <div className="ask__preview well">
       <span className="label label--felt">how it will look</span>
-      <span className="ask__preview-title">{shown || 'Your question, as its own post.'}</span>
+      <span className="ask__preview-title">{shown || 'Your title goes here.'}</span>
       <p className="ask__preview-text">{text || 'The question goes here.'}</p>
       <div className="ask__preview-answers">
         <span className="ask__preview-answer">{labelA}</span>

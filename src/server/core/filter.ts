@@ -144,8 +144,8 @@ export function filterText(text: string, subject: 'question' | 'title'): FilterR
     return {
       ok: false,
       reason:
-        `Keep ${subject}s to ordinary habits. Nothing political, medical, or about identity — ` +
-        'the answer stops being a habit and becomes a statement.',
+        `Keep ${subject}s to ordinary habits. Nothing political, medical or about identity. ` +
+        'Once the answer says something about who somebody is, it is not a habit any more.',
     };
   }
 

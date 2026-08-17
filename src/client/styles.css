@@ -112,6 +112,22 @@
   --rarity-uncommon: #0f9bbd;
   --rarity-rare: #8b5cf6;
 
+  /*
+   * How far a scrolling room bleeds past its own bottom edge.
+   *
+   * Every room in the app is a scroll container, and a scroll container clips —
+   * so each one is padded at the bottom and hands the same distance straight
+   * back with a negative margin, which is what gives the last block's drop
+   * shadow somewhere to land without leaving dead air under every screen.
+   *
+   * The control below a room takes exactly this much top margin, so the room's
+   * clip ends where the button starts. Anything less and the room's box lies
+   * across the top of the button: a list one item too long for the screen paints
+   * its last item over the way out, which is what the menu was doing to Back to
+   * the question.
+   */
+  --bleed: 20px;
+
   --s1: 4px;
   --s2: 8px;
   --s3: 16px;
@@ -658,20 +674,36 @@ button {
  * the separator that the hand-drawn rule under it used to be.
  */
 .question-block {
-  padding: 17px 19px;
-  margin-top: 18px;
+  padding: 13px 16px;
+  margin-top: 14px;
   flex: none;
 }
 
+/*
+ * Three sizes, picked by how long the question is — see `questionStep` in
+ * `App.tsx`. The block is only ever as tall as the words in it, and the words
+ * get smaller before the block gets taller, so a question somebody typed at
+ * full tilt still leaves the crowd and the two answers a screen to stand on.
+ */
 .question {
-  margin: 9px 0 0;
+  margin: 7px 0 0;
   font-family: var(--font-display);
-  font-size: 33px;
+  font-size: 29px;
   line-height: 1.04;
   letter-spacing: 0.005em;
   text-transform: uppercase;
   color: var(--ink);
   text-wrap: pretty;
+}
+
+.question--mid {
+  font-size: 22px;
+  line-height: 1.08;
+}
+
+.question--small {
+  font-size: 17px;
+  line-height: 1.12;
 }
 
 /*
@@ -680,16 +712,25 @@ button {
  * slides — so nothing under it ever has to move to make room for it again.
  */
 .question-block--strip {
-  padding: 12px 15px;
-  margin-top: 16px;
+  padding: 10px 14px;
+  margin-top: 14px;
   border-radius: var(--r-well);
 }
 
 .question--strip {
   margin: 0;
-  font-size: 20px;
+  font-size: 19px;
   line-height: 1.14;
   letter-spacing: 0.01em;
+}
+
+.question--strip.question--mid {
+  font-size: 15px;
+}
+
+.question--strip.question--small {
+  font-size: 12.5px;
+  line-height: 1.2;
 }
 
 /*
@@ -721,24 +762,59 @@ button {
 /* ── The two answers ────────────────────────────────────────────────────── */
 
 /* The whole game, so the biggest targets in it. */
+/* `minmax(0, 1fr)` rather than `1fr`: a column's automatic minimum is the
+   widest thing in it, so one answer typed as an unbroken forty-character word
+   would otherwise take more than half the row and push the other answer off the
+   screen. The two are always the same width, whatever is written on them. */
 .choices {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 13px;
   margin-top: 10px;
   flex: none;
 }
 
+/*
+ * One height, always.
+ *
+ * `height` rather than `min-height`: the pair is the same shape on every
+ * question in the subreddit, and a button that grows to fit its own answer
+ * tells you which answer is the longer one before you have read either. What
+ * gives instead is the type — `choiceStep` in `App.tsx` picks one size for both
+ * buttons from the longer of the two answers, so thirty characters wrap inside
+ * the box a one-word answer got.
+ */
 .choice {
-  min-height: 92px;
-  padding: var(--s3);
+  height: 96px;
+  padding: 10px 12px;
   font-size: 29px;
 }
 
+.choice--mid {
+  font-size: 21px;
+}
+
+.choice--small {
+  font-size: 17px;
+}
+
+/*
+ * Wrapped, not cut. A long answer used to run off the end of its button behind
+ * an ellipsis, which on a two-answer game is the game with one of the answers
+ * missing. The clamp is the backstop under the type steps rather than the way
+ * anything is normally shown: at the smallest step it takes more answer than
+ * anybody has typed.
+ */
 .choice__label {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /* `anywhere` rather than `break-word`, which lets a long word wrap but still
+     reports its whole width as the smallest the button can be. */
+  overflow-wrap: anywhere;
+  min-width: 0;
 }
 
 /* ── The guess ──────────────────────────────────────────────────────────── */
@@ -908,12 +984,20 @@ button {
  * what you took it about, and every pixel it gives up goes to the counters.
  */
 .guess .question-block--strip {
-  padding: 7px 14px;
+  padding: 6px 13px;
   margin-top: 10px;
 }
 
 .guess .question--strip {
-  font-size: 17px;
+  font-size: 16px;
+}
+
+.guess .question--strip.question--mid {
+  font-size: 13.5px;
+}
+
+.guess .question--strip.question--small {
+  font-size: 11.5px;
 }
 
 /* The crowd takes everything the controls do not, and starts from the top of
@@ -1200,7 +1284,8 @@ button {
  * The padding and the equal negative margin are not decoration: this is a
  * scroll container, a scroll container clips on both axes, and a block's drop
  * shadow reaches well past its own box. The padding gives that shadow
- * somewhere to be and the margin hands the space straight back.
+ * somewhere to be and the margin hands the space straight back. See `--bleed`,
+ * which the control under the room matches so the two never overlap.
  */
 .slide,
 .menu__body {
@@ -1210,8 +1295,8 @@ button {
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 4px 10px 30px;
-  margin: -4px -10px -30px;
+  padding: 4px 10px var(--bleed);
+  margin: -4px -10px calc(-1 * var(--bleed));
 }
 
 /*
@@ -1388,7 +1473,7 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: var(--s2);
-  margin-top: 14px;
+  margin-top: var(--bleed);
   flex: none;
 }
 
@@ -1617,8 +1702,10 @@ button {
  */
 .menu__wordmark {
   /* Symmetric: the mark owns the space above and below it, so the button under
-     it clears the shadow the piece throws. */
-  margin: 44px 0 20px;
+     it clears the shadow the piece throws. The air above it is the first thing
+     this screen gives up — five rooms and a way out have to fit under it on a
+     phone, and they were not fitting. */
+  margin: 26px 0 16px;
   display: flex;
   justify-content: center;
   flex: none;
@@ -1647,9 +1734,9 @@ button {
  * under it opens in place.
  */
 .menu__daily {
-  margin-top: 24px;
-  padding: 19px;
-  font-size: 25px;
+  margin-top: 18px;
+  padding: 17px;
+  font-size: 23px;
   border-radius: 11px;
   flex: none;
 }
@@ -1657,16 +1744,16 @@ button {
 /* The one state where there is nothing to press: no button, because a disabled
    one invites a press and there is nothing to do until midnight. */
 .menu__daily-note {
-  margin-top: 24px;
+  margin-top: 18px;
 }
 
 .menu__list {
   list-style: none;
-  margin: 22px 0 0;
+  margin: 16px 0 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   flex: none;
 }
 
@@ -1675,7 +1762,7 @@ button {
   flex-direction: column;
   align-items: flex-start;
   gap: 2px;
-  padding: 13px 15px;
+  padding: 11px 15px;
   border-radius: 9px;
   text-align: left;
 }
@@ -1699,14 +1786,11 @@ button {
   color: rgba(34, 48, 31, 0.55);
 }
 
-/* Pinned to the bottom of the table on every page that has one. */
+/* Pinned to the bottom of the table on every page that has one. The margin is
+   the room's own bleed, so the list above can never paint over this. */
 .menu__back {
-  margin-top: 22px;
+  margin-top: var(--bleed);
   flex: none;
-}
-
-.menu__back--pinned {
-  margin-top: auto;
 }
 
 /* ── Your record ────────────────────────────────────────────────────────── */
@@ -1727,12 +1811,24 @@ button {
   flex: none;
 }
 
-.record__cast {
-  --cast: 0 6px 10px rgba(10, 40, 25, 0.24);
-  position: relative;
-  isolation: isolate;
+/*
+ * The slot the counter stands in.
+ *
+ * A well cut into the cream block, and it is here for a reason that is not
+ * decoration: accessories are moulded in cream, this block is cream, and cream
+ * on cream is nothing at all. The counter is the subject of this page and half
+ * of it was invisible on the players wearing the plainest half of the
+ * catalogue. Cutting the surface behind it gives the whole drawing something to
+ * read against — and a piece resting in a hole casts nothing, so the shadow
+ * this wrapper used to carry went with the change.
+ */
+.record__slot {
   display: flex;
   flex: none;
+  padding: 8px 8px 6px;
+  border-radius: var(--r-well);
+  background: rgba(34, 48, 31, 0.15);
+  box-shadow: inset 0 2px 4px rgba(34, 48, 31, 0.22);
 }
 
 /* The counter keeps its size; everything said about it takes the rest. */
@@ -1906,10 +2002,20 @@ button {
   overflow: hidden;
 }
 
+/*
+ * The list, and the one thing in the well that scrolls.
+ *
+ * The top padding is the accessory allowance. A counter's drawing is half again
+ * as tall as the disc in it and stands out of the top of its cell, but this box
+ * scrolls and a scroll container clips — so the first row's ears were being cut
+ * off against the top of the board. The padding is the overhang and the
+ * negative margin hands it straight back, which keeps the first row exactly
+ * where it was and moves only the edge that was doing the cutting.
+ */
 .board__rows {
   list-style: none;
-  margin: 0;
-  padding: 0;
+  margin: -14px 0 0;
+  padding: 14px 0 0;
   display: flex;
   flex-direction: column;
   /*
@@ -1952,9 +2058,13 @@ button {
  * pair of ears still stands above one, and it is the same arrangement the
  * crowd makes for a cameo.
  *
- * The fill is set as a token rather than a colour, because the drawing paints
- * its own disc: custom properties inherit, so the counter inside picks this up
- * without the board having to know how a counter is drawn.
+ * The disc's colour is handed to the drawing as a prop rather than set as a
+ * token here. It was a token, redefined per row, read by a `fill` attribute
+ * inside the SVG — and a custom property that changes between one instance of a
+ * drawing and the next is the one thing Chromium is liable not to repaint,
+ * which showed up as a board of counters that arrived blank and filled
+ * themselves in the moment the pointer crossed one. See `ROW_FILL` in
+ * `PlayerBoard.tsx`.
  */
 .board__avatar {
   --cast: 0 4px 7px rgba(18, 32, 24, 0.32);
@@ -1970,14 +2080,6 @@ button {
   position: absolute;
   left: 0;
   bottom: 0;
-}
-
-.board__avatar--orange {
-  --counter: var(--counter-mine);
-}
-
-.board__avatar--yellow {
-  --counter: var(--yellow);
 }
 
 /* The one row that is not a player from the list: yours. */
@@ -2039,11 +2141,6 @@ button {
   color: var(--ink-soft-felt);
 }
 
-/* Rows cross-fade in place on a tab switch. The ranking is not the story when
-   the board itself changed, so nothing reorders. */
-.board__rows.is-swapping {
-  animation: fade 120ms linear both;
-}
 
 /* ── The wardrobe ───────────────────────────────────────────────────────── */
 
@@ -2515,7 +2612,6 @@ button {
 .dot-slot--cameo::before,
 .board__avatar::before,
 .question__cast::before,
-.record__cast::before,
 .wardrobe__tip::before {
   content: '';
   position: absolute;
@@ -2628,19 +2724,39 @@ button {
   .question-block {
     align-self: flex-start;
     max-width: 720px;
-    padding: 20px 26px;
-    margin-top: 22px;
+    padding: 16px 22px;
+    margin-top: 18px;
   }
 
   .question {
-    font-size: 46px;
+    font-size: 40px;
     line-height: 1.02;
+  }
+
+  .question--mid {
+    font-size: 29px;
+  }
+
+  .question--small {
+    font-size: 22px;
   }
 
   .question-block--strip {
     align-self: stretch;
     max-width: none;
-    padding: 14px 18px;
+    padding: 12px 16px;
+  }
+
+  .question--strip {
+    font-size: 21px;
+  }
+
+  .question--strip.question--mid {
+    font-size: 17px;
+  }
+
+  .question--strip.question--small {
+    font-size: 14px;
   }
 
   .choices {
@@ -2649,9 +2765,17 @@ button {
   }
 
   .choice {
-    min-height: 104px;
+    height: 112px;
     font-size: 36px;
     border-radius: var(--r-hero);
+  }
+
+  .choice--mid {
+    font-size: 27px;
+  }
+
+  .choice--small {
+    font-size: 21px;
   }
 
   /* The score slide splits: the figures and the award on the left, the
@@ -2722,22 +2846,29 @@ button {
     padding: 20px 22px 16px;
   }
 
+  /*
+   * Two columns, read down the first and then down the second — the order a
+   * ranking has to be read in.
+   *
+   * A grid rather than `column-count`, which is what this was: multicol lays
+   * out and repaints on rules of its own, and a board of grid rows dropped into
+   * one arrived with rows in the wrong place until something forced a second
+   * paint. The row count comes in from `PlayerBoard.tsx` as `--board-rows`,
+   * which is all a column flow needs to know.
+   */
   .board__rows {
-    display: block;
-    column-count: 2;
-    column-gap: 30px;
+    display: grid;
+    grid-auto-flow: column;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: repeat(var(--board-rows, 5), auto);
+    align-content: start;
+    gap: 18px 30px;
+    /* Nothing scrolls here, so nothing clips here: the well's own padding is
+       what the top row's accessory stands in, and the allowance the scrolling
+       version needs comes back off. */
     overflow: visible;
-  }
-
-  .board__row {
-    /* `gap` does not apply to a multi-column flow, and a row split across the
-       column break would be a rank in one column and a score in the other. */
-    margin-bottom: 16px;
-    break-inside: avoid;
-  }
-
-  .board__rows {
-    gap: 18px;
+    margin: 0;
+    padding: 0;
   }
 
   .board__row {
@@ -2801,21 +2932,37 @@ button {
   }
 
   .question-block {
-    padding: 13px 15px;
-    margin-top: 12px;
+    padding: 10px 13px;
+    margin-top: 11px;
   }
 
   .question {
-    font-size: 26px;
+    font-size: 24px;
+  }
+
+  .question--mid {
+    font-size: 18px;
+  }
+
+  .question--small {
+    font-size: 14.5px;
   }
 
   .question-block--strip {
-    padding: 10px 13px;
-    margin-top: 12px;
+    padding: 8px 12px;
+    margin-top: 11px;
   }
 
   .question--strip {
-    font-size: 17px;
+    font-size: 16px;
+  }
+
+  .question--strip.question--mid {
+    font-size: 13px;
+  }
+
+  .question--strip.question--small {
+    font-size: 11px;
   }
 
   .bignum {
@@ -2828,8 +2975,22 @@ button {
   }
 
   .choice {
-    min-height: 72px;
+    height: 78px;
     font-size: 24px;
+  }
+
+  .choice--mid {
+    font-size: 18px;
+  }
+
+  .choice--small {
+    font-size: 14px;
+  }
+
+  /* One line fewer, and the type has already stepped down to pay for it. */
+  .choice__label {
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
   }
 
   .menu__root {
@@ -2982,12 +3143,22 @@ button {
     font-size: 17px;
   }
 
-  .menu__back {
-    margin-top: 12px;
+  /* Every room's bleed and every control's clearance move together, so the two
+     stay exactly matched at the height where pixels are scarcest. */
+  :root {
+    --bleed: 12px;
   }
 
   .question {
-    font-size: 22px;
+    font-size: 21px;
+  }
+
+  .question--mid {
+    font-size: 16px;
+  }
+
+  .question--small {
+    font-size: 13px;
   }
 
   .bignum {
@@ -2995,8 +3166,16 @@ button {
   }
 
   .choice {
-    min-height: 60px;
+    height: 66px;
     font-size: 20px;
+  }
+
+  .choice--mid {
+    font-size: 16px;
+  }
+
+  .choice--small {
+    font-size: 13px;
   }
 
   .figure__value,
@@ -3061,6 +3240,27 @@ button {
 
   .menu__wordmark {
     margin: 14px 0 8px;
+  }
+
+  /* Five things and a way out, on a table half a phone tall. The rooms keep
+     their labels and give up the air around them. */
+  .menu__daily {
+    margin-top: 12px;
+    padding: 13px;
+    font-size: 19px;
+  }
+
+  .menu__list {
+    margin-top: 10px;
+    gap: 7px;
+  }
+
+  .menu__item {
+    padding: 9px 13px;
+  }
+
+  .menu__item-label {
+    font-size: 17px;
   }
 
   .well-button {

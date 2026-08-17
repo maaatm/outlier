@@ -55,7 +55,7 @@ export function Compose({ postId, question, reveal }: Props): React.JSX.Element 
       setPosted(true);
     } catch (failure) {
       if (failure instanceof ApiFailure && failure.status === 409) setPosted(true);
-      else setError(failure instanceof Error ? failure.message : 'Could not post that.');
+      else setError(failure instanceof Error ? failure.message : 'That did not post.');
     } finally {
       setPosting(false);
     }
@@ -78,7 +78,7 @@ export function Compose({ postId, question, reveal }: Props): React.JSX.Element 
         {!posted && (
           <>
             <label className="label compose__label" htmlFor="note">
-              add a line — optional
+              add a line (optional)
             </label>
             <textarea
               id="note"
@@ -87,7 +87,7 @@ export function Compose({ postId, question, reveal }: Props): React.JSX.Element 
               rows={2}
               maxLength={NOTE_MAX_LENGTH}
               value={note}
-              placeholder="Add a line, or do not."
+              placeholder="Anything you want to add."
               onChange={(event) => setNote(event.target.value)}
             />
             <div className="label label-row compose__foot">
