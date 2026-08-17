@@ -28,7 +28,7 @@
 import { navigateTo } from '@devvit/web/client';
 import { useEffect, useRef, useState } from 'react';
 
-import { BOX_PRICE, CROWD_SIZE, HIT_THRESHOLD, TITLE_MAX_LENGTH } from '../../shared/config.js';
+import { BOX_PRICE, HIT_THRESHOLD, TITLE_MAX_LENGTH } from '../../shared/config.js';
 import {
   ACCESSORIES,
   type Equipped,
@@ -59,9 +59,11 @@ import {
 } from '../api.js';
 import { coalescingWriter } from '../coalesce.js';
 import { COUNTER_SIZE } from '../counterArt.js';
+import { WORDMARK_SIZE } from '../wordmarkArt.js';
 import { Blob } from './Blob.js';
 import { PlayerBoard } from './PlayerBoard.js';
 import { StatBar, StatPill } from './StatBar.js';
+import { Wordmark } from './Wordmark.js';
 
 type PanelId = 'record' | 'wardrobe' | 'board' | 'ask';
 
@@ -72,6 +74,16 @@ const TITLES: Record<PanelId, string> = {
   board: 'Leaderboard',
   ask: 'Ask a question',
 };
+
+/**
+ * What the header calls the list itself.
+ *
+ * The list used to carry the wordmark here, like the game's screens do. It
+ * stopped when the wordmark left the hero block and came down onto the felt at
+ * full size: a 22px lockup directly above a 58px one is the mark twice, and the
+ * smaller of the two would be doing the job a screen label does anyway.
+ */
+const ROOT_TITLE = 'Menu';
 
 type Entry = {
   id: PanelId;
@@ -150,15 +162,12 @@ export function Menu({
     <main className="app">
       {/*
         The same header as the game, down to the pills, so opening the menu
-        moves nothing on the way in or back out. Inside a room the wordmark
-        gives way to the room's name: you are past the front door.
+        moves nothing on the way in or back out. The wordmark gives way to a
+        screen label everywhere in here: you are past the front door, and on the
+        list itself the mark is on the felt below at full size.
       */}
       <header className="header">
-        {panel === null ? (
-          <span className="header__mark">Outlier</span>
-        ) : (
-          <span className="header__label">{TITLES[panel]}</span>
-        )}
+        <span className="header__label">{panel === null ? ROOT_TITLE : TITLES[panel]}</span>
         <HeaderStats panel={panel} stats={stats} avatar={avatar} />
       </header>
 
@@ -321,12 +330,22 @@ function Root({
 }): React.JSX.Element {
   return (
     <div className="menu__root">
-      {/* The wordmark alone. The paragraph explaining the game used to live
-          under it and it was the tallest thing on the screen — four rooms, the
-          Daily and the way out all have to fit under this, and they now do. */}
-      <div className="menu__hero block block--cream block--lg">
-        <h1 className="menu__wordmark">Outlier</h1>
-      </div>
+      {/*
+        The mark on the felt, not in a card, and alone above the list. It is
+        the name of the table rather than another piece placed on it, so the
+        cream hero block that used to wrap it is gone rather than restyled.
+        Nothing explains the game here either: the subreddit's sidebar does
+        that, and a paragraph on this screen is a paragraph everything else
+        has to fit under. What is left is the mark, at the size that room buys.
+
+        Still the heading, because on the pinned menu post this screen is the
+        whole document. The lockup names itself — it is one `img` with a label,
+        so what is announced is "Outlier, heading level 1" and never the
+        letters, which spell `utlier`.
+      */}
+      <h1 className="menu__wordmark">
+        <Wordmark size={WORDMARK_SIZE.menu} />
+      </h1>
 
       <DailyAction daily={daily} />
 

@@ -86,6 +86,14 @@
   --well-cut: rgba(34, 48, 31, 0.09);
   --well-cut-inset: inset 0 2px 4px rgba(34, 48, 31, 0.2);
 
+  /*
+   * The wordmark's letters have a bottom face like everything else, but they
+   * are cream sitting on felt rather than on another block, so the face is a
+   * shade the cream blocks never need: darker and greener than `--cream-face`,
+   * which is the same cream reading against a lit surface.
+   */
+  --wordmark-face: #b79e76;
+
   /* counters */
   --counter: #fff1da;
   --counter-mine: #ff7a2f;
@@ -486,18 +494,11 @@ button {
   flex: none;
 }
 
-.header__mark {
-  font-family: var(--font-display);
-  font-size: 22px;
-  line-height: 1.1;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  color: var(--ink-on-felt);
-}
-
 /*
- * Inside a menu room the wordmark gives way to the room's name, small and
- * tracked out — the wordmark is the front door and you are past it.
+ * Inside the menu the wordmark gives way to the room's name, small and tracked
+ * out — the wordmark is the front door and you are past it. The list is a room
+ * like the others by this measure: the lockup is already on the felt below,
+ * full size, and a second one above it would be the mark twice.
  */
 .header__label {
   font-family: var(--font-body);
@@ -517,6 +518,103 @@ button {
   align-items: center;
   gap: 7px;
   flex: none;
+}
+
+/* ── The wordmark ───────────────────────────────────────────────────────── */
+
+/*
+ * A counter, then `UTLIER`. The disc is the O and is a real game piece — same
+ * orange as the primary button, same moulded edge, same tilt the crowd's
+ * counters have — so the mark and the thing you press agree with each other.
+ *
+ * Everything under the wrapper is in `em` against the wrapper's own font size,
+ * which `components/Wordmark.tsx` derives from its `size` prop. That is what
+ * lets the three media queries at the bottom of this file move the whole
+ * lockup by setting one number, exactly as they used to move a font size.
+ *
+ * `--wm-step` is the size a media query chose; `--wm-size` is the size the
+ * component was given. The step wins where there is one.
+ */
+.wordmark {
+  display: flex;
+  align-items: center;
+  font-size: var(--wm-step, var(--wm-size));
+  flex: none;
+}
+
+/*
+ * The tilt is here rather than on the wrapper, so the letters stay level.
+ *
+ * Three shadows: the moulded edge inside its own bottom rim, the bottom face
+ * under it, and the soft one it throws on the felt. The first is the counter's
+ * and is what makes the disc read as a piece rather than a dot — it stays even
+ * though there is a bottom face under it as well.
+ */
+.wordmark__disc {
+  position: relative;
+  display: block;
+  width: var(--wm-disc);
+  height: var(--wm-disc);
+  border-radius: 50%;
+  background: var(--orange);
+  rotate: -9deg;
+  z-index: 2;
+  margin-right: var(--wm-overlap);
+  box-shadow:
+    inset 0 calc(-1 * var(--wm-mould)) 0 rgba(0, 0, 0, 0.18),
+    0 var(--wm-depth) 0 var(--orange-face),
+    0 var(--wm-shadow-y) var(--wm-shadow-blur) rgba(10, 40, 25, 0.32);
+}
+
+/* Children of the disc, so they go round with it. That is intended: a piece
+   lands tilted and its face lands with it. */
+.wordmark__eye {
+  position: absolute;
+  top: 30%;
+  width: 18%;
+  height: 18%;
+  border-radius: 50%;
+  background: var(--counter-eye);
+}
+
+.wordmark__eye--left {
+  left: 22%;
+}
+
+.wordmark__eye--right {
+  right: 22%;
+}
+
+/*
+ * `line-height: .8` collapses the text box to roughly cap height, which is what
+ * centres the letters against the disc. Centred, not seated on a baseline — the
+ * disc is a circle and has no business sitting on one.
+ */
+.wordmark__text {
+  font-family: var(--font-display);
+  /* Lilita One ships at 400 only, and on the menu this sits inside an `h1`.
+     Left to inherit, the browser would synthesise a bold the header's copy of
+     the same lockup does not have. */
+  font-weight: 400;
+  font-size: 1em;
+  line-height: 0.8;
+  letter-spacing: 0.025em;
+  text-transform: uppercase;
+  color: var(--ink-on-felt);
+  text-shadow:
+    0 var(--wm-depth) 0 var(--wordmark-face),
+    0 var(--wm-shadow-y) var(--wm-shadow-blur) rgba(10, 40, 25, 0.3);
+}
+
+/* Under `WORDMARK_MIN_SIZE` the eyes stop resolving, and a counter nobody can
+   read is worse than the O it replaced. Plain type, no disc, no depth. */
+.wordmark--plain {
+  font-family: var(--font-display);
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--ink-on-felt);
 }
 
 /* A counter you have earned, so it is cut into the table rather than sitting
@@ -1508,30 +1606,39 @@ button {
   min-height: 0;
 }
 
-.menu__hero {
-  padding: 22px;
-  margin-top: 18px;
-  border-radius: var(--r-hero);
+/*
+ * The wordmark stands on the felt rather than in a block.
+ *
+ * It used to be a cream hero card with the title inside it, which made the mark
+ * a thing placed on the table alongside the four rooms. The lockup is not one
+ * of the things on the table — it is what the table is called — so the card is
+ * gone rather than restyled, and the counter's own bottom face and shadow are
+ * now cast on green like every other piece here.
+ */
+.menu__wordmark {
+  /* Symmetric: the mark owns the space above and below it, so the button under
+     it clears the shadow the piece throws. */
+  margin: 44px 0 20px;
+  display: flex;
+  justify-content: center;
   flex: none;
 }
 
-.menu__wordmark {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: 58px;
-  line-height: 0.94;
-  letter-spacing: 0.01em;
-  text-transform: uppercase;
-  color: var(--ink);
-}
-
-/* The only thing in the app that says what the game is. */
-.menu__tagline {
-  margin: 12px 0 0;
-  font-weight: 400;
-  font-size: 13px;
-  line-height: 1.55;
-  color: var(--ink-body-cream);
+/*
+ * How big the mark gets, and the one thing that decides it: how wide the table
+ * is.
+ *
+ * With nothing but the four rooms under it the lockup is the screen, so it
+ * takes the room rather than sitting at the size a paragraph left it. It is
+ * also a fixed shape — just under four times its font size wide, disc and
+ * letters together — which is what makes a cap in viewport units the right
+ * tool and not a trick. The second term is the largest size that still leaves
+ * the mark a gutter either side of the felt's own margins; the first is where
+ * it stops growing, because a wordmark taller than the button under it is a
+ * poster rather than a header.
+ */
+.menu__root {
+  --wm-step: min(80px, calc(24.5vw - 16px));
 }
 
 /*
@@ -1540,7 +1647,7 @@ button {
  * under it opens in place.
  */
 .menu__daily {
-  margin-top: 20px;
+  margin-top: 24px;
   padding: 19px;
   font-size: 25px;
   border-radius: 11px;
@@ -1550,7 +1657,7 @@ button {
 /* The one state where there is nothing to press: no button, because a disabled
    one invites a press and there is nothing to do until midnight. */
 .menu__daily-note {
-  margin-top: 20px;
+  margin-top: 24px;
 }
 
 .menu__list {
@@ -2486,8 +2593,9 @@ button {
     padding: 26px 34px;
   }
 
-  .header__mark {
-    font-size: 26px;
+  /* One number moves the whole lockup — see the note on `.wordmark`. */
+  .header {
+    --wm-step: 26px;
   }
 
   .stat {
@@ -2594,8 +2702,8 @@ button {
     font-size: 18px;
   }
 
-  .menu__wordmark {
-    font-size: 72px;
+  .menu__root {
+    --wm-step: 100px;
   }
 
   .screen__title {
@@ -2724,17 +2832,16 @@ button {
     font-size: 24px;
   }
 
-  .menu__hero {
-    padding: 16px;
-    margin-top: 12px;
+  .menu__root {
+    --wm-step: min(56px, calc(24.5vw - 16px));
   }
 
   .menu__wordmark {
-    font-size: 40px;
+    margin: 20px 0 12px;
   }
 
   .menu__daily {
-    margin-top: 14px;
+    margin-top: 16px;
     padding: 15px;
     font-size: 21px;
   }
@@ -2948,13 +3055,12 @@ button {
     font-size: 18px;
   }
 
-  .menu__wordmark {
-    font-size: 32px;
+  .menu__root {
+    --wm-step: min(44px, calc(24.5vw - 16px));
   }
 
-  .menu__tagline {
-    font-size: 11.5px;
-    margin-top: 8px;
+  .menu__wordmark {
+    margin: 14px 0 8px;
   }
 
   .well-button {
