@@ -55,10 +55,18 @@ export const COIN_ELIGIBLE_SUBMISSIONS_PER_DAY = Infinity;
  * What a gift box costs.
  *
  * Showing up pays 5 a day plus 20 every seventh, which averages a little under
- * 8 — so a box is about four days of turning up, or three questions asked. Slow
- * enough that the fourteen rollable items are a season rather than an evening,
- * fast enough that a player who plays every day is never more than a few days
- * from the next one.
+ * 8 — so a box is about four days of turning up, or three questions asked. Fast
+ * enough that a player who plays every day is never more than a few days from
+ * the next one.
+ *
+ * This and the refund below were tuned when there were fourteen rollable items
+ * and a season meant collecting them. The wardrobe pass took the pool to
+ * thirty-eight, so the same price now buys about a third of the progress it did
+ * — the odds of a *given* common fell from 15% a box to 5.5%, an uncommon from
+ * 5% to 2.1%, a rare from 2% to 0.8%. The band odds are unchanged and still mean
+ * what they say; what changed is how many items share a band. Whether a season
+ * should still be a full set, or whether the price should come down, is a
+ * decision nobody has made yet rather than one this number reflects.
  */
 export const BOX_PRICE = 30;
 
