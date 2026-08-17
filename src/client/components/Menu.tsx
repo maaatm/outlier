@@ -28,7 +28,7 @@
 import { navigateTo } from '@devvit/web/client';
 import { useEffect, useRef, useState } from 'react';
 
-import { BOX_PRICE, CROWD_SIZE, HIT_THRESHOLD, TITLE_MAX_LENGTH } from '../../shared/config.js';
+import { BOX_PRICE, HIT_THRESHOLD, TITLE_MAX_LENGTH } from '../../shared/config.js';
 import {
   ACCESSORIES,
   type Equipped,
@@ -331,10 +331,12 @@ function Root({
   return (
     <div className="menu__root">
       {/*
-        The mark on the felt, not in a card. It is the name of the table rather
-        than another piece placed on it, so the cream hero block that used to
-        wrap it is gone rather than restyled — and the two lines that say what
-        the game is come back out from under it onto the green.
+        The mark on the felt, not in a card, and alone above the list. It is
+        the name of the table rather than another piece placed on it, so the
+        cream hero block that used to wrap it is gone rather than restyled.
+        Nothing explains the game here either: the subreddit's sidebar does
+        that, and a paragraph on this screen is a paragraph everything else
+        has to fit under. What is left is the mark, at the size that room buys.
 
         Still the heading, because on the pinned menu post this screen is the
         whole document. The lockup names itself — it is one `img` with a label,
@@ -344,15 +346,6 @@ function Root({
       <h1 className="menu__wordmark">
         <Wordmark size={WORDMARK_SIZE.menu} />
       </h1>
-      <span className="menu__tagline">one question a day</span>
-      {/* With the rules gone to the sidebar, this is the only thing in the app
-          that says what the game is. It has to name both things being scored
-          without turning into a rules page. */}
-      <p className="menu__explainer">
-        One question a day about ordinary behavior. Answer it, then guess how many people
-        out of {CROWD_SIZE} answered the same way. You are scored on both &mdash; how
-        unusual your answer was, and how close the guess landed.
-      </p>
 
       <DailyAction daily={daily} />
 

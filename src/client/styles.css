@@ -1616,35 +1616,29 @@ button {
  * now cast on green like every other piece here.
  */
 .menu__wordmark {
-  margin: 44px 0 0;
+  /* Symmetric: the mark owns the space above and below it, so the button under
+     it clears the shadow the piece throws. */
+  margin: 44px 0 20px;
+  display: flex;
+  justify-content: center;
   flex: none;
 }
 
-/* Three words on the way down from the mark to the paragraph. Small and
-   tracked out, so it reads as a strapline under the mark and not as a heading
-   over the copy. */
-.menu__tagline {
-  margin-top: 26px;
-  font-family: var(--font-body);
-  font-weight: 700;
-  font-size: 9.5px;
-  /* One line of tracked caps, so it takes cap height and not the body's 1.5 —
-     which is two and a bit pixels of nothing between the mark and the copy. */
-  line-height: 1.25;
-  letter-spacing: 0.24em;
-  text-transform: uppercase;
-  color: var(--ink-soft-felt);
-  flex: none;
-}
-
-/* The only thing in the app that says what the game is. */
-.menu__explainer {
-  margin: 14px 0 0;
-  font-weight: 500;
-  font-size: 13px;
-  line-height: 1.55;
-  color: rgba(255, 246, 231, 0.82);
-  flex: none;
+/*
+ * How big the mark gets, and the one thing that decides it: how wide the table
+ * is.
+ *
+ * With nothing but the four rooms under it the lockup is the screen, so it
+ * takes the room rather than sitting at the size a paragraph left it. It is
+ * also a fixed shape — just under four times its font size wide, disc and
+ * letters together — which is what makes a cap in viewport units the right
+ * tool and not a trick. The second term is the largest size that still leaves
+ * the mark a gutter either side of the felt's own margins; the first is where
+ * it stops growing, because a wordmark taller than the button under it is a
+ * poster rather than a header.
+ */
+.menu__root {
+  --wm-step: min(80px, calc(24.5vw - 16px));
 }
 
 /*
@@ -2709,7 +2703,7 @@ button {
   }
 
   .menu__root {
-    --wm-step: 72px;
+    --wm-step: 100px;
   }
 
   .screen__title {
@@ -2839,19 +2833,11 @@ button {
   }
 
   .menu__root {
-    --wm-step: 40px;
+    --wm-step: min(56px, calc(24.5vw - 16px));
   }
 
   .menu__wordmark {
-    margin-top: 20px;
-  }
-
-  .menu__tagline {
-    margin-top: 14px;
-  }
-
-  .menu__explainer {
-    margin-top: 10px;
+    margin: 20px 0 12px;
   }
 
   .menu__daily {
@@ -3070,29 +3056,11 @@ button {
   }
 
   .menu__root {
-    --wm-step: 32px;
+    --wm-step: min(44px, calc(24.5vw - 16px));
   }
 
   .menu__wordmark {
-    margin-top: 14px;
-  }
-
-  .menu__tagline {
-    margin-top: 10px;
-  }
-
-  /*
-   * The paragraph stays at every size, and this tier is where that costs
-   * something: with it back on the felt the menu root scrolls at 512px tall,
-   * which the four rooms alone did not. That is the trade the wordmark handoff
-   * makes deliberately — it is the only thing in the app that says what the
-   * game is, and 512px is Devvit's inline post view, which is exactly where the
-   * pinned menu post meets somebody who has never seen it. The way out is not
-   * in the scroller, so the one control that must always be reachable is.
-   */
-  .menu__explainer {
-    font-size: 11.5px;
-    margin-top: 8px;
+    margin: 14px 0 8px;
   }
 
   .well-button {

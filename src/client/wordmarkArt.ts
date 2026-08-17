@@ -41,7 +41,15 @@
  */
 export const WORDMARK_MIN_SIZE = 18;
 
-/** The two sizes the reference documents, and the only two the app asks for. */
+/**
+ * The two sizes the reference documents, and what the app hands the component.
+ *
+ * Nominal rather than final: these are the sizes the ratios above are exact at,
+ * and the stylesheet steps the rendered size from there — the header up on a
+ * desktop, and the menu's by however wide the table is. So `menu` is the anchor
+ * the menu lockup's proportions are struck from rather than a size it is often
+ * drawn at, and it stays 58 because 58 is the number the reference measures.
+ */
 export const WORDMARK_SIZE = {
   /** The menu root, on the felt. */
   menu: 58,
