@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<style>
+@font-face{font-family:'Gabarito';src:url('src/client/fonts/gabarito-latin.woff2') format('woff2');font-weight:400 500;font-style:normal;font-display:swap}
+@font-face{font-family:'Instrument Sans';src:url('src/client/fonts/instrumentsans-latin.woff2') format('woff2');font-weight:400 600;font-style:normal;font-display:swap}
+@font-face{font-family:'DM Mono';src:url('src/client/fonts/dmmono-400-latin.woff2') format('woff2');font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:'DM Mono';src:url('src/client/fonts/dmmono-500-latin.woff2') format('woff2');font-weight:500;font-style:normal;font-display:swap}
+body{margin:0;background:#e9e6df;font-family:'Instrument Sans',ui-sans-serif,system-ui,sans-serif;color:#15181d}
+a{color:#2b6be4;text-decoration:none}a:hover{color:#15181d}
+</style>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=Lilita+One&family=Space+Grotesk:wght@400;500;700&display=swap">
+</helmet>
+
+<section style="padding:40px 44px 36px;border-bottom:1px solid rgba(0,0,0,.1)">
+<div style="display:flex;align-items:baseline;gap:10px;margin:0 0 6px">
+<a href="#t9" style="font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#1a1a1a;color:#fff;border-radius:4px">9</a>
+<span style="font:600 13px/1.2 system-ui,sans-serif">Accessories remoulded, and twenty-three more pieces for the box</span>
+</div>
+<p style="margin:0 0 6px;max-width:820px;font:400 12px/1.6 system-ui,sans-serif;color:rgba(0,0,0,.6)">The faces are right, so they are untouched. The accessories were rebuilt as literal blocks when the app moved to Blocks — a bunny ear became a rounded rectangle tipped 10°, a halo became a brick, a propeller became a bar — and at 18px a rectangle is a rectangle, not a rabbit. The catalogue's own rule is the fix: <strong style="font-weight:600">an accessory is read by its outline.</strong> Every piece goes back to its own silhouette and is <em>moulded</em> rather than outlined — flat fill, a bottom face 5 units below it in its rarity colour, a hard cast behind it so cream survives on cream. No outlines, nothing rotated but the counter itself.</p>
+<p style="margin:0 0 26px;max-width:820px;font:400 12px/1.6 system-ui,sans-serif;color:rgba(0,0,0,.6)">Twenty-three new pieces follow the same rule: <strong style="font-weight:600">twelve faces and eleven accessories</strong>, taking the pool to 20 faces and 20 accessories — 38 rollable. Every new accessory changes the outline in a way no other piece does; every new face is still dark marks on the disc and nothing more.</p>
+
+<div style="display:flex;flex-direction:column;gap:34px">
+
+<div id="9a" style="display:flex;flex-direction:column;gap:9px;scroll-margin-top:16px">
+<div style="display:flex;align-items:baseline;gap:9px">
+<a href="#9a" style="font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:rgba(0,0,0,.08);color:#1a1a1a;border-radius:5px">9a</a>
+<span style="font:600 12px/1.3 system-ui,sans-serif">What changed — the eight that shipped</span>
+</div>
+<div style="background:#2E9E6B;border-radius:12px;padding:22px 24px 24px;display:flex;flex-direction:column;gap:20px;width:max-content">
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <div style="display:flex;align-items:center;gap:9px">
+      <span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,246,231,.5)">before · blocks standing in for shapes</span>
+      <span style="flex:1;height:2px;background:rgba(8,42,25,.28);border-radius:1px"></span>
+    </div>
+    <div style="display:flex;gap:6px">
+      <sc-for list="{{ accBefore }}" as="it" hint-placeholder-count="8">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:5px;width:96px">
+          <svg viewBox="0 0 100 150" width="76" height="114" style="display:block;overflow:visible"><sc-for list="{{ it.parts }}" as="p" hint-placeholder-count="0"><path d="{{ p.d }}" fill="{{ p.f }}" transform="{{ p.t }}"></path></sc-for></svg>
+          <span style="font-family:'Space Grotesk',sans-serif;font-weight:500;font-size:10.5px;color:rgba(255,246,231,.6);text-align:center">{{ it.name }}</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <div style="display:flex;align-items:center;gap:9px">
+      <span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:#FFC93C">after · moulded to its own outline</span>
+      <span style="flex:1;height:2px;background:rgba(8,42,25,.28);border-radius:1px"></span>
+    </div>
+    <div style="display:flex;gap:6px">
+      <sc-for list="{{ accAfter }}" as="it" hint-placeholder-count="8">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:5px;width:96px">
+          <svg viewBox="0 0 100 150" width="76" height="114" style="display:block;overflow:visible"><sc-for list="{{ it.parts }}" as="p" hint-placeholder-count="0"><path d="{{ p.d }}" fill="{{ p.f }}" transform="{{ p.t }}"></path></sc-for></svg>
+          <span style="font-family:'Lilita One',sans-serif;font-size:14px;letter-spacing:.02em;text-transform:uppercase;color:#FFF6E7;text-align:center">{{ it.name }}</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</div>
+</div>
+
+<div id="9b" style="display:flex;flex-direction:column;gap:9px;scroll-margin-top:16px">
+<div style="display:flex;align-items:baseline;gap:9px">
+<a href="#9b" style="font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:rgba(0,0,0,.08);color:#1a1a1a;border-radius:5px">9b</a>
+<span style="font:600 12px/1.3 system-ui,sans-serif">Accessories — 20 in the pool, eleven of them new</span>
+</div>
+<div style="background:#2E9E6B;border-radius:12px;padding:22px 24px 26px;display:flex;flex-direction:column;gap:24px;width:max-content">
+
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <div style="display:flex;align-items:center;gap:9px">
+      <span style="width:10px;height:10px;border-radius:2px;background:#FFF6E7;box-shadow:0 3px 0 #8b93a1"></span>
+      <span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,246,231,.5)">common · 6 · cream body, grey face</span>
+      <span style="flex:1;height:2px;background:rgba(8,42,25,.28);border-radius:1px"></span>
+    </div>
+    <div style="display:flex;gap:8px">
+      <sc-for list="{{ accC }}" as="it" hint-placeholder-count="5">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:104px">
+          <svg viewBox="0 0 100 150" width="84" height="126" style="display:block;overflow:visible"><sc-for list="{{ it.parts }}" as="p" hint-placeholder-count="0"><path d="{{ p.d }}" fill="{{ p.f }}" transform="{{ p.t }}"></path></sc-for></svg>
+          <span style="font-family:'Lilita One',sans-serif;font-size:15px;letter-spacing:.02em;text-transform:uppercase;color:#FFF6E7;text-align:center;line-height:1.1">{{ it.name }}</span>
+          <sc-if value="{{ it.isNew }}" hint-placeholder-val="{{ false }}"><span style="background:#FFC93C;border-radius:5px;box-shadow:0 3px 0 #C48D12;padding:2px 6px;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:8px;letter-spacing:.16em;text-transform:uppercase;color:#22301F">new</span></sc-if>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <div style="display:flex;align-items:center;gap:9px">
+      <span style="width:10px;height:10px;border-radius:2px;background:#FFF6E7;box-shadow:0 3px 0 #0f9bbd"></span>
+      <span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:#6FDCEF">uncommon · 7 · cream body, teal face</span>
+      <span style="flex:1;height:2px;background:rgba(8,42,25,.28);border-radius:1px"></span>
+    </div>
+    <div style="display:flex;gap:8px">
+      <sc-for list="{{ accU }}" as="it" hint-placeholder-count="5">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:104px">
+          <svg viewBox="0 0 100 150" width="84" height="126" style="display:block;overflow:visible"><sc-for list="{{ it.parts }}" as="p" hint-placeholder-count="0"><path d="{{ p.d }}" fill="{{ p.f }}" transform="{{ p.t }}"></path></sc-for></svg>
+          <span style="font-family:'Lilita One',sans-serif;font-size:15px;letter-spacing:.02em;text-transform:uppercase;color:#FFF6E7;text-align:center;line-height:1.1">{{ it.name }}</span>
+          <sc-if value="{{ it.isNew }}" hint-placeholder-val="{{ false }}"><span style="background:#FFC93C;border-radius:5px;box-shadow:0 3px 0 #C48D12;padding:2px 6px;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:8px;letter-spacing:.16em;text-transform:uppercase;color:#22301F">new</span></sc-if>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <div style="display:flex;align-items:center;gap:9px">
+      <span style="width:10px;height:10px;border-radius:2px;background:#8b5cf6;box-shadow:0 3px 0 #6D3EE0"></span>
+      <span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:#C4AAFF">rare · 7 · moulded in violet</span>
+      <span style="flex:1;height:2px;background:rgba(8,42,25,.28);border-radius:1px"></span>
+    </div>
+    <div style="display:flex;gap:8px">
+      <sc-for list="{{ accR }}" as="it" hint-placeholder-count="5">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:104px">
+          <svg viewBox="0 0 100 150" width="84" height="126" style="display:block;overflow:visible"><sc-for list="{{ it.parts }}" as="p" hint-placeholder-count="0"><path d="{{ p.d }}" fill="{{ p.f }}" transform="{{ p.t }}"></path></sc-for></svg>
+          <span style="font-family:'Lilita One',sans-serif;font-size:15px;letter-spacing:.02em;text-transform:uppercase;color:#FFF6E7;text-align:center;line-height:1.1">{{ it.name }}</span>
+          <sc-if value="{{ it.isNew }}" hint-placeholder-val="{{ false }}"><span style="background:#FFC93C;border-radius:5px;box-shadow:0 3px 0 #C48D12;padding:2px 6px;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:8px;letter-spacing:.16em;text-transform:uppercase;color:#22301F">new</span></sc-if>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</div>
+</div>
+
+<div id="9c" style="display:flex;flex-direction:column;gap:9px;scroll-margin-top:16px">
+<div style="display:flex;align-items:baseline;gap:9px">
+<a href="#9c" style="font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:rgba(0,0,0,.08);color:#1a1a1a;border-radius:5px">9c</a>
+<span style="font:600 12px/1.3 system-ui,sans-serif">Faces — 20 in the pool, twelve of them new</span>
+</div>
+<p style="margin:0 0 4px;max-width:820px;font:400 11.5px/1.55 system-ui,sans-serif;color:rgba(0,0,0,.6)">A face is the part that only reads up close, so it never has to survive the crowd — but it also never gets to be more than dark marks on the disc. The twelve new ones each move one variable: how open the eye is, where it points, how many there are, and what the mouth does about it.</p>
+<div style="background:#2E9E6B;border-radius:12px;padding:22px 24px 26px;display:flex;flex-direction:column;gap:24px;width:max-content">
+
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <div style="display:flex;align-items:center;gap:9px">
+      <span style="width:10px;height:10px;border-radius:2px;background:#FFF6E7;box-shadow:0 3px 0 #8b93a1"></span>
+      <span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,246,231,.5)">common · 7</span>
+      <span style="flex:1;height:2px;background:rgba(8,42,25,.28);border-radius:1px"></span>
+    </div>
+    <div style="display:flex;gap:8px">
+      <sc-for list="{{ faceC }}" as="it" hint-placeholder-count="5">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:104px">
+          <svg viewBox="0 0 100 150" width="84" height="126" style="display:block;overflow:visible"><sc-for list="{{ it.parts }}" as="p" hint-placeholder-count="0"><path d="{{ p.d }}" fill="{{ p.f }}" transform="{{ p.t }}"></path></sc-for></svg>
+          <span style="font-family:'Lilita One',sans-serif;font-size:15px;letter-spacing:.02em;text-transform:uppercase;color:#FFF6E7;text-align:center;line-height:1.1">{{ it.name }}</span>
+          <sc-if value="{{ it.isNew }}" hint-placeholder-val="{{ false }}"><span style="background:#FFC93C;border-radius:5px;box-shadow:0 3px 0 #C48D12;padding:2px 6px;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:8px;letter-spacing:.16em;text-transform:uppercase;color:#22301F">new</span></sc-if>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <div style="display:flex;align-items:center;gap:9px">
+      <span style="width:10px;height:10px;border-radius:2px;background:#FFF6E7;box-shadow:0 3px 0 #0f9bbd"></span>
+      <span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:#6FDCEF">uncommon · 7</span>
+      <span style="flex:1;height:2px;background:rgba(8,42,25,.28);border-radius:1px"></span>
+    </div>
+    <div style="display:flex;gap:8px">
+      <sc-for list="{{ faceU }}" as="it" hint-placeholder-count="5">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:104px">
+          <svg viewBox="0 0 100 150" width="84" height="126" style="display:block;overflow:visible"><sc-for list="{{ it.parts }}" as="p" hint-placeholder-count="0"><path d="{{ p.d }}" fill="{{ p.f }}" transform="{{ p.t }}"></path></sc-for></svg>
+          <span style="font-family:'Lilita One',sans-serif;font-size:15px;letter-spacing:.02em;text-transform:uppercase;color:#FFF6E7;text-align:center;line-height:1.1">{{ it.name }}</span>
+          <sc-if value="{{ it.isNew }}" hint-placeholder-val="{{ false }}"><span style="background:#FFC93C;border-radius:5px;box-shadow:0 3px 0 #C48D12;padding:2px 6px;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:8px;letter-spacing:.16em;text-transform:uppercase;color:#22301F">new</span></sc-if>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <div style="display:flex;align-items:center;gap:9px">
+      <span style="width:10px;height:10px;border-radius:2px;background:#8b5cf6;box-shadow:0 3px 0 #6D3EE0"></span>
+      <span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:#C4AAFF">rare · 6</span>
+      <span style="flex:1;height:2px;background:rgba(8,42,25,.28);border-radius:1px"></span>
+    </div>
+    <div style="display:flex;gap:8px">
+      <sc-for list="{{ faceR }}" as="it" hint-placeholder-count="4">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:104px">
+          <svg viewBox="0 0 100 150" width="84" height="126" style="display:block;overflow:visible"><sc-for list="{{ it.parts }}" as="p" hint-placeholder-count="0"><path d="{{ p.d }}" fill="{{ p.f }}" transform="{{ p.t }}"></path></sc-for></svg>
+          <span style="font-family:'Lilita One',sans-serif;font-size:15px;letter-spacing:.02em;text-transform:uppercase;color:#FFF6E7;text-align:center;line-height:1.1">{{ it.name }}</span>
+          <sc-if value="{{ it.isNew }}" hint-placeholder-val="{{ false }}"><span style="background:#FFC93C;border-radius:5px;box-shadow:0 3px 0 #C48D12;padding:2px 6px;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:8px;letter-spacing:.16em;text-transform:uppercase;color:#22301F">new</span></sc-if>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</div>
+</div>
+
+<div id="9d" style="display:flex;flex-direction:column;gap:9px;scroll-margin-top:16px">
+<div style="display:flex;align-items:baseline;gap:9px">
+<a href="#9d" style="font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:rgba(0,0,0,.08);color:#1a1a1a;border-radius:5px">9d</a>
+<span style="font:600 12px/1.3 system-ui,sans-serif">The size that decides it — and three worn on the counter</span>
+</div>
+<p style="margin:0 0 4px;max-width:820px;font:400 11.5px/1.55 system-ui,sans-serif;color:rgba(0,0,0,.6)">Every accessory is judged at 18px, where a hundred of them land on a phone. Nothing below is legible as an object; each one is legible as a different outline, which is all the rule ever asked for.</p>
+<div style="display:flex;flex-wrap:wrap;gap:22px;align-items:flex-start">
+
+  <div style="background:#2E9E6B;border-radius:12px;padding:22px 24px 24px;display:flex;flex-direction:column;gap:18px;width:max-content">
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,246,231,.5)">crowd · 18px</span>
+      <div style="background:rgba(8,42,25,.3);box-shadow:inset 0 3px 5px rgba(8,42,25,.5);border-radius:9px;padding:14px 16px;display:flex;align-items:flex-end;gap:12px">
+        <sc-for list="{{ accTiny }}" as="it" hint-placeholder-count="14">
+          <svg viewBox="0 0 100 150" width="18" height="27" style="display:block;overflow:visible"><sc-for list="{{ it.parts }}" as="p" hint-placeholder-count="0"><path d="{{ p.d }}" fill="{{ p.f }}" transform="{{ p.t }}"></path></sc-for></svg>
+        </sc-for>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,246,231,.5)">leaderboard row · 26px</span>
+      <div style="background:rgba(8,42,25,.3);box-shadow:inset 0 3px 5px rgba(8,42,25,.5);border-radius:9px;padding:14px 16px;display:flex;align-items:flex-end;gap:12px">
+        <sc-for list="{{ accTiny }}" as="it" hint-placeholder-count="14">
+          <svg viewBox="0 0 100 150" width="26" height="39" style="display:block;overflow:visible"><sc-for list="{{ it.parts }}" as="p" hint-placeholder-count="0"><path d="{{ p.d }}" fill="{{ p.f }}" transform="{{ p.t }}"></path></sc-for></svg>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+
+  <div style="background:#2E9E6B;border-radius:12px;padding:22px 24px 24px;display:flex;gap:16px;width:max-content">
+    <div style="display:flex;flex-direction:column;align-items:center;gap:12px;width:176px">
+      <svg viewBox="0 0 100 150" width="140" height="210" style="display:block;overflow:visible"><sc-for list="{{ wornCrown }}" as="p" hint-placeholder-count="0"><path d="{{ p.d }}" fill="{{ p.f }}" transform="{{ p.t }}"></path></sc-for></svg>
+      <div style="width:100%;background:#FFF6E7;border-radius:9px;box-shadow:0 5px 0 #CBB795,0 10px 13px rgba(10,40,25,.2);padding:9px 10px;text-align:center">
+        <span style="display:block;font-family:'Lilita One',sans-serif;font-size:18px;letter-spacing:.03em;text-transform:uppercase;color:#22301F">Crown</span>
+        <span style="display:block;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;color:#6D3EE0">accessory · rare · new</span>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:12px;width:176px">
+      <svg viewBox="0 0 100 150" width="140" height="210" style="display:block;overflow:visible"><sc-for list="{{ wornBolt }}" as="p" hint-placeholder-count="0"><path d="{{ p.d }}" fill="{{ p.f }}" transform="{{ p.t }}"></path></sc-for></svg>
+      <div style="width:100%;background:#FFF6E7;border-radius:9px;box-shadow:0 5px 0 #CBB795,0 10px 13px rgba(10,40,25,.2);padding:9px 10px;text-align:center">
+        <span style="display:block;font-family:'Lilita One',sans-serif;font-size:18px;letter-spacing:.03em;text-transform:uppercase;color:#22301F">Bolt</span>
+        <span style="display:block;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;color:#6D3EE0">accessory · rare · new</span>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:12px;width:176px">
+      <svg viewBox="0 0 100 150" width="140" height="210" style="display:block;overflow:visible"><sc-for list="{{ wornBobble }}" as="p" hint-placeholder-count="0"><path d="{{ p.d }}" fill="{{ p.f }}" transform="{{ p.t }}"></path></sc-for></svg>
+      <div style="width:100%;background:#FFF6E7;border-radius:9px;box-shadow:0 5px 0 #CBB795,0 10px 13px rgba(10,40,25,.2);padding:9px 10px;text-align:center">
+        <span style="display:block;font-family:'Lilita One',sans-serif;font-size:18px;letter-spacing:.03em;text-transform:uppercase;color:#22301F">Bobble hat</span>
+        <span style="display:block;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;color:#0f9bbd">accessory · uncommon · new</span>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+</div>
+</section>
+</x-dc>
+<script data-dc-script>
+class Component extends DCLogic {
+  /* ── wardrobe art: faces, accessories, the loot pool ──────────────────
+   * One authoring space, the one the catalogue already documents:
+   *   viewBox 0 0 100 150 · disc centre (50,100) r 50 · accessory room y 0..56.
+   * A piece is moulded, not outlined: flat fill, a bottom face 5 units below it
+   * in its rarity colour, and a hard cast behind it so cream survives on cream.
+   */
+  artMirror(d) {
+    const t = d.trim().split(/[\s,]+/), out = [];
+    const N = { M: 2, L: 2, C: 6, Q: 4, T: 2, S: 4, A: 7, m: 2, l: 2, c: 6, q: 4, t: 2, s: 4, a: 7 };
+    let i = 0, cmd = 'M';
+    while (i < t.length) {
+      if (/^[a-zA-Z]$/.test(t[i])) { cmd = t[i]; i++; out.push(cmd); if (cmd === 'Z' || cmd === 'z') continue; }
+      const n = N[cmd] || 2, v = t.slice(i, i + n).map(Number);
+      i += n;
+      if (cmd === 'A' || cmd === 'a') {
+        v[2] = -v[2]; v[4] = 1 - v[4];
+        v[5] = cmd === 'A' ? 100 - v[5] : -v[5];
+      } else {
+        const abs = cmd === cmd.toUpperCase();
+        for (let k = 0; k < v.length; k += 2) v[k] = abs ? 100 - v[k] : -v[k];
+      }
+      out.push(v.map(x => Math.round(x * 100) / 100).join(' '));
+    }
+    return out.join(' ');
+  }
+  artBar(x, y, w, h, r) {
+    const rr = Math.min(r, w / 2, h / 2);
+    return `M ${x + rr} ${y} L ${x + w - rr} ${y} Q ${x + w} ${y} ${x + w} ${y + rr} L ${x + w} ${y + h - rr} Q ${x + w} ${y + h} ${x + w - rr} ${y + h} L ${x + rr} ${y + h} Q ${x} ${y + h} ${x} ${y + h - rr} L ${x} ${y + rr} Q ${x} ${y} ${x + rr} ${y} Z`;
+  }
+  artPaint(rarity) {
+    return rarity === 'rare'
+      ? { body: '#8b5cf6', face: '#6D3EE0' }
+      : { body: '#FFF6E7', face: rarity === 'uncommon' ? '#0f9bbd' : '#8b93a1' };
+  }
+  artTint(rarity) {
+    return rarity === 'rare' ? '#C4AAFF' : rarity === 'uncommon' ? '#6FDCEF' : 'rgba(255,246,231,.5)';
+  }
+  artCat() {
+    if (this._art) return this._art;
+    const D = (cx, cy, r) => `M ${cx - r} ${cy} a ${r} ${r} 0 1 0 ${r * 2} 0 a ${r} ${r} 0 1 0 ${-r * 2} 0 Z`;
+    const lid = cx => `M ${cx - 11} 78 Q ${cx} 94 ${cx + 11} 78 Q ${cx} 84 ${cx - 11} 78 Z`;
+    const star = (cx, cy, r) => {
+      const k = r * 0.17;
+      return `M ${cx} ${cy - r} Q ${cx + k} ${cy - k} ${cx + r} ${cy} Q ${cx + k} ${cy + k} ${cx} ${cy + r} Q ${cx - k} ${cy + k} ${cx - r} ${cy} Q ${cx - k} ${cy - k} ${cx} ${cy - r} Z`;
+    };
+    const P = d => d + ' ' + this.artMirror(d);
+
+    const faces = [
+      { id: 'eyes', name: 'Two eyes', rarity: 'common', d: `${D(27, 81, 7)} ${D(73, 81, 7)}` },
+      { id: 'tiny', name: 'Pinpricks', rarity: 'common', d: `${D(30, 84, 4)} ${D(70, 84, 4)}` },
+      { id: 'wide', name: 'Wide eyes', rarity: 'common', d: `${D(28, 82, 11)} ${D(72, 82, 11)}` },
+      { id: 'sleepy', name: 'Sleepy', rarity: 'common', isNew: true, d: 'M 19 80 A 9 9 0 0 0 37 80 Z M 81 80 A 9 9 0 0 1 63 80 Z' },
+      { id: 'squint', name: 'Squint', rarity: 'common', isNew: true, d: `${this.artBar(17, 79, 22, 7, 3.5)} ${this.artBar(61, 79, 22, 7, 3.5)}` },
+      { id: 'closed', name: 'Eyes closed', rarity: 'uncommon', d: `${lid(28)} ${lid(72)}` },
+      { id: 'smile', name: 'Smile', rarity: 'uncommon', d: `${D(28, 79, 6)} ${D(72, 79, 6)} M 34 104 Q 50 122 66 104 Q 50 112 34 104 Z` },
+      { id: 'oh', name: 'Oh', rarity: 'uncommon', d: `${D(30, 79, 6)} ${D(70, 79, 6)} ${D(50, 110, 10)}` },
+      { id: 'sideeye', name: 'Side-eye', rarity: 'uncommon', isNew: true, d: `${D(36, 80, 7.5)} ${D(78, 80, 7.5)}` },
+      { id: 'grin', name: 'Grin', rarity: 'uncommon', isNew: true, d: `${D(28, 77, 6.5)} ${D(72, 77, 6.5)} M 27 99 A 23 23 0 0 0 73 99 Z` },
+      { id: 'wink', name: 'Wink', rarity: 'rare', d: `${D(27, 81, 7)} ${lid(72)}` },
+      { id: 'cyclops', name: 'Cyclops', rarity: 'rare', d: D(50, 86, 15) },
+      { id: 'third', name: 'Third eye', rarity: 'rare', isNew: true, d: `${D(30, 86, 7)} ${D(70, 86, 7)} ${D(50, 64, 8)}` },
+      { id: 'starry', name: 'Starstruck', rarity: 'rare', isNew: true, d: `${star(28, 81, 12)} ${star(72, 81, 12)}` },
+    ];
+
+    const accs = [
+      { id: 'bare', name: 'Bare', rarity: 'common', d: '' },
+      { id: 'cowlick', name: 'Cowlick', rarity: 'common', d: 'M 43 58 C 40 40 47 22 68 10 C 60 25 55 40 56 58 Z' },
+      { id: 'leaf', name: 'Sprout', rarity: 'common', d: 'M 45 58 L 45 34 Q 45 29 50 29 Q 55 29 55 34 L 55 58 Z M 53 36 C 55 19 68 9 84 9 C 83 26 70 37 53 37 Z' },
+      { id: 'catears', name: 'Cat ears', rarity: 'common', isNew: true, d: P('M 24 58 Q 25 32 30 24 Q 39 39 45 56 Z') },
+      { id: 'crest', name: 'Crest', rarity: 'common', isNew: true, d: 'M 30 58 Q 31 40 36 30 Q 41 40 42 58 Z M 44 58 Q 45 32 50 20 Q 55 32 56 58 Z M 58 58 Q 59 40 64 30 Q 69 40 70 58 Z' },
+      { id: 'ears', name: 'Bunny ears', rarity: 'uncommon', d: P('M 30 58 C 24 46 21 27 26 16 C 31 9 39 14 39 27 C 39 39 40 48 40 58 Z') },
+      { id: 'antennae', name: 'Antennae', rarity: 'uncommon', d: P(`M 40 58 C 36 44 33 33 29 25 L 36 21 C 41 31 45 44 47 58 Z ${D(31, 18, 9)}`) },
+      { id: 'devil', name: 'Devil horns', rarity: 'uncommon', d: P('M 13 58 C 12 38 19 23 34 16 C 30 29 27 43 27 58 Z') },
+      { id: 'bow', name: 'Bow', rarity: 'uncommon', isNew: true, d: `${P('M 48 44 L 9 20 L 12 54 Z')} ${D(50, 44, 9)}` },
+      { id: 'bobble', name: 'Bobble hat', rarity: 'uncommon', isNew: true, d: `M 16 58 C 16 32 31 20 50 20 C 69 20 84 32 84 58 Z ${D(50, 14, 10)}` },
+      { id: 'horn', name: 'Unicorn horn', rarity: 'rare', d: 'M 39 58 Q 43 32 50 8 Q 57 32 61 58 Z' },
+      /* The one piece with a hole: the inner ellipse is wound the other way, so
+       * it must stay a single path for the fill rule to punch it out. */
+      { id: 'halo', name: 'Halo', rarity: 'rare', hole: true, d: 'M 18 26 a 32 10 0 1 0 64 0 a 32 10 0 1 0 -64 0 Z M 29 26 a 21 5 0 1 1 42 0 a 21 5 0 1 1 -42 0 Z' },
+      { id: 'propeller', name: 'Propeller', rarity: 'rare', d: `M 46 58 L 46 30 L 54 30 L 54 58 Z ${P('M 47 24 C 34 15 16 16 10 25 C 16 33 34 34 47 30 Z')} ${D(50, 27, 8)}` },
+      { id: 'crown', name: 'Crown', rarity: 'rare', isNew: true, d: 'M 20 58 L 20 24 L 33 38 L 50 16 L 67 38 L 80 24 L 80 58 Z' },
+      { id: 'bolt', name: 'Bolt', rarity: 'rare', isNew: true, d: 'M 58 6 L 32 38 L 47 38 L 38 58 L 68 24 L 52 24 Z' },
+    ];
+
+    /* Two bars crossed at 45°, corners worked out rather than rotated, so an X
+     * is the same kind of data as every other mark on a face. */
+    const X = (cx, cy, r, t) => [Math.PI / 4, -Math.PI / 4].map(a => {
+      const c = [[-r, -t], [r, -t], [r, t], [-r, t]]
+        .map(p => [cx + p[0] * Math.cos(a) - p[1] * Math.sin(a), cy + p[0] * Math.sin(a) + p[1] * Math.cos(a)]);
+      return 'M ' + c.map(p => p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' L ') + ' Z';
+    }).join(' ');
+    const petals = [0, 1, 2, 3, 4].map(i => {
+      const a = -Math.PI / 2 + (i * Math.PI * 2) / 5;
+      return D(50 + Math.cos(a) * 12, 26 + Math.sin(a) * 12, 8.5);
+    }).join(' ');
+
+    faces.push(
+      { id: 'frown', name: 'Frown', rarity: 'common', isNew: true, d: `${D(28, 79, 6)} ${D(72, 79, 6)} M 34 116 Q 50 98 66 116 Q 50 108 34 116 Z` },
+      { id: 'bored', name: 'Bored', rarity: 'common', isNew: true, d: `${D(30, 80, 6)} ${D(70, 80, 6)} ${this.artBar(38, 106, 24, 6, 3)}` },
+      { id: 'angry', name: 'Angry', rarity: 'uncommon', isNew: true, d: `${D(30, 95, 6.5)} ${D(70, 95, 6.5)} ${P('M 17 65 L 40 75 L 38 82 L 16 73 Z')}` },
+      { id: 'tongue', name: 'Tongue out', rarity: 'uncommon', isNew: true, d: `${D(28, 78, 6)} ${D(72, 78, 6)} M 30 100 A 20 20 0 0 0 70 100 Z M 41 112 L 59 112 L 59 127 Q 59 137 50 137 Q 41 137 41 127 Z` },
+      { id: 'foureyes', name: 'Four eyes', rarity: 'rare', isNew: true, d: `${D(28, 74, 6)} ${D(72, 74, 6)} ${D(28, 93, 6)} ${D(72, 93, 6)}` },
+      { id: 'xeyes', name: 'X eyes', rarity: 'rare', isNew: true, d: `${X(28, 81, 11, 3.4)} ${X(72, 81, 11, 3.4)}` },
+    );
+
+    accs.push(
+      { id: 'party', name: 'Party hat', rarity: 'common', isNew: true, d: `M 27 58 L 50 15 L 73 58 Z ${D(50, 11, 8)}` },
+      { id: 'daisy', name: 'Daisy', rarity: 'uncommon', isNew: true, d: `M 46 58 L 46 34 Q 50 30 54 34 L 54 58 Z ${petals} ${D(50, 26, 8)}` },
+      { id: 'starant', name: 'Star antenna', rarity: 'uncommon', isNew: true, d: `M 45 58 C 44 44 45 34 48 27 L 55 29 C 52 38 52 46 53 58 Z ${star(51, 18, 12)}` },
+      { id: 'tophat', name: 'Top hat', rarity: 'rare', isNew: true, d: `${this.artBar(11, 44, 78, 11, 5)} ${this.artBar(27, 6, 46, 42, 5)}` },
+      { id: 'antlers', name: 'Antlers', rarity: 'rare', isNew: true, d: `${P('M 34 58 C 30 44 26 30 22 18 L 30 15 C 35 28 39 44 41 58 Z')} ${P('M 27 32 L 11 25 L 8 32 L 25 39 Z')} ${P('M 23 19 L 13 6 L 19 2 L 29 15 Z')}` },
+    );
+
+    const rimY = 143, half = Math.sqrt(2500 - (rimY - 100) * (rimY - 100));
+    this._art = {
+      faces, accs,
+      disc: D(50, 100, 50),
+      rim: `M ${(50 - half).toFixed(2)} ${rimY} A 50 50 0 0 0 ${(50 + half).toFixed(2)} ${rimY} Z`,
+      /* The block versions shipped with the Blocks pass, kept for the before/after. */
+      old: {
+        cowlick: [{ x: 45, y: 12, w: 13, h: 46, r: 6, rot: 18 }],
+        leaf: [{ x: 47, y: 20, w: 8, h: 38, r: 4 }, { x: 55, y: 13, w: 25, h: 13, r: 6, rot: -24 }],
+        ears: [{ x: 21, y: 24, w: 16, h: 43, r: 8, rot: -10 }, { x: 63, y: 24, w: 16, h: 43, r: 8, rot: 10 }],
+        antennae: [{ x: 29, y: 14, w: 7, h: 44, r: 3, rot: -13 }, { x: 64, y: 14, w: 7, h: 44, r: 3, rot: 13 }],
+        devil: [{ x: 11, y: 20, w: 15, h: 42, r: 7, rot: -26 }, { x: 74, y: 20, w: 15, h: 42, r: 7, rot: 26 }],
+        horn: [{ x: 42, y: 8, w: 16, h: 52, r: 8 }],
+        halo: [{ x: 21, y: 20, w: 58, h: 15, r: 7 }],
+        propeller: [{ x: 46, y: 28, w: 8, h: 30, r: 4 }, { x: 14, y: 22, w: 72, h: 13, r: 6, rot: -7 }],
+      },
+    };
+    return this._art;
+  }
+  artSubpaths(item) {
+    if (!item || !item.d) return [];
+    if (item.hole) return [item.d];
+    return item.d.match(/M[^M]*/g) || [item.d];
+  }
+  artParts(faceId, accId, o) {
+    const A = this.artCat();
+    const opt = Object.assign({ body: '#FFF1DA', rim: 'rgba(0,0,0,.16)', ink: '#3A2A18' }, o || {});
+    const face = A.faces.find(f => f.id === faceId), acc = A.accs.find(a => a.id === accId);
+    const parts = [{ d: A.disc, f: 'rgba(18,32,24,.2)', t: 'translate(0 5)' }];
+    if (acc && acc.d) {
+      const p = this.artPaint(acc.rarity);
+      /* One element per subpath. Mirroring reverses a path's winding, so two
+       * overlapping halves inside a single `d` cancel each other out under the
+       * non-zero rule and the overlap punches a hole — which is what clipped
+       * the antennae, the bow and the propeller. Split them and each piece
+       * simply paints over the last. The cast stays whole: any hole in it is
+       * behind the body anyway, and one element means the translucent fill
+       * cannot double up where two pieces overlap. */
+      parts.push({ d: acc.d, f: 'rgba(18,32,24,.26)', t: 'translate(0 7) translate(50 38) scale(1.06) translate(-50 -38)' });
+      const subs = this.artSubpaths(acc);
+      subs.forEach(s => parts.push({ d: s, f: p.face, t: 'translate(0 5)' }));
+      subs.forEach(s => parts.push({ d: s, f: p.body, t: 'translate(0 0)' }));
+    }
+    parts.push({ d: A.disc, f: opt.body, t: 'translate(0 0)' });
+    parts.push({ d: A.rim, f: opt.rim, t: 'translate(0 0)' });
+    if (face && face.d) this.artSubpaths(face).forEach(s => parts.push({ d: s, f: opt.ink, t: 'translate(0 0)' }));
+    return parts;
+  }
+  artOldParts(accId) {
+    const A = this.artCat();
+    const acc = A.accs.find(a => a.id === accId), p = this.artPaint(acc.rarity);
+    const parts = [{ d: A.disc, f: 'rgba(18,32,24,.2)', t: 'translate(0 5)' }];
+    (A.old[accId] || []).forEach(b => {
+      const t = b.rot ? `rotate(${b.rot} ${b.x + b.w / 2} ${b.y + b.h / 2})` : 'translate(0 0)';
+      const bottom = Math.min(b.y + b.h, 54), depth = Math.min(6, Math.max(3, b.h * 0.12));
+      parts.push({ d: this.artBar(b.x - 2.4, b.y + 0.2, b.w + 4.8, b.h + 4.8, b.r + 2.4), f: 'rgba(18,32,24,.26)', t });
+      parts.push({ d: this.artBar(b.x, b.y, b.w, b.h, b.r), f: p.body, t });
+      parts.push({ d: this.artBar(b.x, bottom - depth, b.w, depth, bottom === b.y + b.h ? b.r : 0), f: p.face, t });
+    });
+    parts.push({ d: A.disc, f: '#FFF1DA', t: 'translate(0 0)' });
+    parts.push({ d: A.rim, f: 'rgba(0,0,0,.16)', t: 'translate(0 0)' });
+    parts.push({ d: A.faces[0].d, f: '#3A2A18', t: 'translate(0 0)' });
+    return parts;
+  }
+  artCards(kind, rarity, opts) {
+    const A = this.artCat();
+    const list = kind === 'face' ? A.faces : A.accs;
+    return list
+      .filter(it => !rarity || it.rarity === rarity)
+      .map(it => ({
+        id: it.id,
+        name: it.name,
+        meta: it.rarity.toUpperCase(),
+        tint: this.artTint(it.rarity),
+        isNew: it.isNew === true,
+        parts: kind === 'face' ? this.artParts(it.id, 'bare', opts) : this.artParts('eyes', it.id, opts),
+      }));
+  }
+
+  renderVals() {
+    const oldIds = ['cowlick', 'leaf', 'ears', 'antennae', 'devil', 'horn', 'halo', 'propeller'];
+    const named = id => this.artCat().accs.find(a => a.id === id);
+    const worn = { body: '#FF7A2F', rim: 'rgba(0,0,0,.18)', ink: '#3A2A18' };
+    return {
+      accBefore: oldIds.map(id => ({ name: named(id).name, parts: this.artOldParts(id) })),
+      accAfter: oldIds.map(id => ({ name: named(id).name, parts: this.artParts('eyes', id) })),
+      faceC: this.artCards('face', 'common'),
+      faceU: this.artCards('face', 'uncommon'),
+      faceR: this.artCards('face', 'rare'),
+      accC: this.artCards('acc', 'common'),
+      accU: this.artCards('acc', 'uncommon'),
+      accR: this.artCards('acc', 'rare'),
+      accTiny: this.artCards('acc').filter(c => c.id !== 'bare'),
+      wornCrown: this.artParts('grin', 'crown', worn),
+      wornBolt: this.artParts('sideeye', 'bolt', worn),
+      wornBobble: this.artParts('sleepy', 'bobble', worn),
+    };
+  }
+}
+</script>
+</body>
+</html>
