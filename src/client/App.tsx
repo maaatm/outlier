@@ -19,8 +19,10 @@ import { DotCrowd } from './components/DotCrowd.js';
 import { Histogram } from './components/Histogram.js';
 import { Menu } from './components/Menu.js';
 import { StatBar } from './components/StatBar.js';
+import { Wordmark } from './components/Wordmark.js';
 import { COUNTER_SIZE } from './counterArt.js';
 import { useCountUp } from './countUp.js';
+import { WORDMARK_SIZE } from './wordmarkArt.js';
 
 const DEFAULT_GUESS = 50;
 
@@ -152,7 +154,7 @@ function Game({
   return (
     <main className="app">
       <header className="header">
-        <span className="header__mark">Outlier</span>
+        <Wordmark size={WORDMARK_SIZE.header} />
         <StatBar stats={stats} />
       </header>
 
