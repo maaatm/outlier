@@ -56,18 +56,31 @@ describe('the catalogue', () => {
     expect(STARTER_ACCESSORY.rarity).toBe('common');
   });
 
-  it('draws something for every item except the empty accessory slot', () => {
-    // Wearing nothing is an item rather than the absence of one, so that the
-    // wardrobe has an honest way to take an accessory off.
-    expect(STARTER_ACCESSORY.path).toBe('');
-    for (const item of ITEMS) {
-      if (item !== STARTER_ACCESSORY) expect(item.path.length).toBeGreaterThan(0);
-    }
-  });
-
   it('ships enough of each kind to be worth a wardrobe', () => {
     expect(FACES.length).toBeGreaterThanOrEqual(8);
     expect(ACCESSORIES.length).toBeGreaterThanOrEqual(8);
+  });
+
+  it('fills every band of both layers', () => {
+    // The box draws a band first and an item uniformly inside it, so a band
+    // with nothing in it is a share of the odds redistributed to the others.
+    // Both layers hold some of every band, so a rare is not always a hat.
+    for (const layer of [FACES, ACCESSORIES]) {
+      for (const rarity of ['common', 'uncommon', 'rare'] as const) {
+        expect(layer.filter((item) => item.rarity === rarity).length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('runs each layer common, then uncommon, then rare', () => {
+    // The wardrobe walks these lists as rings, so the order is what a player
+    // steps through. A new item goes at the end of its band rather than being
+    // sorted in, so nothing already in the list moves under them.
+    const ladder = { common: 0, uncommon: 1, rare: 2 } as const;
+    for (const layer of [FACES, ACCESSORIES]) {
+      const rungs = layer.map((item) => ladder[item.rarity]);
+      expect(rungs).toEqual([...rungs].sort((a, b) => a - b));
+    }
   });
 });
 

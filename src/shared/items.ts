@@ -5,6 +5,12 @@
  * the client can draw an item and the server can validate an equip against the
  * same list.
  *
+ * What is *not* here is the drawing. An item is an id, a name and a rarity;
+ * what it looks like lives in `client/counterArt.ts`, keyed by the same ids.
+ * The split is the server's doing: this file is the one the server imports, to
+ * check that a submitted id exists and is the kind it claims to be, and a
+ * thousand characters of path data is none of its business.
+ *
  * ## The rule for anything added here
  *
  * **An accessory breaks the circle's silhouette. It does not decorate the inside
@@ -19,14 +25,22 @@
  * reads up close, which is why everyone has one and why it is never the thing
  * that identifies a player across a crowd.
  *
+ * ## The order of these lists
+ *
+ * Each list runs common, then uncommon, then rare. The wardrobe's steppers walk
+ * a list as a ring, so the order is what a player steps through, and a ring that
+ * climbs is one they can feel their way along. It is also why nothing is ever
+ * re-sorted here: a new item goes at the end of its band, so that everything
+ * already in the list stays where the player last left it.
+ *
  * ## The geometry
  *
- * Every path is authored against one viewBox with the dot at a known place, or
- * nothing lines up the moment the dot resizes:
+ * Every drawing is authored against one viewBox with the dot at a known place,
+ * or nothing lines up the moment the dot resizes:
  *
  *     viewBox   0 0 100 150
  *     the dot   centre (50, 100), outer radius 50 — the bottom third of the box
- *     above it  y 0..50, which is the accessory's room and nobody else's
+ *     above it  y 0..56, which is the accessory's room and nobody else's
  *
  * The radius is the dot's *outer* edge, matching `.dot` in `styles.css`: a 2px
  * border on a border-box element, so a 24px dot is 24px across including its
@@ -35,10 +49,6 @@
  * box. That is deliberate — `.slide` and `.menu__body` are scroll containers,
  * and a scroll container clips on both axes, so anything painting outside its
  * box loses an edge there.
- *
- * Accessories stay inside x 6..94 and y 6..56 for the same reason. The ink is a
- * constant 2px on screen, which at 18px is eleven units of this space, and half
- * of it hangs outside the path it is drawn on.
  *
  * Accessories are drawn *behind* the head, so whatever tucks under the rim is
  * hidden rather than painted over it. Their bases run past y=50 on purpose.
@@ -61,8 +71,6 @@ export type Item = {
   /** What the wardrobe calls it. */
   name: string;
   rarity: Rarity;
-  /** Inline SVG path data. No files, no CDN — the app makes no external requests. */
-  path: string;
   /** True for the pair everyone starts with. Never rolled from a box. */
   starter?: boolean;
 };
@@ -99,16 +107,6 @@ export function blobHeight(size: number): number {
   return (size * VIEW_HEIGHT) / VIEW_WIDTH;
 }
 
-/** A circle as path data. Eyes, mouths and antenna heads are all circles. */
-function disc(cx: number, cy: number, r: number): string {
-  return `M ${cx - r} ${cy} a ${r} ${r} 0 1 0 ${r * 2} 0 a ${r} ${r} 0 1 0 ${-r * 2} 0 Z`;
-}
-
-/** A closed eye: two arcs bowing the same way, filled as the crescent between. */
-function lid(cx: number): string {
-  return `M ${cx - 11} 78 Q ${cx} 94 ${cx + 11} 78 Q ${cx} 84 ${cx - 11} 78 Z`;
-}
-
 /**
  * The starter face is the dot the crowd already draws — two spans at 14% of the
  * dot, 24% down, inset 20% — so today's crowd is already the default blob rather
@@ -119,61 +117,30 @@ const EYES: Item = {
   kind: 'face',
   name: 'Two eyes',
   rarity: 'common',
-  path: `${disc(27, 81, 7)} ${disc(73, 81, 7)}`,
   starter: true,
 };
 
 export const FACES: readonly Item[] = [
   EYES,
-  {
-    id: 'tiny',
-    kind: 'face',
-    name: 'Pinpricks',
-    rarity: 'common',
-    path: `${disc(30, 84, 4)} ${disc(70, 84, 4)}`,
-  },
-  {
-    id: 'wide',
-    kind: 'face',
-    name: 'Wide eyes',
-    rarity: 'common',
-    path: `${disc(28, 82, 11)} ${disc(72, 82, 11)}`,
-  },
-  {
-    id: 'closed',
-    kind: 'face',
-    name: 'Eyes closed',
-    rarity: 'uncommon',
-    path: `${lid(28)} ${lid(72)}`,
-  },
-  {
-    id: 'smile',
-    kind: 'face',
-    name: 'Smile',
-    rarity: 'uncommon',
-    path: `${disc(28, 79, 6)} ${disc(72, 79, 6)} M 34 104 Q 50 122 66 104 Q 50 112 34 104 Z`,
-  },
-  {
-    id: 'oh',
-    kind: 'face',
-    name: 'Oh',
-    rarity: 'uncommon',
-    path: `${disc(30, 79, 6)} ${disc(70, 79, 6)} ${disc(50, 110, 10)}`,
-  },
-  {
-    id: 'wink',
-    kind: 'face',
-    name: 'Wink',
-    rarity: 'rare',
-    path: `${disc(27, 81, 7)} ${lid(72)}`,
-  },
-  {
-    id: 'cyclops',
-    kind: 'face',
-    name: 'Cyclops',
-    rarity: 'rare',
-    path: disc(50, 86, 15),
-  },
+  { id: 'tiny', kind: 'face', name: 'Pinpricks', rarity: 'common' },
+  { id: 'wide', kind: 'face', name: 'Wide eyes', rarity: 'common' },
+  { id: 'sleepy', kind: 'face', name: 'Sleepy', rarity: 'common' },
+  { id: 'squint', kind: 'face', name: 'Squint', rarity: 'common' },
+  { id: 'frown', kind: 'face', name: 'Frown', rarity: 'common' },
+  { id: 'bored', kind: 'face', name: 'Bored', rarity: 'common' },
+  { id: 'closed', kind: 'face', name: 'Eyes closed', rarity: 'uncommon' },
+  { id: 'smile', kind: 'face', name: 'Smile', rarity: 'uncommon' },
+  { id: 'oh', kind: 'face', name: 'Oh', rarity: 'uncommon' },
+  { id: 'sideeye', kind: 'face', name: 'Side-eye', rarity: 'uncommon' },
+  { id: 'grin', kind: 'face', name: 'Grin', rarity: 'uncommon' },
+  { id: 'angry', kind: 'face', name: 'Angry', rarity: 'uncommon' },
+  { id: 'tongue', kind: 'face', name: 'Tongue out', rarity: 'uncommon' },
+  { id: 'wink', kind: 'face', name: 'Wink', rarity: 'rare' },
+  { id: 'cyclops', kind: 'face', name: 'Cyclops', rarity: 'rare' },
+  { id: 'third', kind: 'face', name: 'Third eye', rarity: 'rare' },
+  { id: 'starry', kind: 'face', name: 'Starstruck', rarity: 'rare' },
+  { id: 'foureyes', kind: 'face', name: 'Four eyes', rarity: 'rare' },
+  { id: 'xeyes', kind: 'face', name: 'X eyes', rarity: 'rare' },
 ];
 
 /**
@@ -187,89 +154,30 @@ const BARE: Item = {
   kind: 'accessory',
   name: 'Bare',
   rarity: 'common',
-  path: '',
   starter: true,
 };
 
 export const ACCESSORIES: readonly Item[] = [
   BARE,
-  {
-    id: 'cowlick',
-    kind: 'accessory',
-    name: 'Cowlick',
-    rarity: 'common',
-    path: 'M 43 55 C 44 38 52 26 68 20 C 62 30 56 38 54 55 Z',
-  },
-  {
-    id: 'leaf',
-    kind: 'accessory',
-    name: 'Sprout',
-    rarity: 'common',
-    path: 'M 54 53 C 54 34 64 20 82 14 C 82 34 74 48 64 53 Z',
-  },
-  {
-    id: 'ears',
-    kind: 'accessory',
-    name: 'Bunny ears',
-    rarity: 'uncommon',
-    path:
-      'M 42 56 C 30 42 25 26 30 16 C 36 11 44 22 46 36 C 47 45 47 51 47 56 Z ' +
-      'M 58 56 C 70 42 75 26 70 16 C 64 11 56 22 54 36 C 53 45 53 51 53 56 Z',
-  },
-  {
-    id: 'antennae',
-    kind: 'accessory',
-    name: 'Antennae',
-    rarity: 'uncommon',
-    path:
-      `M 41 57 L 27 30 L 33 27 L 47 55 Z ${disc(28, 22, 8)} ` +
-      `M 59 57 L 73 30 L 67 27 L 53 55 Z ${disc(72, 22, 8)}`,
-  },
-  {
-    id: 'devil',
-    kind: 'accessory',
-    name: 'Devil horns',
-    rarity: 'uncommon',
-    /*
-     * Set wider on the head and leaning outward, which is the only thing
-     * separating a devil from a rabbit once both are eleven pixels of outline.
-     */
-    path:
-      'M 22 62 C 14 52 10 38 13 24 C 24 32 32 48 36 60 Z ' +
-      'M 78 62 C 86 52 90 38 87 24 C 76 32 68 48 64 60 Z',
-  },
-  {
-    id: 'horn',
-    kind: 'accessory',
-    name: 'Unicorn horn',
-    rarity: 'rare',
-    path: 'M 41 56 Q 44 30 50 14 Q 56 30 59 56 Z',
-  },
-  {
-    /*
-     * The one item with a hole in it. The inner ellipse is wound the other way
-     * round — `a … 1 1 …` against the outer's `a … 1 0 …` — so the default
-     * non-zero fill rule punches it out. Every other path here is a union of
-     * overlapping shapes and needs that same rule to merge rather than cancel,
-     * which is why this is solved in the path data instead of with `evenodd`.
-     */
-    id: 'halo',
-    kind: 'accessory',
-    name: 'Halo',
-    rarity: 'rare',
-    path:
-      'M 20 30 a 30 10 0 1 0 60 0 a 30 10 0 1 0 -60 0 Z ' +
-      'M 30 30 a 20 5 0 1 1 40 0 a 20 5 0 1 1 -40 0 Z',
-  },
-  {
-    id: 'propeller',
-    kind: 'accessory',
-    name: 'Propeller',
-    rarity: 'rare',
-    path:
-      'M 14 30 C 18 21 34 21 46 27 C 58 21 82 21 86 30 C 82 39 58 39 46 33 ' +
-      'C 34 39 18 39 14 30 Z M 46 56 L 46 30 L 54 30 L 54 56 Z',
-  },
+  { id: 'cowlick', kind: 'accessory', name: 'Cowlick', rarity: 'common' },
+  { id: 'leaf', kind: 'accessory', name: 'Sprout', rarity: 'common' },
+  { id: 'catears', kind: 'accessory', name: 'Cat ears', rarity: 'common' },
+  { id: 'crest', kind: 'accessory', name: 'Crest', rarity: 'common' },
+  { id: 'party', kind: 'accessory', name: 'Party hat', rarity: 'common' },
+  { id: 'ears', kind: 'accessory', name: 'Bunny ears', rarity: 'uncommon' },
+  { id: 'antennae', kind: 'accessory', name: 'Antennae', rarity: 'uncommon' },
+  { id: 'devil', kind: 'accessory', name: 'Devil horns', rarity: 'uncommon' },
+  { id: 'bow', kind: 'accessory', name: 'Bow', rarity: 'uncommon' },
+  { id: 'bobble', kind: 'accessory', name: 'Bobble hat', rarity: 'uncommon' },
+  { id: 'daisy', kind: 'accessory', name: 'Daisy', rarity: 'uncommon' },
+  { id: 'starant', kind: 'accessory', name: 'Star antenna', rarity: 'uncommon' },
+  { id: 'horn', kind: 'accessory', name: 'Unicorn horn', rarity: 'rare' },
+  { id: 'halo', kind: 'accessory', name: 'Halo', rarity: 'rare' },
+  { id: 'propeller', kind: 'accessory', name: 'Propeller', rarity: 'rare' },
+  { id: 'crown', kind: 'accessory', name: 'Crown', rarity: 'rare' },
+  { id: 'bolt', kind: 'accessory', name: 'Bolt', rarity: 'rare' },
+  { id: 'tophat', kind: 'accessory', name: 'Top hat', rarity: 'rare' },
+  { id: 'antlers', kind: 'accessory', name: 'Antlers', rarity: 'rare' },
 ];
 
 export const ITEMS: readonly Item[] = [...FACES, ...ACCESSORIES];
@@ -302,7 +210,8 @@ export function getItem(id: string, kind: ItemKind): Item | undefined {
  * An item by id alone, for the one caller that does not know the kind: a box
  * result arrives as an id, and which list it came out of is the answer rather
  * than part of the question. Safe because ids are unique across both lists —
- * asserted in `tests/items.test.ts`, which is what this leans on.
+ * asserted in `tests/items.test.ts`, which is what this leans on, and what
+ * `counterArt.ts` leans on to key one table of drawings by id.
  */
 export function findItem(id: string): Item | undefined {
   return ITEMS.find((item) => item.id === id);
@@ -347,7 +256,7 @@ export function resolveAccessory(id: string | undefined | null): Item {
 }
 
 /**
- * Where an item sits in its list, for the wardrobe's "7 of 8".
+ * Where an item sits in its list, for the wardrobe's "7 of 20".
  *
  * An id the catalogue does not have reads as the first item rather than as -1,
  * because every caller here is about to index with the answer and the first item

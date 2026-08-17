@@ -9,12 +9,20 @@
  *
  * The layers, bottom to top, and why in that order:
  *
- *   1. the accessory, as blocks, so whatever tucks under the rim is hidden by
- *      the disc rather than painted as a slab across it
+ *   1. the accessory — its cast, then its rarity face, then its body — so that
+ *      whatever tucks under the rim is hidden by the disc rather than painted
+ *      as a slab across it
  *   2. the disc
  *   3. the band inside its bottom edge, which is what makes it a piece with
  *      height rather than a circle
  *   4. the face
+ *
+ * Every layer but the cast is drawn as one element per subpath. Mirroring a
+ * path reverses its winding, so two overlapping halves inside a single `d`
+ * cancel under the non-zero fill rule and punch a hole through the overlap —
+ * an antenna losing its stalk, a tongue with a notch across it. The cast stays
+ * whole for the opposite reason: it is translucent, and one element is what
+ * stops the fill doubling where two pieces overlap.
  *
  * The element is `size` wide and half again as tall: the accessory lives inside
  * the viewBox rather than overflowing the box, so nothing here needs a scroll
@@ -24,12 +32,12 @@
 import { BLOB_CIRCLE, VIEW_BOX, blobHeight, resolveAccessory, resolveFace } from '../../shared/items.js';
 import {
   CAST_FILL,
+  CAST_TRANSFORM,
   DISC_RIM,
-  blockCast,
-  blockFace,
-  blockSpin,
-  blocksFor,
+  FACE_TRANSFORM,
   paintFor,
+  pathFor,
+  subpathsFor,
 } from '../counterArt.js';
 
 type Props = {
@@ -59,6 +67,8 @@ export function Blob({ face, accessory, size, label, fill }: Props): React.JSX.E
   const faceItem = resolveFace(face);
   const accessoryItem = resolveAccessory(accessory);
   const paint = paintFor(accessoryItem.rarity);
+  const worn = pathFor(accessoryItem.id);
+  const pieces = subpathsFor(accessoryItem.id);
 
   return (
     <svg
@@ -70,37 +80,19 @@ export function Blob({ face, accessory, size, label, fill }: Props): React.JSX.E
       aria-label={label}
       aria-hidden={label ? undefined : true}
     >
-      {/* Every accessory's shadow before any accessory, so two pieces that
-          stand close do not cast onto each other. */}
-      {blocksFor(accessoryItem.id).map((block, index) => {
-        const cast = blockCast(block);
-        return (
-          <rect
-            key={index}
-            x={cast.x}
-            y={cast.y}
-            width={cast.w}
-            height={cast.h}
-            rx={cast.r}
-            fill={CAST_FILL}
-            transform={blockSpin(block)}
-          />
-        );
-      })}
+      {/* The whole accessory's shadow, as one element and before any of it, so
+          that two pieces standing close neither cast onto each other nor
+          double the fill where they overlap. */}
+      {worn && <path d={worn} fill={CAST_FILL} transform={CAST_TRANSFORM} />}
 
-      {blocksFor(accessoryItem.id).map((block, index) => (
-        <g key={index} transform={blockSpin(block)}>
-          <rect
-            x={block.x}
-            y={block.y}
-            width={block.w}
-            height={block.h}
-            rx={block.r}
-            fill={paint.body}
-          />
-          {/* Rarity lives on the piece's own bottom face. */}
-          <path d={blockFace(block)} fill={paint.face} />
-        </g>
+      {/* Rarity lives on the piece's own bottom face: the same drawing dropped
+          a few units, with the body painted back over all but its bottom edge. */}
+      {pieces.map((d, index) => (
+        <path key={index} d={d} fill={paint.face} transform={FACE_TRANSFORM} />
+      ))}
+
+      {pieces.map((d, index) => (
+        <path key={index} d={d} fill={paint.body} />
       ))}
 
       <circle
@@ -111,7 +103,9 @@ export function Blob({ face, accessory, size, label, fill }: Props): React.JSX.E
       />
       <path d={DISC_RIM} fill="rgba(0, 0, 0, 0.16)" />
 
-      {faceItem.path && <path d={faceItem.path} fill="var(--counter-eye)" />}
+      {subpathsFor(faceItem.id).map((d, index) => (
+        <path key={index} d={d} fill="var(--counter-eye)" />
+      ))}
     </svg>
   );
 }
