@@ -6,21 +6,26 @@
  * the room, and it carries a lead nobody joining late can close. The week is
  * the board that greets you; all time is still there for anyone who wants it.
  *
+ * Which tab you are on is said with depth rather than with colour: the one you
+ * are reading is a block standing on the table and the other is pressed into
+ * it. That is the same rule every selected thing in the app follows, and it is
+ * why neither tab needs a word explaining which is which.
+ *
  * Rows stay terse on purpose. **Your record** is the room next door and it owns
  * the prose about streaks and rates; if the rows here start explaining
- * themselves the two rooms are competing. Rank is carried by position, so no
- * row takes an accent — the two-accents-per-screen rule is not suspended for a
- * leaderboard.
+ * themselves the two rooms are competing.
  */
 
 import { useEffect, useState } from 'react';
 
-import type { BoardRange, PlayerBoardResponse } from '../../shared/types.js';
+import type { BoardRange, PlayerBoardEntry, PlayerBoardResponse } from '../../shared/types.js';
 import { fetchPlayerBoard } from '../api.js';
+import { COUNTER_SIZE, rowTint } from '../counterArt.js';
+import { Blob } from './Blob.js';
 
 const TABS: { id: BoardRange; label: string }[] = [
-  { id: 'week', label: 'this week' },
-  { id: 'all', label: 'all time' },
+  { id: 'week', label: 'This week' },
+  { id: 'all', label: 'All time' },
 ];
 
 export function PlayerBoard(): React.JSX.Element {
@@ -45,15 +50,16 @@ export function PlayerBoard(): React.JSX.Element {
   }, [range]);
 
   return (
-    <div className="detail">
-      {/* The same tab idiom as the reveal's detail strip, rather than a second
-          one invented for the menu. */}
-      <div className="detail__tabs">
+    <>
+      <div className="tabs">
         {TABS.map((tab) => (
           <button
             key={tab.id}
             type="button"
-            className={`detail__tab${range === tab.id ? ' is-active' : ''}`}
+            className={`button block block--yellow block--md tab${
+              range === tab.id ? '' : ' tab--off'
+            }`}
+            aria-pressed={range === tab.id}
             onClick={() => setRange(tab.id)}
           >
             {tab.label}
@@ -62,7 +68,7 @@ export function PlayerBoard(): React.JSX.Element {
       </div>
 
       <Rows board={board} failed={failed} range={range} />
-    </div>
+    </>
   );
 }
 
@@ -76,17 +82,17 @@ function Rows({
   range: BoardRange;
 }): React.JSX.Element {
   if (failed) {
-    return <p className="notice notice--quiet">The board did not load.</p>;
+    return <p className="notice notice--quiet notice--spaced">The board did not load.</p>;
   }
   if (board === null) {
-    return <p className="notice notice--quiet">Loading.</p>;
+    return <p className="notice notice--quiet notice--spaced">Loading.</p>;
   }
 
   // A fresh week is empty every Monday and a fresh install is empty outright.
   // Neither is an error, and neither should read like one.
   if (board.rows.length === 0) {
     return (
-      <p className="notice notice--quiet">
+      <p className="notice notice--spaced">
         {range === 'week'
           ? 'Nothing banked this week yet. Answer anything and the board starts.'
           : 'Nothing banked yet. Answer anything and the board starts.'}
@@ -95,27 +101,60 @@ function Rows({
   }
 
   return (
-    <>
-      <ol className="board">
+    <div className="board">
+      {/* The list scrolls; the well does not. That is what keeps the row below
+          it on the floor of the well rather than somewhere off the bottom of a
+          long board. On a wide table the same list reads across in two columns
+          instead of scrolling at all. */}
+      <ol className="board__rows">
         {board.rows.map((row) => (
-          <li key={row.userId} className="board__row board__row--player">
-            <span className="board__rank">{row.rank}</span>
-            <span className="board__name">{row.name}</span>
-            <span className="board__points">{row.points}</span>
-          </li>
+          <Row key={row.userId} row={row} />
         ))}
       </ol>
 
       {/* Returned even when the viewer is already in the list above: a board you
           are absent from is a board you stop opening, and the second glance
-          costs a line. */}
+          costs a line. Pinned, so it is the one row that never moves when the
+          tab changes. */}
       {board.you && (
-        <div className="board__row board__row--player board__you">
+        <div className="board__row board__you">
           <span className="board__rank">{board.you.rank}</span>
+          <span className="board__counter" aria-hidden="true" />
           <span className="board__name">you</span>
           <span className="board__points">{board.you.points}</span>
         </div>
       )}
-    </>
+    </div>
+  );
+}
+
+/**
+ * One player, wearing what they are actually wearing.
+ *
+ * The counter is their own — the board pays one extra `hMGet` for the whole
+ * page of them — and its fill is drawn from the id, so the pieces read as a
+ * handful of different people rather than a column of identical discs. The
+ * colour carries no meaning: it is stable for a given player and mixed down
+ * the board, and that is all it is for.
+ *
+ * A counter's drawing is half again as tall as the piece in it, because the
+ * accessory lives above the disc. The cell here is the disc's size and the
+ * drawing hangs out of the top of it, which is what puts the ears above the
+ * row instead of stretching every row to fit them.
+ */
+function Row({ row }: { row: PlayerBoardEntry }): React.JSX.Element {
+  return (
+    <li className="board__row">
+      <span className="board__rank">{row.rank}</span>
+      <span className={`board__avatar board__avatar--${rowTint(row.userId)}`}>
+        <Blob
+          face={row.avatar.face}
+          accessory={row.avatar.accessory}
+          size={COUNTER_SIZE.row}
+        />
+      </span>
+      <span className="board__name">{row.name}</span>
+      <span className="board__points">{row.points}</span>
+    </li>
   );
 }

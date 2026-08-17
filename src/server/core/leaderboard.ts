@@ -16,6 +16,7 @@ import type { T2 } from '@devvit/web/shared';
 
 import { boardPoints } from '../../shared/board.js';
 import { PLAYER_BOARD_SIZE } from '../../shared/config.js';
+import { unpackAvatar } from '../../shared/items.js';
 import { toWeekKey } from '../../shared/day.js';
 import type { BoardRange, PlayerBoardEntry, PlayerBoardResponse } from '../../shared/types.js';
 import { keys } from './keys.js';
@@ -49,17 +50,27 @@ export async function readPlayerBoard(
   };
 }
 
-/** Attach a username to each member, dropping the ones that no longer exist. */
+/**
+ * Attach a username and a counter to each member, dropping the ones that no
+ * longer exist.
+ *
+ * Two `hMGet`s in parallel rather than one plus a wave of per-player reads:
+ * the equipped pair is packed into a single field of one shared hash for
+ * exactly this reason — see the header on `core/avatars.ts` — so drawing ten
+ * players costs the board one more round trip, taken alongside the names it
+ * was already fetching.
+ */
 async function namedRows(
   key: string,
   ranked: { member: string; score: number }[]
 ): Promise<PlayerBoardEntry[]> {
   if (ranked.length === 0) return [];
 
-  const names = await redis.hMGet(
-    keys.names,
-    ranked.map((entry) => entry.member)
-  );
+  const members = ranked.map((entry) => entry.member);
+  const [names, avatars] = await Promise.all([
+    redis.hMGet(keys.names, members),
+    redis.hMGet(keys.avatars, members),
+  ]);
 
   const rows: PlayerBoardEntry[] = [];
   for (const [index, entry] of ranked.entries()) {
@@ -73,6 +84,9 @@ async function namedRows(
       userId: entry.member,
       name,
       points: boardPoints(entry.score),
+      // A player who has never opened the wardrobe has no field here, which
+      // unpacks to the pair everybody starts in rather than to nothing.
+      avatar: unpackAvatar(avatars[index]),
     });
   }
 

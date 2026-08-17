@@ -104,6 +104,7 @@ const { boardKey, readPlayerBoard } = await import('../src/server/core/leaderboa
 const { recordPlay } = await import('../src/server/core/users.js');
 const { keys } = await import('../src/server/core/keys.js');
 const { COINS_FIRST_VOTE, WEEK_BOARD_TTL_SECONDS } = await import('../src/shared/config.js');
+const { STARTER_PAIR } = await import('../src/shared/items.js');
 
 /**
  * A Monday, so a week's worth of days after it stays inside one week key. Kept
@@ -197,8 +198,12 @@ describe('writing the boards', () => {
     const week = await readPlayerBoard('week', 't2_ada');
     const all = await readPlayerBoard('all', 't2_ada');
 
-    expect(week.rows).toEqual([{ rank: 1, userId: 't2_ada', name: 'ada', points: 60 }]);
-    expect(all.rows).toEqual([{ rank: 1, userId: 't2_ada', name: 'ada', points: 60 }]);
+    // The pair is the starter one: nobody who has never opened the wardrobe has
+    // a field in `avatars`, and the board draws them in what everyone starts in
+    // rather than leaving a hole beside their name.
+    const row = { rank: 1, userId: 't2_ada', name: 'ada', points: 60, avatar: STARTER_PAIR };
+    expect(week.rows).toEqual([row]);
+    expect(all.rows).toEqual([row]);
   });
 
   it('ranks the weekly board on this week only, and all time on the lifetime total', async () => {
@@ -382,9 +387,13 @@ describe('the invariant', () => {
     // Points are an aggregate over every question a player ever answered. There
     // is no question id, no choice, no guess and no count on this shape — and a
     // new field that carried one would fail here.
+    //
+    // `avatar` is the equipped pair, which is a property of the player and not
+    // of anything they answered. It is on this list because the board draws it,
+    // and it is allowed on this list because there is no question behind it.
     expect(Object.keys(board).sort()).toEqual(['range', 'rows', 'you']);
     for (const row of board.rows) {
-      expect(Object.keys(row).sort()).toEqual(['name', 'points', 'rank', 'userId']);
+      expect(Object.keys(row).sort()).toEqual(['avatar', 'name', 'points', 'rank', 'userId']);
     }
     expect(Object.keys(board.you ?? {}).sort()).toEqual(['points', 'rank']);
   });
