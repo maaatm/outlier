@@ -221,16 +221,30 @@ function QuestionCard({
  *
  * Two words should still land like a poster, and a long one still has to leave
  * the crowd and the two answers a screen to sit on. So the type steps down
- * through three fixed sizes instead of the block growing to whatever it is
- * handed — a house question is a line and a half, and the longest thing anybody
- * has ever typed into the ask room fits at the bottom step.
+ * through three sizes instead of the block growing to whatever it is handed —
+ * a house question is a line and a half, and the longest thing anybody has ever
+ * typed into the ask room fits at the bottom step.
+ *
+ * The two numbers are where they are because of what a step costs. A line is
+ * as tall as the type is big and there are as many lines as the length divided
+ * by that size, so a block's height runs with length times size squared — which
+ * makes the tallest block a step can build the one at the far end of its own
+ * range. Fifty-five and ninety-five is where those three worst cases come
+ * closest to level without taking the top size away from the questions that
+ * are actually in the pool, whose median is forty-six characters and whose
+ * longest is sixty-four.
+ *
+ * They used to be seventy and a hundred and twenty, which left the middle step
+ * able to build a taller block than the bottom one ever could: a question that
+ * got longer came back shorter, and the tallest block on the table belonged to
+ * a question of middling length.
  *
  * Length in characters rather than measured width: the answer has to be the
  * same on the first frame as on the second, and a measurement is not.
  */
 function questionStep(text: string): string {
-  if (text.length > 120) return ' question--small';
-  if (text.length > 70) return ' question--mid';
+  if (text.length > 95) return ' question--small';
+  if (text.length > 55) return ' question--mid';
   return '';
 }
 

@@ -673,37 +673,57 @@ button {
 /*
  * The question is a cream block on the felt, and the block's bottom face is
  * the separator that the hand-drawn rule under it used to be.
+ *
+ * It also carries the size its question is set from, which is the one number
+ * this whole section turns on. See `.question` below.
  */
 .question-block {
-  padding: 13px 16px;
-  margin-top: 14px;
+  padding: 10px 16px;
+  margin-top: 11px;
   flex: none;
+  font-size: clamp(7.6px, 2.63vw, 10px);
 }
 
 /*
  * Three sizes, picked by how long the question is — see `questionStep` in
- * `App.tsx`. The block is only ever as tall as the words in it, and the words
- * get smaller before the block gets taller, so a question somebody typed at
- * full tilt still leaves the crowd and the two answers a screen to stand on.
+ * `App.tsx` — and all three written as ratios of the block's own size rather
+ * than as pixels.
+ *
+ * The step answers how *long* the question is, which is a number known before
+ * the first paint. It cannot answer how many lines that will be, because that
+ * is the column's answer rather than the question's: a hundred characters set
+ * as two lines in a 430px phone and as six in a 320px one, and six lines of
+ * question is the crowd's screen spent on the question. So the block's size
+ * gives ground as the column narrows and the three steps ride on it — one
+ * number per breakpoint instead of three, and the steps keep the relationship
+ * to each other they were drawn with at every width.
+ *
+ * The words still get smaller before the block gets taller. That was already
+ * the rule; it just has one more thing to be smaller about.
  */
 .question {
-  margin: 7px 0 0;
+  margin: 5px 0 0;
   font-family: var(--font-display);
-  font-size: 29px;
+  font-size: 2.9em;
   line-height: 1.04;
   letter-spacing: 0.005em;
   text-transform: uppercase;
   color: var(--ink);
   text-wrap: pretty;
+  /* A word longer than the column breaks at the edge instead of running out of
+     the block and across the felt. `anywhere` rather than `break-word`, which
+     wraps the same way but still reports the whole word as the narrowest the
+     block can be — and the block is shrink-to-fit on a wide screen. */
+  overflow-wrap: anywhere;
 }
 
 .question--mid {
-  font-size: 22px;
+  font-size: 2.2em;
   line-height: 1.08;
 }
 
 .question--small {
-  font-size: 17px;
+  font-size: 1.7em;
   line-height: 1.12;
 }
 
@@ -2767,21 +2787,14 @@ button {
   .question-block {
     align-self: flex-start;
     max-width: 720px;
-    padding: 16px 22px;
-    margin-top: 18px;
+    padding: 13px 22px;
+    margin-top: 14px;
+    /* Flat: the column is never the thing that is short here. */
+    font-size: 13.8px;
   }
 
   .question {
-    font-size: 40px;
     line-height: 1.02;
-  }
-
-  .question--mid {
-    font-size: 29px;
-  }
-
-  .question--small {
-    font-size: 22px;
   }
 
   .question-block--strip {
@@ -3023,20 +3036,12 @@ button {
   }
 
   .question-block {
-    padding: 10px 13px;
-    margin-top: 11px;
-  }
-
-  .question {
-    font-size: 24px;
-  }
-
-  .question--mid {
-    font-size: 18px;
-  }
-
-  .question--small {
-    font-size: 14.5px;
+    padding: 8px 13px;
+    margin-top: 9px;
+    /* The floor is where the question would otherwise be set smaller than the
+       strip it turns into, which would have answering a question feel like
+       less than having answered it. */
+    font-size: clamp(7px, 2.07vw, 8.28px);
   }
 
   .question-block--strip {
@@ -3243,16 +3248,8 @@ button {
     --bleed: 12px;
   }
 
-  .question {
-    font-size: 21px;
-  }
-
-  .question--mid {
-    font-size: 16px;
-  }
-
-  .question--small {
-    font-size: 13px;
+  .question-block {
+    font-size: clamp(6.2px, 2.07vw, 7.24px);
   }
 
   .bignum {
