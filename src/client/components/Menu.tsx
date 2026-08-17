@@ -59,9 +59,11 @@ import {
 } from '../api.js';
 import { coalescingWriter } from '../coalesce.js';
 import { COUNTER_SIZE } from '../counterArt.js';
+import { WORDMARK_SIZE } from '../wordmarkArt.js';
 import { Blob } from './Blob.js';
 import { PlayerBoard } from './PlayerBoard.js';
 import { StatBar, StatPill } from './StatBar.js';
+import { Wordmark } from './Wordmark.js';
 
 type PanelId = 'record' | 'wardrobe' | 'board' | 'ask';
 
@@ -72,6 +74,16 @@ const TITLES: Record<PanelId, string> = {
   board: 'Leaderboard',
   ask: 'Ask a question',
 };
+
+/**
+ * What the header calls the list itself.
+ *
+ * The list used to carry the wordmark here, like the game's screens do. It
+ * stopped when the wordmark left the hero block and came down onto the felt at
+ * full size: a 22px lockup directly above a 58px one is the mark twice, and the
+ * smaller of the two would be doing the job a screen label does anyway.
+ */
+const ROOT_TITLE = 'Menu';
 
 type Entry = {
   id: PanelId;
@@ -150,15 +162,12 @@ export function Menu({
     <main className="app">
       {/*
         The same header as the game, down to the pills, so opening the menu
-        moves nothing on the way in or back out. Inside a room the wordmark
-        gives way to the room's name: you are past the front door.
+        moves nothing on the way in or back out. The wordmark gives way to a
+        screen label everywhere in here: you are past the front door, and on the
+        list itself the mark is on the felt below at full size.
       */}
       <header className="header">
-        {panel === null ? (
-          <span className="header__mark">Outlier</span>
-        ) : (
-          <span className="header__label">{TITLES[panel]}</span>
-        )}
+        <span className="header__label">{panel === null ? ROOT_TITLE : TITLES[panel]}</span>
         <HeaderStats panel={panel} stats={stats} avatar={avatar} />
       </header>
 
@@ -321,12 +330,29 @@ function Root({
 }): React.JSX.Element {
   return (
     <div className="menu__root">
-      {/* The wordmark alone. The paragraph explaining the game used to live
-          under it and it was the tallest thing on the screen — four rooms, the
-          Daily and the way out all have to fit under this, and they now do. */}
-      <div className="menu__hero block block--cream block--lg">
-        <h1 className="menu__wordmark">Outlier</h1>
-      </div>
+      {/*
+        The mark on the felt, not in a card. It is the name of the table rather
+        than another piece placed on it, so the cream hero block that used to
+        wrap it is gone rather than restyled — and the two lines that say what
+        the game is come back out from under it onto the green.
+
+        Still the heading, because on the pinned menu post this screen is the
+        whole document. The lockup names itself — it is one `img` with a label,
+        so what is announced is "Outlier, heading level 1" and never the
+        letters, which spell `utlier`.
+      */}
+      <h1 className="menu__wordmark">
+        <Wordmark size={WORDMARK_SIZE.menu} />
+      </h1>
+      <span className="menu__tagline">one question a day</span>
+      {/* With the rules gone to the sidebar, this is the only thing in the app
+          that says what the game is. It has to name both things being scored
+          without turning into a rules page. */}
+      <p className="menu__explainer">
+        One question a day about ordinary behavior. Answer it, then guess how many people
+        out of {CROWD_SIZE} answered the same way. You are scored on both &mdash; how
+        unusual your answer was, and how close the guess landed.
+      </p>
 
       <DailyAction daily={daily} />
 
