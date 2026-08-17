@@ -165,6 +165,22 @@ export const QUESTION_MAX_LENGTH = 120;
 export const LABEL_MAX_LENGTH = 12;
 
 /**
+ * What a player may type, and the only length rule the submission path holds
+ * anybody to.
+ *
+ * These are not the taste bounds above. They are what the screens are built to
+ * hold: the question block is measured to fit 150 characters and the two answer
+ * buttons to fit 30 each, at every size the app is checked at, down to a 320px
+ * phone. Past that the layout is guessing, and a question nobody can read on
+ * the screen it is asked from is not a question that got through — it is one
+ * that got cut off.
+ *
+ * The house pool sits well inside both, so `data/questions.json` is unaffected.
+ */
+export const SUBMITTED_QUESTION_MAX_LENGTH = 150;
+export const SUBMITTED_LABEL_MAX_LENGTH = 30;
+
+/**
  * The longest a post title may be.
  *
  * This is Reddit's own cap rather than a taste judgement — a `submitCustomPost`

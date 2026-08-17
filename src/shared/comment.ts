@@ -40,7 +40,7 @@ export function buildComment(question: Question, reveal: Reveal, note?: string):
   const soFar = reveal.provisional ? ' so far' : '';
 
   const lines: string[] = [
-    `**${mine}** — ${reveal.dotsWithYou} of ${CROWD_SIZE} are with me${soFar}. ` +
+    `I said **${mine}**. ${reveal.dotsWithYou} of ${CROWD_SIZE} are with me${soFar}. ` +
       `I guessed ${reveal.guess}%, off by ${reveal.error}. **${badge.title}.**`,
   ];
 

@@ -10,6 +10,8 @@ import { Hono } from 'hono';
 import {
   MOD_QUEUE_PAGE_SIZE,
   SUBMISSIONS_PER_DAY,
+  SUBMITTED_LABEL_MAX_LENGTH,
+  SUBMITTED_QUESTION_MAX_LENGTH,
   TITLE_MAX_LENGTH,
 } from '../../shared/config.js';
 import { SUBMISSION_GUIDANCE } from '../../shared/validate.js';
@@ -42,7 +44,7 @@ menuRoutes.post('/internal/menu/submit-question', async (c) => {
   const remaining = await remainingSubmissions(userId);
   if (remaining <= 0) {
     return c.json<UiResponse>({
-      showToast: `That is ${SUBMISSIONS_PER_DAY} today. The allowance turns over at midnight UTC.`,
+      showToast: `That is ${SUBMISSIONS_PER_DAY} for today. The count starts over at midnight UTC.`,
     });
   }
 
@@ -59,6 +61,7 @@ menuRoutes.post('/internal/menu/submit-question', async (c) => {
             type: 'string',
             name: 'text',
             label: 'Your question',
+            helpText: `Up to ${SUBMITTED_QUESTION_MAX_LENGTH} characters, which is what the question block on the post holds.`,
             required: true,
             placeholder: 'Do you eat the pizza crust?',
           },
@@ -66,6 +69,7 @@ menuRoutes.post('/internal/menu/submit-question', async (c) => {
             type: 'string',
             name: 'labelA',
             label: 'First answer',
+            helpText: `Up to ${SUBMITTED_LABEL_MAX_LENGTH} characters — it has to fit on a button.`,
             defaultValue: 'Yes',
             required: true,
           },

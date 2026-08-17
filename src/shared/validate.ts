@@ -4,7 +4,11 @@
  * client-side validation is a courtesy, not a gate.
  */
 
-import { TITLE_MAX_LENGTH } from './config.js';
+import {
+  SUBMITTED_LABEL_MAX_LENGTH,
+  SUBMITTED_QUESTION_MAX_LENGTH,
+  TITLE_MAX_LENGTH,
+} from './config.js';
 
 export type ValidationResult = { ok: true } | { ok: false; reason: string };
 
@@ -52,21 +56,32 @@ export function fitTitle(title: string): string {
 /**
  * What a question has to be, which is deliberately little.
  *
- * Length is not a rule and neither is punctuation. A question that has to be ten
- * characters, or under a hundred and twenty, or ended in a question mark, was a
- * house style being enforced as a validity check on somebody else's writing —
- * and every one of those refusals fell on a player who had already typed the
- * thing. `docs/writing-questions.md` still says what a good question looks like,
- * and the mod queue in front of the Daily slot is still the gate that matters.
+ * Punctuation is not a rule and neither is a minimum. A question that had to be
+ * ten characters, or had to end in a question mark, was a house style being
+ * enforced as a validity check on somebody else's writing —
+ * `docs/writing-questions.md` still says what a good question looks like, and
+ * the mod queue in front of the Daily slot is still the gate that matters.
  *
- * What is left is the part that is not about taste: something was written, it
- * reads as words rather than as punctuation, and it is not a link or a username.
+ * The maximum is different in kind, and it is why it is the one length still
+ * here: `SUBMITTED_QUESTION_MAX_LENGTH` is what the question block is measured
+ * to hold. It is a fact about the screen rather than an opinion about the
+ * writing, the field counts down to it as it is typed, and it is a limit
+ * somebody meets while writing rather than a refusal handed to them afterwards.
+ *
+ * The rest is the part that is not about taste: something was written, it reads
+ * as words rather than as punctuation, and it is not a link or a username.
  */
 export function validateQuestionText(raw: string): ValidationResult {
   const text = normalizeQuestionText(raw);
 
   if (text.length === 0) {
     return { ok: false, reason: 'Ask something first.' };
+  }
+  if (text.length > SUBMITTED_QUESTION_MAX_LENGTH) {
+    return {
+      ok: false,
+      reason: `Questions stop at ${SUBMITTED_QUESTION_MAX_LENGTH} characters. That one is ${text.length}.`,
+    };
   }
   if (!/[a-z]/i.test(text)) {
     return { ok: false, reason: 'That does not read as a question.' };
@@ -106,16 +121,23 @@ export function validateTitle(raw: string): ValidationResult {
 }
 
 /**
- * An answer needs to exist. That is the whole rule.
+ * An answer needs to exist and it needs to fit on a button.
  *
- * A long one will be a long button — the two choices are rendered at whatever
- * width they come out at — but that is a question being asked badly rather than
- * a question being asked wrongly, and the person it looks worst for is the one
- * who wrote it.
+ * The two choices are the biggest targets in the game and they are a fixed size,
+ * the same on every question in the subreddit. Thirty characters is what fits
+ * inside one at the smallest screen the app is measured at, so it is the bound
+ * here as well. Longer than that used to be allowed and was shown cut off, which
+ * is the worst of both: a question asked with an answer nobody can read.
  */
 export function validateLabel(raw: string, which: string): ValidationResult {
   const label = normalizeQuestionText(raw);
   if (label.length === 0) return { ok: false, reason: `${which} needs a label.` };
+  if (label.length > SUBMITTED_LABEL_MAX_LENGTH) {
+    return {
+      ok: false,
+      reason: `${which} has to fit on a button: ${SUBMITTED_LABEL_MAX_LENGTH} characters at most.`,
+    };
+  }
   return OK;
 }
 

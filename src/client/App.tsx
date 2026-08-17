@@ -47,7 +47,7 @@ export function App(): React.JSX.Element {
 
   const load = useCallback(async (): Promise<void> => {
     if (!postId) {
-      setPhase({ name: 'error', message: 'This post has no question attached.' });
+      setPhase({ name: 'error', message: 'There is no question on this post.' });
       return;
     }
     try {
@@ -55,7 +55,8 @@ export function App(): React.JSX.Element {
     } catch (failure) {
       setPhase({
         name: 'error',
-        message: failure instanceof Error ? failure.message : 'Could not load the question.',
+        message:
+          failure instanceof Error ? failure.message : 'That did not load. Try the post again.',
       });
     }
   }, [postId]);
@@ -67,7 +68,7 @@ export function App(): React.JSX.Element {
   if (phase.name === 'loading') {
     return (
       <main className="app">
-        <p className="notice notice--quiet">Loading.</p>
+        <p className="notice notice--quiet">Loading...</p>
       </main>
     );
   }
@@ -210,9 +211,41 @@ function QuestionCard({
             ? 'daily'
             : 'open question'}
       </span>
-      <h1 className="question">{question.text}</h1>
+      <h1 className={`question${questionStep(question.text)}`}>{question.text}</h1>
     </div>
   );
+}
+
+/**
+ * How big a question is set, decided by how long it is.
+ *
+ * Two words should still land like a poster, and a long one still has to leave
+ * the crowd and the two answers a screen to sit on. So the type steps down
+ * through three sizes instead of the block growing to whatever it is handed —
+ * a house question is a line and a half, and the longest thing anybody has ever
+ * typed into the ask room fits at the bottom step.
+ *
+ * The two numbers are where they are because of what a step costs. A line is
+ * as tall as the type is big and there are as many lines as the length divided
+ * by that size, so a block's height runs with length times size squared — which
+ * makes the tallest block a step can build the one at the far end of its own
+ * range. Fifty-five and ninety-five is where those three worst cases come
+ * closest to level without taking the top size away from the questions that
+ * are actually in the pool, whose median is forty-six characters and whose
+ * longest is sixty-four.
+ *
+ * They used to be seventy and a hundred and twenty, which left the middle step
+ * able to build a taller block than the bottom one ever could: a question that
+ * got longer came back shorter, and the tallest block on the table belonged to
+ * a question of middling length.
+ *
+ * Length in characters rather than measured width: the answer has to be the
+ * same on the first frame as on the second, and a measurement is not.
+ */
+function questionStep(text: string): string {
+  if (text.length > 95) return ' question--small';
+  if (text.length > 55) return ' question--mid';
+  return '';
 }
 
 /**
@@ -225,7 +258,7 @@ function QuestionCard({
 function QuestionStrip({ question }: { question: Question }): React.JSX.Element {
   return (
     <div className="question-block question-block--strip block block--cream block--sm">
-      <h1 className="question question--strip">{question.text}</h1>
+      <h1 className={`question question--strip${questionStep(question.text)}`}>{question.text}</h1>
     </div>
   );
 }
@@ -285,6 +318,22 @@ function Byline({
   );
 }
 
+/**
+ * How big the two answers are set, and why they are set together.
+ *
+ * The longer of the pair picks the step and both buttons take it: two answers at
+ * two type sizes read as one of them being the recommended one. The buttons do
+ * not resize — a thirty-character answer wraps inside exactly the box a
+ * one-word answer got, so the pair is the same shape on every question in the
+ * subreddit.
+ */
+function choiceStep(labelA: string, labelB: string): string {
+  const longest = Math.max(labelA.length, labelB.length);
+  if (longest > 16) return ' choice--small';
+  if (longest > 8) return ' choice--mid';
+  return '';
+}
+
 /** Tap an answer, drag the slider, lock in. */
 function PlayView({
   postId,
@@ -309,7 +358,7 @@ function PlayView({
   if (locked) {
     // Only reachable for a question closed by hand, which may have no summary in
     // the thread to point at. Old Dailies are never closed.
-    return <p className="notice notice--spaced">Voting is closed on this one.</p>;
+    return <p className="notice notice--spaced">This one is closed for voting.</p>;
   }
   if (!canVote) {
     return <p className="notice notice--spaced">Sign in to play.</p>;
@@ -328,7 +377,7 @@ function PlayView({
         onReveal(failure.reveal);
         return;
       }
-      setError(failure instanceof Error ? failure.message : 'Could not record that.');
+      setError(failure instanceof Error ? failure.message : 'That did not go through. Try again.');
       setSubmitting(false);
     }
   }
@@ -337,6 +386,7 @@ function PlayView({
   // people, not a split. The reveal then sweeps these same counters into two
   // piles, which is the whole point of the moment.
   if (choice === null) {
+    const step = choiceStep(question.labelA, question.labelB);
     return (
       <div className="guess">
         <QuestionCard question={question} avatar={avatar} />
@@ -346,14 +396,14 @@ function PlayView({
         <div className="choices">
           <button
             type="button"
-            className="button block block--yellow block--lg choice"
+            className={`button block block--yellow block--lg choice${step}`}
             onClick={() => setChoice('a')}
           >
             <span className="choice__label">{question.labelA}</span>
           </button>
           <button
             type="button"
-            className="button block block--orange block--lg choice"
+            className={`button block block--orange block--lg choice${step}`}
             onClick={() => setChoice('b')}
           >
             <span className="choice__label">{question.labelB}</span>
@@ -395,7 +445,7 @@ function PlayView({
               saves goes to the crowd, which is what this screen is about. */}
           <p className="guess__head">
             <span className="label">
-              You said {label} — how many out of {CROWD_SIZE} agree?
+              You said {label}. How many of {CROWD_SIZE} agree?
             </span>
             <span className="bignum">{guess}</span>
           </p>
@@ -678,8 +728,8 @@ function BlobNotice({ onAnswered }: { onAnswered: () => void }): React.JSX.Eleme
       {/* Short on purpose. This lands on somebody's first reveal, and the
           crowd gives up height for every line of it. */}
       <p className="blob-notice__copy">
-        Your counter can turn up in other players&rsquo; crowds now, on the side you
-        answered. Turn that off any time in Your record.
+        Other players can see your counter in their crowds now, standing on the side you
+        answered. You can switch that off in Your record.
       </p>
       <button
         type="button"
@@ -691,7 +741,7 @@ function BlobNotice({ onAnswered }: { onAnswered: () => void }): React.JSX.Eleme
         <Cross />
       </button>
       {failed && (
-        <p className="notice notice--quiet notice--cream">That did not save. It will ask again.</p>
+        <p className="notice notice--quiet notice--cream">That did not save. We will ask again.</p>
       )}
     </div>
   );
@@ -740,7 +790,7 @@ function PointsAward({ award, animate }: { award: Award; animate: boolean }): Re
         <span className="award__band">{band.label}</span>
         <span className="award__breakdown">
           {award.base} for playing
-          {award.bonus > 0 ? ` · ${award.bonus} for landing within ${band.maxError}` : ''}
+          {award.bonus > 0 ? ` · ${award.bonus} for getting within ${band.maxError}` : ''}
         </span>
       </span>
       {/* The count-up is decoration, so it is hidden and the settled total is

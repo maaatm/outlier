@@ -28,7 +28,13 @@
 import { navigateTo } from '@devvit/web/client';
 import { useEffect, useRef, useState } from 'react';
 
-import { BOX_PRICE, HIT_THRESHOLD, TITLE_MAX_LENGTH } from '../../shared/config.js';
+import {
+  BOX_PRICE,
+  HIT_THRESHOLD,
+  SUBMITTED_LABEL_MAX_LENGTH,
+  SUBMITTED_QUESTION_MAX_LENGTH,
+  TITLE_MAX_LENGTH,
+} from '../../shared/config.js';
 import {
   ACCESSORIES,
   type Equipped,
@@ -99,10 +105,10 @@ type Entry = {
  * else.
  */
 const ENTRIES: Entry[] = [
-  { id: 'ask', blurb: 'write one for the subreddit and post it' },
-  { id: 'record', blurb: 'your counter, streak, and how you read the room' },
-  { id: 'wardrobe', blurb: 'change the face and accessory your counter wears' },
-  { id: 'board', blurb: 'who has banked the most points' },
+  { id: 'ask', blurb: 'write one and post it to the subreddit' },
+  { id: 'record', blurb: 'your streak, your points, how well you call it' },
+  { id: 'wardrobe', blurb: "your counter's face and what it wears" },
+  { id: 'board', blurb: 'who has the most points' },
 ];
 
 /**
@@ -381,7 +387,7 @@ function DailyAction({ daily }: { daily: DailyPointer | null }): React.JSX.Eleme
   if (daily?.state === 'none') {
     return (
       <p className="footnote menu__daily-note">
-        Tomorrow&rsquo;s question posts at midnight UTC.
+        The next question goes up at midnight UTC.
       </p>
     );
   }
@@ -406,7 +412,7 @@ function DailyAction({ daily }: { daily: DailyPointer | null }): React.JSX.Eleme
       disabled={!permalink}
       onClick={() => permalink && navigateTo(new URL(permalink, REDDIT_ORIGIN).toString())}
     >
-      {played ? "You've played today's" : "Today's question"}
+      {played ? 'Already played today' : "Today's question"}
     </button>
   );
 }
@@ -447,9 +453,11 @@ function Record({
   return (
     <div className="menu__panel">
       <div className="record__card block block--cream block--lg">
-        {/* The wrapper is what the counter's shadow is cast from — see the
-            note on `.dot-slot--cameo::before` in the stylesheet. */}
-        <span className="record__cast">
+        {/* The counter stands in a slot cut into the block. Most accessories
+            are moulded in cream and this block is cream, so without something
+            cut behind it half the drawing is invisible on the one page that is
+            about it. */}
+        <span className="record__slot">
           <Blob
             face={avatar?.face}
             accessory={avatar?.accessory}
@@ -459,7 +467,7 @@ function Record({
           />
         </span>
         <div className="record__side">
-          <span className="record__title">You, on the table</span>
+          <span className="record__title">This is you</span>
           {avatar?.canSave && <ShowBlob showBlob={avatar.showBlob} onShow={onShow} />}
         </div>
       </div>
@@ -492,13 +500,14 @@ function Record({
         <span className="label">how you read the room</span>
         {stats.totalPlayed > 0 ? (
           <p className="record__line">
-            {stats.totalPlayed} {stats.totalPlayed === 1 ? 'question' : 'questions'} answered.
-            You landed within {HIT_THRESHOLD} points on {stats.totalHits} of them &mdash;{' '}
+            You have answered {stats.totalPlayed}{' '}
+            {stats.totalPlayed === 1 ? 'question' : 'questions'} and come within{' '}
+            {HIT_THRESHOLD} points on {stats.totalHits} of them. That is{' '}
             <strong>{rate}%</strong>.
           </p>
         ) : (
           <p className="record__line">
-            Nothing banked yet. Answer anything and the counters start.
+            Nothing to show yet. Answer a question and these start filling in.
           </p>
         )}
       </div>
@@ -530,9 +539,8 @@ function ShowBlob({
   return (
     <>
       <span className="record__note">
-        Other players see your counter in the crowd on questions you have both answered, on
-        the side you picked. Turn it off and it comes out of every crowd, including the ones
-        it is already in.
+        Other players see your counter on questions you have both answered, standing on the
+        side you picked. Switch it off and it leaves every crowd, old ones included.
       </span>
       <button
         type="button"
@@ -586,7 +594,7 @@ function Wardrobe({
       <h1 className="screen__title">Your counter</h1>
 
       {avatar === null ? (
-        <p className="notice notice--quiet notice--spaced">Loading.</p>
+        <p className="notice notice--quiet notice--spaced">Loading...</p>
       ) : (
         <>
           <div className="wardrobe__preview">
@@ -710,7 +718,7 @@ function GiftBox({
           ? 'Opening...'
           : affordable
             ? `${result ? 'Open another' : 'Open a box'} · ${BOX_PRICE}`
-            : `${BOX_PRICE - avatar.coins} more coins`}
+            : `${BOX_PRICE - avatar.coins} coins short`}
       </button>
 
       {error && <p className="notice notice--quiet notice--spaced">{error}</p>}
@@ -744,7 +752,7 @@ function BoxResult({
   if (!item) {
     return (
       <p className="notice notice--quiet" key={`${result.item}:${result.coins}`}>
-        Something arrived, but the wardrobe does not recognise it.
+        Something came out, but the wardrobe does not know what it is.
       </p>
     );
   }
@@ -866,9 +874,9 @@ function Board(): React.JSX.Element {
       <h1 className="screen__title">Who&rsquo;s ahead</h1>
       <PlayerBoard />
       <Footnote>
-        Points are banked per vote, so every question pays &mdash; the Daily, an open
-        question, or one from the archive. The weekly board starts over on Monday at
-        midnight UTC; all time never resets.
+        Every question you answer pays points, whether it is the Daily, an open question or
+        something out of the archive. The weekly board clears every Monday at midnight UTC.
+        All time never clears.
       </Footnote>
     </div>
   );
@@ -882,16 +890,17 @@ function Board(): React.JSX.Element {
  *
  * **It fits on the screen.** Every field, the preview and the button are visible
  * at once, at the 512px the inline post view can be — the same budget the
- * wardrobe is built to. That is what makes the fields single-line boxes that
- * scroll sideways rather than boxes that grow downward: a question is one line
- * however long it is, and a room that reflows as you type moves the button you
- * are reaching for.
+ * wardrobe is built to. Every box here is a fixed height for that reason. The
+ * question wraps inside its own, because it is the one field somebody writes a
+ * sentence into; the three short ones stay single lines that scroll sideways.
+ * What none of them do is grow, because a room that reflows as you type moves
+ * the button you are reaching for.
  *
  * **Four fields, in the order they are read**, and only the first is work: the
  * answers arrive as Yes/No the way the Devvit form's do, and the title defaults
- * to the question. Only the title carries a counter, because it is the only
- * field with a limit left — Reddit's, on titles, which is a post that will not
- * be created rather than a matter of taste.
+ * to the question. All four count down to their own limit on the label's line,
+ * so a limit is something you watch arrive rather than something you are told
+ * about after you have written past it.
  *
  * **One primary button, and the room is the confirm.** Nothing here submits on
  * blur or on the last keystroke. The wardrobe can afford to save as it goes
@@ -937,23 +946,31 @@ function Ask({ canSubmit }: { canSubmit: boolean }): React.JSX.Element {
     <div className="menu__panel">
       <h1 className="screen__title">Ask the room</h1>
       <p className="screen__lede">
-        A good one splits the room and takes two words to answer. Yours goes in the pile
-        the moderators draw tomorrow&rsquo;s question from.
+        The good ones split the room and take two words to answer. Yours joins the pile the
+        moderators pick tomorrow&rsquo;s question from.
       </p>
 
       {!canSubmit && (
         <p className="notice notice--spaced">
-          Sign in to ask the subreddit something. You can read the rest of the menu either
-          way.
+          Sign in to post a question. The rest of the menu works either way.
         </p>
       )}
 
       <div className="ask block block--cream block--lg">
-        <Field id="ask-text" label="the question">
-          <input
+        {/* The one field somebody writes a sentence into, so it is the one
+            that wraps. Its height is fixed rather than grown to fit: the box
+            holds the whole of what it accepts at most sizes and scrolls the
+            last line at the shortest, which is the trade that keeps the button
+            below from moving out from under a thumb mid-sentence. */}
+        <Field
+          id="ask-text"
+          label="the question"
+          hint={`${text.length} / ${SUBMITTED_QUESTION_MAX_LENGTH}`}
+        >
+          <textarea
             id="ask-text"
-            className="ask__input well--cut"
-            type="text"
+            className="ask__input ask__input--wrap well--cut"
+            maxLength={SUBMITTED_QUESTION_MAX_LENGTH}
             value={text}
             placeholder="Do you eat the pizza crust?"
             disabled={!canSubmit}
@@ -962,21 +979,31 @@ function Ask({ canSubmit }: { canSubmit: boolean }): React.JSX.Element {
         </Field>
 
         <div className="ask__pair">
-          <Field id="ask-a" label="first answer">
+          <Field
+            id="ask-a"
+            label="first answer"
+            hint={`${labelA.length} / ${SUBMITTED_LABEL_MAX_LENGTH}`}
+          >
             <input
               id="ask-a"
               className="ask__input well--cut"
               type="text"
+              maxLength={SUBMITTED_LABEL_MAX_LENGTH}
               value={labelA}
               disabled={!canSubmit}
               onChange={(event) => setLabelA(event.target.value)}
             />
           </Field>
-          <Field id="ask-b" label="second answer">
+          <Field
+            id="ask-b"
+            label="second answer"
+            hint={`${labelB.length} / ${SUBMITTED_LABEL_MAX_LENGTH}`}
+          >
             <input
               id="ask-b"
               className="ask__input well--cut"
               type="text"
+              maxLength={SUBMITTED_LABEL_MAX_LENGTH}
               value={labelB}
               disabled={!canSubmit}
               onChange={(event) => setLabelB(event.target.value)}
@@ -989,7 +1016,7 @@ function Ask({ canSubmit }: { canSubmit: boolean }): React.JSX.Element {
             thing to invent. */}
         <Field
           id="ask-title"
-          label="post title — optional"
+          label="post title (optional)"
           hint={`${title.length} / ${TITLE_MAX_LENGTH}`}
         >
           <input
@@ -998,7 +1025,7 @@ function Ask({ canSubmit }: { canSubmit: boolean }): React.JSX.Element {
             type="text"
             maxLength={TITLE_MAX_LENGTH}
             value={title}
-            placeholder={text || 'The question, unless you write one.'}
+            placeholder={text || 'Leave this blank to use the question.'}
             disabled={!canSubmit}
             onChange={(event) => setTitle(event.target.value)}
           />
@@ -1029,8 +1056,8 @@ function Ask({ canSubmit }: { canSubmit: boolean }): React.JSX.Element {
  * One labelled field, with a counter on the label's line if it has a limit.
  *
  * The counter shares the label's line rather than taking one under the box: this
- * room has a height budget and a hint per field would be four rows of it. Only
- * the title has one at all — nothing else in a submission is bounded any more.
+ * room has a height budget, and four hints on four rows of their own would be a
+ * quarter of it spent on arithmetic.
  */
 function Field({
   id,
@@ -1080,7 +1107,7 @@ function AskPreview({
   return (
     <div className="ask__preview well">
       <span className="label label--felt">how it will look</span>
-      <span className="ask__preview-title">{shown || 'Your question, as its own post.'}</span>
+      <span className="ask__preview-title">{shown || 'Your title goes here.'}</span>
       <p className="ask__preview-text">{text || 'The question goes here.'}</p>
       <div className="ask__preview-answers">
         <span className="ask__preview-answer">{labelA}</span>

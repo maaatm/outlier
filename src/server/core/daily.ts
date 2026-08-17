@@ -245,12 +245,12 @@ export function buildDailySummary(
     '',
     `**${majorityLabel} ${majorityPercent}%** · ${minorityLabel} ${minorityPercent}%`,
     '',
-    `${tally.total} ${tally.total === 1 ? 'vote' : 'votes'} so far. Still open — ` +
-      'answer it yourself and the split moves.',
+    `${tally.total} ${tally.total === 1 ? 'vote' : 'votes'} so far. It is still open, so ` +
+      'your own answer moves the split.',
   ];
 
   if (tally.total < PROVISIONAL_VOTE_FLOOR) {
-    lines.push('', 'A small enough crowd that the split is mostly noise.');
+    lines.push('', 'Still a small crowd, so the split is mostly noise.');
   }
 
   lines.push('', '^(Outlier · still open)');
