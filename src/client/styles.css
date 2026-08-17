@@ -441,6 +441,7 @@ button {
 
 /* A screen title, on the felt rather than inside anything. */
 .screen__title {
+  flex: none;
   margin: 18px 0 0;
   font-family: var(--font-display);
   font-size: 40px;
@@ -1734,7 +1735,7 @@ button {
  * under it opens in place.
  */
 .menu__daily {
-  margin-top: 18px;
+  margin-top: 22px;
   padding: 17px;
   font-size: 23px;
   border-radius: 11px;
@@ -1744,16 +1745,21 @@ button {
 /* The one state where there is nothing to press: no button, because a disabled
    one invites a press and there is nothing to do until midnight. */
 .menu__daily-note {
-  margin-top: 18px;
+  margin-top: 22px;
 }
 
+/*
+ * The rooms, spaced so they read as four separate things rather than as a
+ * stack. The gap is the piece's own bottom face plus air: at 10px the shadow
+ * one block throws lands on the next one and the four run together.
+ */
 .menu__list {
   list-style: none;
-  margin: 16px 0 0;
+  margin: 22px 0 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 16px;
   flex: none;
 }
 
@@ -1857,18 +1863,24 @@ button {
   color: var(--ink-body-cream);
 }
 
+/*
+ * One sentence of arithmetic, and the last thing on the page — so it is sized
+ * as the footnote it is rather than as a third card. It was the same weight as
+ * the counter's own block above it, which left it sitting on top of the way out
+ * of the room on a short screen.
+ */
 .record__read {
-  padding: 16px 18px;
-  margin-top: 16px;
-  border-radius: 11px;
+  padding: 12px 14px;
+  margin-top: 14px;
+  border-radius: 10px;
   flex: none;
 }
 
 .record__line {
-  margin: 9px 0 0;
+  margin: 6px 0 0;
   font-weight: 500;
-  font-size: 13.5px;
-  line-height: 1.55;
+  font-size: 12.5px;
+  line-height: 1.5;
   color: rgba(34, 48, 31, 0.8);
 }
 
@@ -2419,10 +2431,13 @@ button {
  * scrolling, because a form whose submit button is below the fold is a form
  * that looks finished before it is.
  *
- * What pays for it is that every field is one line. A single-line box that
- * scrolls sideways holds a question of any length in the height of one row,
- * where a box that grows downward reflows the room on the keystroke that wraps
- * and moves the button out from under a thumb already on its way to it.
+ * What pays for it is that every box here is a fixed height. The question wraps
+ * inside its own — it is the one field somebody writes a sentence into, and a
+ * sentence that runs off the side of a box is a sentence you cannot check
+ * before posting it — and the three short fields stay single rows that scroll
+ * sideways. None of them grow: a box that grows reflows the room on the
+ * keystroke that wraps and moves the button out from under a thumb already on
+ * its way to it.
  */
 .ask {
   display: flex;
@@ -2457,6 +2472,34 @@ button {
   line-height: 1.4;
   color: var(--ink);
   text-overflow: ellipsis;
+}
+
+/*
+ * The question's own box: the same well, wrapping, and a fixed number of rows.
+ *
+ * `resize: none` because the room is measured and a corner that lets somebody
+ * drag it taller is a corner that pushes the button off the bottom. The height
+ * holds the whole of what the field accepts on a phone and gives up its last
+ * line on the shortest screens, where the alternative is the room scrolling.
+ */
+.ask__input--wrap {
+  /*
+   * Two rows on the shortest table this app runs on, five on a tall phone —
+   * five being the whole of what the field accepts, so a 150-character question
+   * is in the box at once — and a straight line between the two.
+   *
+   * A height rather than a stack of breakpoints, because what this box can
+   * afford *is* a straight line in the window's height: everything else in the
+   * room is a fixed number of rows, so every pixel the window gains is a pixel
+   * this box can have. The slope is 1 for that reason and the offset is where
+   * the room breaks even. Settled before the first keystroke either way, so the
+   * button below never moves while somebody is typing.
+   */
+  height: clamp(46px, 100dvh - 540px, 136px);
+  resize: none;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  text-overflow: clip;
 }
 
 .ask__input::placeholder {
@@ -2931,6 +2974,54 @@ button {
     margin-top: 16px;
   }
 
+  /*
+   * Your record on a short screen. The counter gives ground first — it is the
+   * one thing on this page that is a drawing rather than a number — and the
+   * read-out at the bottom gives the rest, so it stops crowding the way out of
+   * the room.
+   */
+  .record__card {
+    padding: 12px 14px;
+    margin-top: 12px;
+    gap: 13px;
+  }
+
+  .record__slot {
+    padding: 6px 6px 5px;
+  }
+
+  .record__slot .blob {
+    width: 60px;
+    height: 90px;
+  }
+
+  .record__title {
+    font-size: 19px;
+  }
+
+  .record__note {
+    font-size: 11px;
+    line-height: 1.45;
+  }
+
+  .figures--pairs {
+    gap: 9px;
+  }
+
+  .figures--pairs .figure {
+    padding: 9px 11px;
+  }
+
+  .record__read {
+    padding: 10px 12px;
+    margin-top: 12px;
+  }
+
+  .record__line {
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
   .question-block {
     padding: 10px 13px;
     margin-top: 11px;
@@ -3008,8 +3099,8 @@ button {
   }
 
   .menu__list {
-    margin-top: 14px;
-    gap: 9px;
+    margin-top: 18px;
+    gap: 13px;
   }
 
   .screen__title {
@@ -3020,8 +3111,19 @@ button {
   /* The boxes lose vertical padding before anything else does. The 16px inside
      them is not styling — it is what stops iOS zooming the page when a field
      takes focus — so it is the last thing to go, and it does not go. */
+  /*
+   * The first thing the ask room gives up, and now it goes here rather than a
+   * breakpoint lower: everything else on that screen is either a field, the
+   * preview of what the fields add up to, or the button that posts it. Advice
+   * about what makes a good question is the only line there that is not part of
+   * asking one, and the question's own box is worth more than it is.
+   */
+  .screen__lede {
+    display: none;
+  }
+
   .ask {
-    gap: 9px;
+    gap: 8px;
     padding: 12px 14px;
     margin-top: 12px;
   }
@@ -3032,8 +3134,8 @@ button {
   }
 
   .ask__preview {
-    margin-top: 12px;
-    padding: 11px 13px;
+    margin-top: 10px;
+    padding: 9px 12px;
   }
 
   .ask__post {
@@ -3101,18 +3203,10 @@ button {
   }
 
   /*
-   * The ask room gives up its guidance, and then its own title.
-   *
-   * Everything else on that screen is either a field, the preview of what the
-   * fields add up to, or the button that posts it — advice about what makes a
-   * good question is the only line there that is not part of asking one. The
-   * title goes second and costs nothing: the header is already saying which
+   * The ask room gives up its own title here, having given up its guidance a
+   * breakpoint earlier. It costs nothing: the header is already saying which
    * room this is, two lines above where the heading was.
    */
-  .screen__lede {
-    display: none;
-  }
-
   .menu__panel > .screen__title {
     display: none;
   }

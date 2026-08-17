@@ -28,7 +28,13 @@
 import { navigateTo } from '@devvit/web/client';
 import { useEffect, useRef, useState } from 'react';
 
-import { BOX_PRICE, HIT_THRESHOLD, TITLE_MAX_LENGTH } from '../../shared/config.js';
+import {
+  BOX_PRICE,
+  HIT_THRESHOLD,
+  SUBMITTED_LABEL_MAX_LENGTH,
+  SUBMITTED_QUESTION_MAX_LENGTH,
+  TITLE_MAX_LENGTH,
+} from '../../shared/config.js';
 import {
   ACCESSORIES,
   type Equipped,
@@ -533,9 +539,8 @@ function ShowBlob({
   return (
     <>
       <span className="record__note">
-        Other players see your counter in the crowd on questions you have both answered,
-        standing on the side you picked. Switch it off and it leaves every crowd, old ones
-        included.
+        Other players see your counter on questions you have both answered, standing on the
+        side you picked. Switch it off and it leaves every crowd, old ones included.
       </span>
       <button
         type="button"
@@ -885,16 +890,17 @@ function Board(): React.JSX.Element {
  *
  * **It fits on the screen.** Every field, the preview and the button are visible
  * at once, at the 512px the inline post view can be — the same budget the
- * wardrobe is built to. That is what makes the fields single-line boxes that
- * scroll sideways rather than boxes that grow downward: a question is one line
- * however long it is, and a room that reflows as you type moves the button you
- * are reaching for.
+ * wardrobe is built to. Every box here is a fixed height for that reason. The
+ * question wraps inside its own, because it is the one field somebody writes a
+ * sentence into; the three short ones stay single lines that scroll sideways.
+ * What none of them do is grow, because a room that reflows as you type moves
+ * the button you are reaching for.
  *
  * **Four fields, in the order they are read**, and only the first is work: the
  * answers arrive as Yes/No the way the Devvit form's do, and the title defaults
- * to the question. Only the title carries a counter, because it is the only
- * field with a limit left — Reddit's, on titles, which is a post that will not
- * be created rather than a matter of taste.
+ * to the question. All four count down to their own limit on the label's line,
+ * so a limit is something you watch arrive rather than something you are told
+ * about after you have written past it.
  *
  * **One primary button, and the room is the confirm.** Nothing here submits on
  * blur or on the last keystroke. The wardrobe can afford to save as it goes
@@ -951,11 +957,20 @@ function Ask({ canSubmit }: { canSubmit: boolean }): React.JSX.Element {
       )}
 
       <div className="ask block block--cream block--lg">
-        <Field id="ask-text" label="the question">
-          <input
+        {/* The one field somebody writes a sentence into, so it is the one
+            that wraps. Its height is fixed rather than grown to fit: the box
+            holds the whole of what it accepts at most sizes and scrolls the
+            last line at the shortest, which is the trade that keeps the button
+            below from moving out from under a thumb mid-sentence. */}
+        <Field
+          id="ask-text"
+          label="the question"
+          hint={`${text.length} / ${SUBMITTED_QUESTION_MAX_LENGTH}`}
+        >
+          <textarea
             id="ask-text"
-            className="ask__input well--cut"
-            type="text"
+            className="ask__input ask__input--wrap well--cut"
+            maxLength={SUBMITTED_QUESTION_MAX_LENGTH}
             value={text}
             placeholder="Do you eat the pizza crust?"
             disabled={!canSubmit}
@@ -964,21 +979,31 @@ function Ask({ canSubmit }: { canSubmit: boolean }): React.JSX.Element {
         </Field>
 
         <div className="ask__pair">
-          <Field id="ask-a" label="first answer">
+          <Field
+            id="ask-a"
+            label="first answer"
+            hint={`${labelA.length} / ${SUBMITTED_LABEL_MAX_LENGTH}`}
+          >
             <input
               id="ask-a"
               className="ask__input well--cut"
               type="text"
+              maxLength={SUBMITTED_LABEL_MAX_LENGTH}
               value={labelA}
               disabled={!canSubmit}
               onChange={(event) => setLabelA(event.target.value)}
             />
           </Field>
-          <Field id="ask-b" label="second answer">
+          <Field
+            id="ask-b"
+            label="second answer"
+            hint={`${labelB.length} / ${SUBMITTED_LABEL_MAX_LENGTH}`}
+          >
             <input
               id="ask-b"
               className="ask__input well--cut"
               type="text"
+              maxLength={SUBMITTED_LABEL_MAX_LENGTH}
               value={labelB}
               disabled={!canSubmit}
               onChange={(event) => setLabelB(event.target.value)}
@@ -1031,8 +1056,8 @@ function Ask({ canSubmit }: { canSubmit: boolean }): React.JSX.Element {
  * One labelled field, with a counter on the label's line if it has a limit.
  *
  * The counter shares the label's line rather than taking one under the box: this
- * room has a height budget and a hint per field would be four rows of it. Only
- * the title has one at all — nothing else in a submission is bounded any more.
+ * room has a height budget, and four hints on four rows of their own would be a
+ * quarter of it spent on arithmetic.
  */
 function Field({
   id,

@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import { filterText } from '../src/server/core/filter.js';
-import { NOTE_MAX_LENGTH, TITLE_MAX_LENGTH } from '../src/shared/config.js';
+import {
+  NOTE_MAX_LENGTH,
+  SUBMITTED_LABEL_MAX_LENGTH,
+  SUBMITTED_QUESTION_MAX_LENGTH,
+  TITLE_MAX_LENGTH,
+} from '../src/shared/config.js';
 import { buildComment, normalizeNote } from '../src/shared/comment.js';
 import { bucketFor } from '../src/server/core/votes.js';
 import { buildDailySummary } from '../src/server/core/daily.js';
@@ -23,20 +28,34 @@ describe('question text rules', () => {
   });
 
   /*
-   * Length and punctuation are not rules. Both used to be, and both fell on
-   * somebody who had already typed the thing — a question is refused here for
-   * being a link or being nothing, and for nothing else. What a *good* question
-   * looks like is `docs/writing-questions.md`'s business, and the mod queue in
-   * front of the Daily slot is the gate that enforces any of it.
+   * Punctuation is not a rule and neither is a minimum. Both used to be, and
+   * both fell on somebody who had already typed the thing. What a *good*
+   * question looks like is `docs/writing-questions.md`'s business, and the mod
+   * queue in front of the Daily slot is the gate that enforces any of it.
+   *
+   * The maximum is the exception and it is a different kind of rule: it is what
+   * the question block on the screen is measured to hold, the field counts down
+   * to it while it is being typed, and past it the question would be shown cut
+   * off. See `SUBMITTED_QUESTION_MAX_LENGTH`.
    */
   it('does not require a question mark', () => {
     expect(validateQuestionText('You eat the pizza crust')).toEqual({ ok: true });
     expect(validateQuestionText('Crust. Yes or no')).toEqual({ ok: true });
   });
 
-  it('takes a question of any length, short or long', () => {
+  it('has no minimum, and stops where the question block does', () => {
     expect(validateQuestionText('Crust?')).toEqual({ ok: true });
-    expect(validateQuestionText(`Do you ${'really '.repeat(200)}eat it?`)).toEqual({ ok: true });
+    expect(validateQuestionText('A'.repeat(SUBMITTED_QUESTION_MAX_LENGTH))).toEqual({ ok: true });
+    expect(validateQuestionText('A'.repeat(SUBMITTED_QUESTION_MAX_LENGTH + 1)).ok).toBe(false);
+    expect(validateQuestionText(`Do you ${'really '.repeat(200)}eat it?`).ok).toBe(false);
+  });
+
+  // Measured after the whitespace is collapsed, so nobody is refused for
+  // characters that were never going to be posted.
+  it('counts the question it would post, not the one that was pasted', () => {
+    const padded = `Do you eat the crust?${' '.repeat(400)}`;
+    expect(padded.length).toBeGreaterThan(SUBMITTED_QUESTION_MAX_LENGTH);
+    expect(validateQuestionText(padded)).toEqual({ ok: true });
   });
 
   it('still refuses a blank one', () => {
@@ -62,14 +81,15 @@ describe('question text rules', () => {
   });
 
   /*
-   * A long answer is a long button — the two choices render at whatever width
-   * they come out at — but that is a question asked badly rather than one asked
-   * wrongly, and the person it looks worst for is the one who wrote it.
+   * An answer has to fit on a button. The two choices are a fixed size — the
+   * same on every question in the subreddit — so an answer longer than one
+   * holds is an answer shown cut off, which is the game with half of itself
+   * missing.
    */
-  it('takes an answer of any length but not a blank one', () => {
-    expect(validateSubmission('Do you eat the crust?', 'Yes', 'A'.repeat(80), '')).toEqual({
-      ok: true,
-    });
+  it('holds an answer to what fits on a button, and refuses a blank one', () => {
+    const fits = 'A'.repeat(SUBMITTED_LABEL_MAX_LENGTH);
+    expect(validateSubmission('Do you eat the crust?', 'Yes', fits, '')).toEqual({ ok: true });
+    expect(validateSubmission('Do you eat the crust?', 'Yes', `${fits}A`, '').ok).toBe(false);
     expect(validateSubmission('Do you eat the crust?', '', 'No', '').ok).toBe(false);
     expect(validateSubmission('Do you eat the crust?', 'Yes', '   ', '').ok).toBe(false);
   });
@@ -138,18 +158,18 @@ describe('title rules', () => {
   });
 
   /*
-   * A question is no longer bounded, so a long one can outrun the only bound
-   * left. The two failures are different and are handled differently: a title
-   * somebody typed past the cap is refused with a reason, because they wrote it
-   * and can shorten it — a question past the cap is not a title anybody wrote,
-   * so it is cut to fit rather than refusing a perfectly good question for the
-   * length of a field the player was told was optional.
+   * A typed title past the cap is refused with a reason, because they wrote it
+   * and can shorten it. A *fallback* past the cap is not a title anybody wrote,
+   * so it is cut to fit rather than refusing the question it came from.
+   *
+   * No question a player submits today can reach the cap — they stop at
+   * `SUBMITTED_QUESTION_MAX_LENGTH`, well inside it — but questions written
+   * before that rule are still in Redis, and every Daily title is built from
+   * one of them through here.
    */
-  it('trims the fallback to the cap instead of refusing the question', () => {
+  it('trims a long fallback to the cap instead of refusing it', () => {
     const long = `Do you ${'really '.repeat(80)}eat the pizza crust?`;
     expect(long.length).toBeGreaterThan(TITLE_MAX_LENGTH);
-
-    expect(validateSubmission(long, 'Yes', 'No', '')).toEqual({ ok: true });
 
     const title = normalizeTitle('', long);
     expect(title.length).toBe(TITLE_MAX_LENGTH);
