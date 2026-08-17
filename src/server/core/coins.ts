@@ -2,9 +2,9 @@
  * The coin ledger, where it touches Redis.
  *
  * The rules themselves are pure and live in `shared/coins.ts`; this is the part
- * that reads and writes `user:{userId}`. Two of the four ways to earn are here —
- * posting a question and having one promoted — because neither of them is a
- * vote and so neither passes through `recordPlay`.
+ * that reads and writes `user:{userId}`. `creditCoins` is the one writer every
+ * earn goes through, and one of the earns is here — posting a question — because
+ * it is not a vote and so does not pass through `recordPlay`.
  *
  * Everything credits with `hIncrBy`. A balance is the one number in this app
  * that two requests can move at once — a vote paying the daily award while a box
@@ -18,6 +18,7 @@ import { reddit, redis } from '@devvit/web/server';
 
 import { submissionAward } from '../../shared/coins.js';
 import { toDayKey } from '../../shared/day.js';
+import { logEarning } from './earnings.js';
 import { keys, userFields } from './keys.js';
 
 export async function readCoins(userId: string): Promise<number> {
@@ -100,6 +101,9 @@ export async function awardSubmissionCoins(
     [userFields.subCount]: String(award.subCount),
   });
 
-  if (award.coins > 0) await creditCoins(userId, award.coins);
+  if (award.coins > 0) {
+    await creditCoins(userId, award.coins);
+    await logEarning(userId, 'submission', award.coins);
+  }
   return award.coins;
 }

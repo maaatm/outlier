@@ -12,12 +12,12 @@ import { CROWD_SIZE } from '../shared/config.js';
 import type { Equipped } from '../shared/items.js';
 import { getBand, type Award } from '../shared/points.js';
 import type { Choice, Question, QuestionState, Reveal, StateResponse } from '../shared/types.js';
-import { ApiFailure, castVote, fetchState, saveShowBlob } from './api.js';
+import { ApiFailure, castVote, fetchState, joinSubreddit, saveShowBlob } from './api.js';
 import { Blob } from './components/Blob.js';
 import { Compose } from './components/Compose.js';
 import { DotCrowd } from './components/DotCrowd.js';
 import { Histogram } from './components/Histogram.js';
-import { Menu } from './components/Menu.js';
+import { Menu, UnseenDot } from './components/Menu.js';
 import { StatBar } from './components/StatBar.js';
 import { Wordmark } from './components/Wordmark.js';
 import { COUNTER_SIZE } from './counterArt.js';
@@ -125,6 +125,16 @@ export function App(): React.JSX.Element {
           state: { ...state, reveal: { ...state.reveal, blobNotice: false } },
         });
       }}
+      // Held here for the same reason, and it matters more: the offer sits on a
+      // slide the player can walk back to, and an offer that returns after it
+      // has been answered is one that was not answered.
+      onJoinAnswered={() => {
+        if (!state.reveal) return;
+        setPhase({
+          name: 'ready',
+          state: { ...state, reveal: { ...state.reveal, joinOffer: false } },
+        });
+      }}
     />
   );
 }
@@ -138,6 +148,7 @@ function Game({
   onOpenMenu,
   onReveal,
   onBlobNoticed,
+  onJoinAnswered,
 }: {
   postId: string;
   state: QuestionState;
@@ -147,6 +158,7 @@ function Game({
   onOpenMenu: () => void;
   onReveal: (reveal: Reveal) => void;
   onBlobNoticed: () => void;
+  onJoinAnswered: () => void;
 }): React.JSX.Element {
   const { question, reveal, stats, canVote, authorAvatar } = state;
 
@@ -169,6 +181,7 @@ function Game({
           onSlide={onSlide}
           onOpenMenu={onOpenMenu}
           onBlobNoticed={onBlobNoticed}
+          onJoinAnswered={onJoinAnswered}
         />
       ) : (
         <PlayView
@@ -518,6 +531,7 @@ function RevealView({
   onSlide,
   onOpenMenu,
   onBlobNoticed,
+  onJoinAnswered,
 }: {
   postId: string;
   question: Question;
@@ -527,6 +541,7 @@ function RevealView({
   onSlide: (slide: number) => void;
   onOpenMenu: () => void;
   onBlobNoticed: () => void;
+  onJoinAnswered: () => void;
 }): React.JSX.Element {
   const mine = reveal.choice === 'a' ? question.labelA : question.labelB;
   const theirs = reveal.choice === 'a' ? question.labelB : question.labelA;
@@ -617,6 +632,14 @@ function RevealView({
             </div>
 
             <PointsAward award={reveal.award} animate={animate} />
+
+            {/* Under the award, on the slide where the game already hands you
+                something — so the offer inherits the block idiom rather than
+                inventing one. Not slide 0, where the blob notice fires: two
+                first-run interruptions on one screen means both are dismissed
+                unread. Not slide 2, which has exactly one primary action. */}
+            {reveal.joinOffer && <JoinOffer onAnswered={onJoinAnswered} />}
+
           </div>
 
           {/* Where everyone guessed, and nothing else. The well stays whether or
@@ -677,6 +700,10 @@ function RevealView({
         ) : (
           <button type="button" className="well-button slides__step" onClick={onOpenMenu}>
             Menu
+            {/* The same dot the menu's own list carries, on the button that
+                leads there. It is the only thing on this screen that says a
+                payout is waiting to be read. */}
+            {reveal.stats.unseenEarnings && <UnseenDot />}
           </button>
         )}
       </nav>
@@ -742,6 +769,66 @@ function BlobNotice({ onAnswered }: { onAnswered: () => void }): React.JSX.Eleme
       </button>
       {failed && (
         <p className="notice notice--quiet notice--cream">That did not save. We will ask again.</p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The subreddit, and the box that comes with joining it.
+ *
+ * Two controls, and they are not the same weight: joining is a block on the
+ * felt and declining is the same X that closes anything. Either one answers the
+ * offer for good, because both write to `joined` — the X so the reveal stops
+ * asking, the button because the box has been handed over.
+ *
+ * A failure leaves the offer up and says so, the same way `BlobNotice` does:
+ * the alternative is a player who tapped join, was subscribed to nothing, and
+ * has no way to try again.
+ */
+function JoinOffer({ onAnswered }: { onAnswered: () => void }): React.JSX.Element {
+  const [working, setWorking] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  async function answer(decline: boolean): Promise<void> {
+    setWorking(true);
+    setFailed(false);
+    try {
+      await joinSubreddit(decline);
+      onAnswered();
+    } catch {
+      setFailed(true);
+      setWorking(false);
+    }
+  }
+
+  return (
+    <div className="join-offer block block--cream block--sm" role="status">
+      <p className="join-offer__copy">
+        <strong>Join r/PlayOutlier and take a gift box on us.</strong> One tap, and the box is
+        waiting in your wardrobe.
+      </p>
+      <div className="join-offer__actions">
+        <button
+          type="button"
+          className="button block block--orange block--md join-offer__take"
+          disabled={working}
+          onClick={() => void answer(false)}
+        >
+          {working ? 'Joining...' : 'Join and claim'}
+        </button>
+        <button
+          type="button"
+          className="join-offer__close"
+          aria-label="No thanks"
+          disabled={working}
+          onClick={() => void answer(true)}
+        >
+          <Cross />
+        </button>
+      </div>
+      {failed && (
+        <p className="notice notice--quiet notice--cream">That did not go through. Try again.</p>
       )}
     </div>
   );

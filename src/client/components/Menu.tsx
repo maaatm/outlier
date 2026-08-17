@@ -28,13 +28,24 @@
 import { navigateTo } from '@devvit/web/client';
 import { useEffect, useRef, useState } from 'react';
 
+import { royaltyFor } from '../../shared/coins.js';
 import {
   BOX_PRICE,
+  COINS_COMMENT,
+  COINS_FIRST_VOTE,
+  COINS_PROMOTION,
+  COINS_STREAK_BONUS,
+  COINS_SUBMISSION,
+  COMMENT_UPVOTE_COIN_CAP,
+  EARNINGS_LOG_SIZE,
   HIT_THRESHOLD,
+  ROYALTY_VOTES_PER_COIN,
+  STREAK_BONUS_EVERY,
   SUBMITTED_LABEL_MAX_LENGTH,
   SUBMITTED_QUESTION_MAX_LENGTH,
   TITLE_MAX_LENGTH,
 } from '../../shared/config.js';
+import { EARN_COPY, type Earning } from '../../shared/earnings.js';
 import {
   ACCESSORIES,
   type Equipped,
@@ -52,12 +63,15 @@ import type {
   AvatarResponse,
   BoxResponse,
   DailyPointer,
+  JoinResponse,
   PlayerStats,
 } from '../../shared/types.js';
 import { normalizeTitle, validateSubmission } from '../../shared/validate.js';
 import {
   fetchAvatar,
   fetchDaily,
+  fetchEarnings,
+  joinSubreddit,
   openBox,
   saveAvatar,
   saveShowBlob,
@@ -162,7 +176,19 @@ export function Menu({
     };
   }, [postId]);
 
-  const { avatar, equip, absorb, show } = useAvatar(panel === 'record' || panel === 'wardrobe');
+  const { avatar, equip, absorb, show, joined } = useAvatar(
+    panel === 'record' || panel === 'wardrobe'
+  );
+  const { entries, coins, add } = useEarnings(panel === 'record');
+
+  // The dot is a question about the moment the menu was opened, and opening the
+  // record is what answers it — the fetch above marks the ledger seen on the
+  // server, and this is the same fact on this side of the wire. Held here rather
+  // than in `Root`, which remounts on every trip out of a room and back.
+  const [ledgerOpened, setLedgerOpened] = useState(false);
+  useEffect(() => {
+    if (panel === 'record') setLedgerOpened(true);
+  }, [panel]);
 
   return (
     <main className="app">
@@ -180,8 +206,26 @@ export function Menu({
       {/* Keyed so a page change remounts and cross-fades, and so a room opened
           after a long one starts at the top rather than mid-scroll. */}
       <div className="menu__body fade-in" key={panel ?? 'root'}>
-        {panel === null && <Root onOpen={setPanel} daily={daily} />}
-        {panel === 'record' && <Record stats={stats} avatar={avatar} onShow={show} />}
+        {panel === null && (
+          <Root
+            onOpen={setPanel}
+            daily={daily}
+            unseen={stats.unseenEarnings && !ledgerOpened}
+          />
+        )}
+        {panel === 'record' && (
+          <Record
+            stats={stats}
+            avatar={avatar}
+            entries={entries}
+            coins={coins}
+            onShow={show}
+            onJoined={(response) => {
+              joined(response);
+              if (response.granted) add({ reason: 'join', coins: 0, at: Date.now(), detail: 0 });
+            }}
+          />
+        )}
         {panel === 'wardrobe' && (
           <Wardrobe avatar={avatar} onEquip={equip} onOpened={absorb} />
         )}
@@ -244,6 +288,7 @@ function useAvatar(needed: boolean): {
   equip: (next: Equipped) => void;
   absorb: (box: BoxResponse) => void;
   show: (showBlob: boolean) => void;
+  joined: (response: JoinResponse) => void;
 } {
   const [avatar, setAvatar] = useState<AvatarResponse | null>(null);
 
@@ -298,8 +343,25 @@ function useAvatar(needed: boolean): {
         : {
             ...current,
             coins: box.coins,
+            freeRolls: box.freeRolls,
             owned: current.owned.includes(box.item) ? current.owned : [...current.owned, box.item],
           }
+    );
+  }
+
+  /**
+   * Fold a join into what is held.
+   *
+   * The same reasoning as `absorb`: the response carries both halves of what
+   * changed — the grant and the rolls it left — so the wardrobe's box knows what
+   * the next tap costs without a refetch, and the row that offered it goes away
+   * because `joined` is now true rather than because the room reloaded.
+   */
+  function joined(response: JoinResponse): void {
+    setAvatar((current) =>
+      current === null
+        ? current
+        : { ...current, joined: response.joined, freeRolls: response.freeRolls }
     );
   }
 
@@ -323,16 +385,70 @@ function useAvatar(needed: boolean): {
     });
   }
 
-  return { avatar, equip, absorb, show };
+  return { avatar, equip, absorb, show, joined };
+}
+
+/**
+ * The ledger, fetched the first time Your record is opened and held for the rest
+ * of the menu's life.
+ *
+ * Held up here for the same reason the avatar is: `Record` unmounts on every
+ * trip out of the room, and state inside it would refetch on the way back — but
+ * this fetch is also what marks the ledger seen, and asking the server twice to
+ * be told the same thing is a round trip spent to say nothing.
+ *
+ * A failure leaves it null, and the block renders its empty state rather than an
+ * error: a receipt that did not arrive is worth less than the room around it.
+ */
+function useEarnings(needed: boolean): {
+  entries: Earning[] | null;
+  /** The balance as the ledger read it. Null until it has been read. */
+  coins: number | null;
+  add: (entry: Earning) => void;
+} {
+  const [entries, setEntries] = useState<Earning[] | null>(null);
+  // The balance comes back with the ledger because the two are read together on
+  // the server, and it is the fresher of the two this room holds: `stats` was
+  // settled when the post loaded, and an hourly sweep can pay a player between
+  // that and their opening this page.
+  const [coins, setCoins] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!needed || entries !== null) return;
+    let live = true;
+    fetchEarnings()
+      .then((response) => {
+        if (!live) return;
+        setEntries(response.entries);
+        setCoins(response.coins);
+      })
+      // Nothing arrived, so the block teaches instead of waiting forever. The
+      // ways to earn are true whether or not this call worked, and the balance
+      // stays the one the page was opened with.
+      .catch(() => live && setEntries([]));
+    return () => {
+      live = false;
+    };
+  }, [needed, entries]);
+
+  /** A line earned while the room is open, put where it would have arrived. */
+  function add(entry: Earning): void {
+    setEntries((current) => [entry, ...(current ?? [])].slice(0, EARNINGS_LOG_SIZE));
+  }
+
+  return { entries, coins, add };
 }
 
 /** The list itself, under the wordmark, with the one way out above it. */
 function Root({
   onOpen,
   daily,
+  unseen,
 }: {
   onOpen: (id: PanelId) => void;
   daily: DailyPointer | null;
+  /** Something has been paid since this player last opened their record. */
+  unseen: boolean;
 }): React.JSX.Element {
   return (
     <div className="menu__root">
@@ -363,7 +479,10 @@ function Root({
               className="button block block--cream block--sm menu__item"
               onClick={() => onOpen(entry.id)}
             >
-              <span className="menu__item-label">{TITLES[entry.id]}</span>
+              <span className="menu__item-label">
+                {TITLES[entry.id]}
+                {entry.id === 'record' && unseen && <UnseenDot />}
+              </span>
               <span className="menu__item-blurb">{entry.blurb}</span>
             </button>
           </li>
@@ -441,11 +560,18 @@ function Footnote({ children }: { children: React.ReactNode }): React.JSX.Elemen
 function Record({
   stats,
   avatar,
+  entries,
+  coins,
   onShow,
+  onJoined,
 }: {
   stats: PlayerStats;
   avatar: AvatarResponse | null;
+  entries: Earning[] | null;
+  /** The balance the ledger read, which is fresher than the one on `stats`. */
+  coins: number | null;
   onShow: (showBlob: boolean) => void;
+  onJoined: (response: JoinResponse) => void;
 }): React.JSX.Element {
   const rate =
     stats.totalPlayed > 0 ? Math.round((stats.totalHits / stats.totalPlayed) * 100) : 0;
@@ -492,9 +618,20 @@ function Record({
         </div>
         <div className="figure well">
           <span className="label label--felt">coins</span>
-          <span className="figure__value figure__value--orange">{stats.coins}</span>
+          {/* The ledger's balance once it has arrived, because it was read a
+              moment ago and the one on `stats` was read when the post loaded —
+              and an hourly sweep can pay somebody in between. */}
+          <span className="figure__value figure__value--orange">{coins ?? stats.coins}</span>
         </div>
       </div>
+
+      {/* The offer, kept until it is taken. It is here rather than in the
+          wardrobe — the obvious home and the wrong one — because that room is
+          measured to fit 512px without scrolling and has already given its fine
+          print to the box. This page has no height budget. */}
+      {avatar?.canSave && !avatar.joined && <JoinRow onJoined={onJoined} />}
+
+      <Earnings entries={entries} />
 
       <div className="record__read block block--cream block--lg">
         <span className="label">how you read the room</span>
@@ -513,6 +650,141 @@ function Record({
       </div>
     </div>
   );
+}
+
+/**
+ * Where the coins came from, and — when there are none — where they come from.
+ *
+ * A **block, not a well**, and that is the one deliberate exception to the rule
+ * this design runs on: everything else on this page is a total the player
+ * already knew, and this is the page telling them something they did not.
+ *
+ * Two states, one box. A new player's ledger is empty, and an empty box is a
+ * worse first impression than no box — so the same block teaches instead,
+ * mirroring the `Nothing to show yet` branch `record__read` already has. Both
+ * tables read their numbers from `shared/config.ts`, so neither can drift from
+ * what the game actually pays.
+ */
+function Earnings({ entries }: { entries: Earning[] | null }): React.JSX.Element {
+  const earned = entries !== null && entries.length > 0;
+
+  return (
+    <div className="earnings block block--cream block--lg">
+      <span className="label">{earned ? 'what you have earned' : 'ways to earn'}</span>
+
+      {entries === null ? (
+        <p className="record__line">Loading...</p>
+      ) : (
+        <ul className="earnings__list">
+          {earned
+            ? entries.map((entry) => (
+                <EarnRow
+                  // The timestamp is what makes a member unique in the ledger
+                  // itself, so it is what identifies a row here too.
+                  key={`${entry.at}:${entry.reason}`}
+                  label={EARN_COPY[entry.reason](entry.detail)}
+                  // The free roll pays a box rather than coins, and a row
+                  // reading `+0` reads as a bug rather than as a gift.
+                  amount={entry.reason === 'join' ? 'free box' : `+${entry.coins}`}
+                />
+              ))
+            : WAYS_TO_EARN.map((way) => (
+                <EarnRow key={way.label} label={way.label} amount={way.amount} />
+              ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/**
+ * What the game pays, in the order a player meets it.
+ *
+ * Every number is read from `config.ts` rather than typed here, which is the
+ * whole point of the table: a rate that changes changes this screen with it.
+ */
+const WAYS_TO_EARN: readonly { label: string; amount: string }[] = [
+  { label: 'turn up', amount: `+${COINS_FIRST_VOTE}` },
+  { label: `every ${STREAK_BONUS_EVERY}th day in a row`, amount: `+${COINS_STREAK_BONUS}` },
+  { label: 'post your comment', amount: `+${COINS_COMMENT}` },
+  { label: 'upvotes on it', amount: `up to +${COMMENT_UPVOTE_COIN_CAP}` },
+  { label: 'ask a question', amount: `+${COINS_SUBMISSION}` },
+  { label: '...it becomes the Daily', amount: `+${COINS_PROMOTION}` },
+  {
+    label: `...every ${ROYALTY_VOTES_PER_COIN} people answer it`,
+    // Asked of the rule rather than written down: what a hundredth answer pays
+    // is `royaltyFor`'s answer and nothing else's.
+    amount: `+${royaltyFor(ROYALTY_VOTES_PER_COIN)}`,
+  },
+];
+
+/**
+ * One line of the ledger: what happened on the left, what it paid on the right.
+ *
+ * The amount is `DM Mono`'s job in the stylesheet and the reason is body copy,
+ * matching the wardrobe's item meta line — a column of numbers that do not line
+ * up is a column nobody can read down.
+ */
+function EarnRow({ label, amount }: { label: string; amount: string }): React.JSX.Element {
+  return (
+    <li className="earnings__row">
+      <span className="earnings__reason">{label}</span>
+      <span className="earnings__amount">{amount}</span>
+    </li>
+  );
+}
+
+/**
+ * Join the subreddit, and take a box for it.
+ *
+ * A row rather than a block with a heading: it is an offer on a page of totals,
+ * and it leaves for good the moment it is taken. Declining the reveal's version
+ * of this does not remove it — that only stops the reveal asking again, and
+ * somebody who said not now should still be able to say yes here.
+ */
+function JoinRow({ onJoined }: { onJoined: (response: JoinResponse) => void }): React.JSX.Element {
+  const [joining, setJoining] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function join(): Promise<void> {
+    setJoining(true);
+    setError(null);
+    try {
+      onJoined(await joinSubreddit());
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : 'That did not go through.');
+      setJoining(false);
+    }
+  }
+
+  return (
+    <div className="join block block--cream block--lg">
+      <span className="join__copy">
+        Join r/PlayOutlier and take a gift box on us. One tap, and the box is waiting in
+        your wardrobe.
+      </span>
+      <button
+        type="button"
+        className="button block block--orange block--md join__button"
+        disabled={joining}
+        onClick={() => void join()}
+      >
+        {joining ? 'Joining...' : 'Join and claim'}
+      </button>
+      {error && <p className="notice notice--quiet notice--cream">{error}</p>}
+    </div>
+  );
+}
+
+/**
+ * Something has been paid since this player last looked.
+ *
+ * A dot, in the orange coins already carry on this page and in `BoxResult` —
+ * deliberately not `--sun`, which is the streak and nothing else. It says
+ * nothing about how much, because a dot that needed a number would be a badge.
+ */
+export function UnseenDot(): React.JSX.Element {
+  return <span className="unseen-dot" aria-label="new earnings" role="img" />;
 }
 
 /**
@@ -673,7 +945,9 @@ function GiftBox({
   const [result, setResult] = useState<BoxResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const affordable = avatar.coins >= BOX_PRICE;
+  // A free roll is spent before coins are, on the server and therefore here.
+  const free = avatar.freeRolls > 0;
+  const affordable = free || avatar.coins >= BOX_PRICE;
 
   async function open(): Promise<void> {
     setOpening(true);
@@ -701,8 +975,13 @@ function GiftBox({
         ) : (
           <div className="label label--felt label-row">
             <span>gift box</span>
+            {/* The price line says what the next tap costs, and a free roll is
+                what it costs. The catalogue count moves to the result row,
+                where it always was on the other side of a press. */}
             <span>
-              you own {avatar.owned.length} of {ITEMS.length}
+              {free
+                ? `${avatar.freeRolls} free ${avatar.freeRolls === 1 ? 'roll' : 'rolls'}`
+                : `you own ${avatar.owned.length} of ${ITEMS.length}`}
             </span>
           </div>
         )}
@@ -716,9 +995,11 @@ function GiftBox({
       >
         {opening
           ? 'Opening...'
-          : affordable
-            ? `${result ? 'Open another' : 'Open a box'} · ${BOX_PRICE}`
-            : `${BOX_PRICE - avatar.coins} coins short`}
+          : free
+            ? `${result ? 'Open another' : 'Open a box'} — free`
+            : affordable
+              ? `${result ? 'Open another' : 'Open a box'} · ${BOX_PRICE}`
+              : `${BOX_PRICE - avatar.coins} coins short`}
       </button>
 
       {error && <p className="notice notice--quiet notice--spaced">{error}</p>}
@@ -765,8 +1046,15 @@ function BoxResult({
     >
       <span className="box__result-head">
         <span className="box__result-name">{item.name}</span>
+        {/* A free roll has no refund line to show, because it took nothing in.
+            Everything else about the receipt is the same one a paid box gets. */}
         <span className="box__result-meta">
-          {item.rarity} · {result.duplicate ? `duplicate · +${result.refunded} coins` : 'new'}
+          {item.rarity} ·{' '}
+          {result.duplicate
+            ? result.free
+              ? 'duplicate'
+              : `duplicate · +${result.refunded} coins`
+            : 'new'}
         </span>
       </span>
       <span className="box__result-count">
@@ -1048,6 +1336,15 @@ function Ask({ canSubmit }: { canSubmit: boolean }): React.JSX.Element {
       ) : (
         started && !check.ok && <p className="notice notice--quiet notice--spaced">{check.reason}</p>
       )}
+
+      {/* What posting pays, at the point of decision — the same job the `+5
+          coins` on the comment's foot row does. It is the room's fine print
+          rather than a fifth field, because this room is measured to fit and a
+          rate is not something anybody types into. */}
+      <Footnote>
+        Posting pays +{COINS_SUBMISSION} coins, and {COINS_PROMOTION} more if it becomes the
+        Daily.
+      </Footnote>
     </div>
   );
 }

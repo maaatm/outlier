@@ -44,6 +44,45 @@ export const COINS_SUBMISSION = 10;
 /** Paid to the *author* when their question takes the Daily slot. */
 export const COINS_PROMOTION = 30;
 
+/** Posting the generated comment. One per question, uncapped per day. */
+export const COINS_COMMENT = 5;
+
+/**
+ * What a comment's upvotes pay, and the ceiling on one comment.
+ *
+ * The cap is what keeps a comment that reaches r/all from being worth more than
+ * a fortnight of playing. `COMMENT_TRACK_HOURS` is how long a comment keeps
+ * accruing: almost every upvote a Reddit comment will ever get arrives in the
+ * first day, and tracking forever would mean an unbounded set of comments to
+ * re-read on every sweep.
+ */
+export const COINS_PER_COMMENT_UPVOTE = 1;
+export const COMMENT_UPVOTE_COIN_CAP = 10;
+export const COMMENT_TRACK_HOURS = 48;
+
+/** Comments re-read per sweep run, newest first. See `core/commentRewards.ts`. */
+export const COMMENT_SWEEP_BATCH = 100;
+
+/**
+ * What a question pays its author for being played, and the ceiling per
+ * question.
+ *
+ * The cap binds at 2,500 answers, which no question has yet reached — it is
+ * there so that an old Daily cannot pay its author forever as the archive stays
+ * playable, not to refuse anybody anything they are likely to earn.
+ */
+export const ROYALTY_VOTES_PER_COIN = 100;
+export const ROYALTY_COIN_CAP = 25;
+
+/** What joining the subreddit grants, once per account, ever. */
+export const JOIN_FREE_ROLLS = 1;
+
+/** Reveals a player must have seen before the join offer appears on one. */
+export const JOIN_OFFER_MIN_PLAYS = 2;
+
+/** Entries kept in a player's earnings ledger. A receipt, not a history. */
+export const EARNINGS_LOG_SIZE = 8;
+
 /**
  * How many submissions in a UTC day still pay coins. Submission itself is
  * uncapped — this caps only the reward, so a flood costs the farmer nothing
@@ -227,7 +266,7 @@ export const HISTOGRAM_BUCKETS = 10;
 export const POOL_SHUFFLE_SEED = 0x0dd1e5;
 
 /**
- * TESTING ONLY — set to false before this goes anywhere real.
+ * TESTING ONLY — off, and it stays off now that the economy pays for things.
  *
  * When true the game forgets that you played: your answer is never written to
  * `voted:{questionId}`, so every time you open a post you get the question
@@ -238,8 +277,14 @@ export const POOL_SHUFFLE_SEED = 0x0dd1e5;
  * toward the tallies, so a test subreddit builds up a real distribution to look
  * at — and a live subreddit would build up a fake one. The streak is untouched
  * and still works normally; points are not, since every replay pays again.
+ *
+ * Three of the incentives inflate under it — comment coins, royalties and
+ * submission coins all sit on paths the flag opens up — which is why it was
+ * turned off before any of them shipped. Nothing measured while it is on is
+ * measuring the game. Turning it back on for an afternoon in the dev subreddit
+ * is still the intended use; leaving it on is not.
  */
-export const REPLAY_MODE = true;
+export const REPLAY_MODE = false;
 
 /** Post flair applied to player-submitted questions. */
 export const OPEN_QUESTION_FLAIR = 'Open question';

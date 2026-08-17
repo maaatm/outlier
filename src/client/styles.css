@@ -1285,6 +1285,81 @@ button {
   outline-offset: -2px;
 }
 
+/*
+ * The join offer, under the award on the score slide.
+ *
+ * It inherits the award's own idiom — a block, because something is being
+ * handed to you — and sits directly under it, so the slide reads as one thing
+ * arriving and then a second. Two controls on one row: the offer is a block
+ * standing on the surface and declining is the same X that closes anything,
+ * which is the same weighting the guess screen gives Change and Lock it in.
+ */
+.join-offer {
+  margin-top: 10px;
+  padding: 11px 13px;
+  flex: none;
+}
+
+.join-offer__copy {
+  margin: 0;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--ink-body-cream);
+}
+
+.join-offer__copy strong {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.join-offer__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 9px;
+}
+
+.join-offer__take {
+  flex: 1;
+  padding: 11px;
+  font-size: 17px;
+  border-radius: 9px;
+}
+
+.join-offer__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Bigger than the glyph: a 16px X is not a target. */
+  width: 40px;
+  height: 40px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-well);
+  background: none;
+  color: var(--ink-soft-cream);
+  cursor: pointer;
+  transition: color 100ms ease-out;
+}
+
+.join-offer__close:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .join-offer__close:hover:not(:disabled) {
+    color: var(--ink);
+  }
+}
+
+.join-offer__close:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: -2px;
+}
+
 /* ── The reveal ─────────────────────────────────────────────────────────── */
 
 /*
@@ -1966,6 +2041,111 @@ button {
   outline: 3px solid var(--ink);
   outline-offset: 3px;
   border-radius: var(--r-well);
+}
+
+/*
+ * ── The ledger ─────────────────────────────────────────────────────────────
+ *
+ * A block on a page of wells, and the one deliberate exception to the rule that
+ * a number you have already banked sits in a well: everything else in this room
+ * is a total the player knew before they opened it, and this is the page telling
+ * them something they did not. Two states share the box — what you earned, and,
+ * while there is nothing, how to.
+ */
+.earnings {
+  padding: 12px 14px;
+  margin-top: 14px;
+  border-radius: 10px;
+  flex: none;
+}
+
+.earnings__list {
+  margin: 7px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+/*
+ * One line per earning: what happened, and what it paid. The reason gives way
+ * first — a long sentence is truncated rather than allowed to push the amount
+ * off its column, because a column of numbers that does not line up is a column
+ * nobody can read down.
+ */
+.earnings__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 3px 0;
+}
+
+.earnings__reason {
+  font-weight: 500;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--ink-body-cream);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The amount is set in the display face for the same reason the figures are:
+   it is a number, and these are read as a column. */
+.earnings__amount {
+  flex: none;
+  font-family: var(--font-display);
+  font-size: 15px;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--orange-face);
+}
+
+/*
+ * The offer, on the page that has room for it.
+ *
+ * It is a block rather than a well because it is being handed to you, which is
+ * the same reason the award on the reveal is one.
+ */
+.join {
+  padding: 12px 14px;
+  margin-top: 14px;
+  border-radius: 10px;
+  flex: none;
+}
+
+.join__copy {
+  display: block;
+  font-weight: 500;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ink-body-cream);
+}
+
+.join__button {
+  width: 100%;
+  margin-top: 10px;
+  padding: 12px;
+  font-size: 18px;
+  border-radius: 9px;
+}
+
+/*
+ * Something has been paid since this player last looked.
+ *
+ * The orange coins already carry on this page and in the box's result, never
+ * `--sun`, which is the streak and nothing else. Six pixels, and no number: a
+ * dot that needed one would be a badge.
+ */
+.unseen-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 7px;
+  border-radius: 50%;
+  background: var(--orange);
+  vertical-align: 0.35em;
 }
 
 /* ── The leaderboard ────────────────────────────────────────────────────── */

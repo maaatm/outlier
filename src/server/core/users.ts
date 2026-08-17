@@ -27,10 +27,11 @@
 import { context, redis, reddit } from '@devvit/web/server';
 
 import { boardScore, daysSinceLaunch } from '../../shared/board.js';
-import { coinsForNewDay } from '../../shared/coins.js';
+import { type DayAward, coinsForNewDay } from '../../shared/coins.js';
 import { WEEK_BOARD_TTL_SECONDS } from '../../shared/config.js';
 import { daysBetween, fromDayKey, toDayKey, toWeekKey } from '../../shared/day.js';
 import type { PlayerStats } from '../../shared/types.js';
+import { logEarning } from './earnings.js';
 import { keys, userFields } from './keys.js';
 
 export type UserRecord = {
@@ -53,6 +54,16 @@ export type UserRecord = {
    * the one thing that debits, and it does so under a `watch` in `boxes.ts`.
    */
   coins: number;
+  /**
+   * Coin events recorded, and how many of them this player has seen.
+   *
+   * Two counters rather than a flag, because the question is "has anything
+   * arrived since you last looked" and a flag cannot answer it without somebody
+   * remembering to set it. `logEarning` moves the first, opening the ledger sets
+   * the second to it, and the difference is the dot on the menu.
+   */
+  earnSeq: number;
+  earnSeen: number;
 };
 
 export const EMPTY_USER: UserRecord = {
@@ -65,6 +76,8 @@ export const EMPTY_USER: UserRecord = {
   weekPoints: 0,
   weekKey: '',
   coins: 0,
+  earnSeq: 0,
+  earnSeen: 0,
 };
 
 export async function getUser(userId: string): Promise<UserRecord> {
@@ -92,6 +105,11 @@ export async function getUser(userId: string): Promise<UserRecord> {
     // A record from before the economy has no balance, which is a balance of
     // zero rather than anything to back-fill.
     coins: Number(raw.coins ?? 0) || 0,
+    // Both absent on every record written before the ledger existed, which
+    // reads as an empty ledger fully seen — no dot on a player's first open,
+    // and one on the next earning after it.
+    earnSeq: Number(raw.earnSeq ?? 0) || 0,
+    earnSeen: Number(raw.earnSeen ?? 0) || 0,
   };
 }
 
@@ -114,6 +132,10 @@ export function projectStats(record: UserRecord, today: string = toDayKey()): Pl
     totalPlayed: record.totalPlayed,
     totalHits: record.totalHits,
     extendedToday: record.lastPlayedDay === today,
+    // Derived from two fields on the record this function was already handed,
+    // so the dot on the menu costs no read on the vote path, the state path, or
+    // anywhere else.
+    unseenEarnings: record.earnSeq > record.earnSeen,
   };
 }
 
@@ -135,6 +157,14 @@ export type Play = {
 export type Advanced = UserRecord & {
   /** The day's first vote pays; the second one pays nothing. */
   coinsEarned: number;
+  /**
+   * The same coins, split by what paid them.
+   *
+   * The balance only needs the sum, and the ledger needs the halves: turning up
+   * and a seventh day in a row are two different lines on the receipt, and a
+   * caller handed one number cannot tell them apart afterwards.
+   */
+  earned: DayAward;
 };
 
 /**
@@ -165,10 +195,15 @@ export function advance(record: UserRecord, play: Play, today: string): Advanced
     weekPoints: (record.weekKey === weekKey ? record.weekPoints : 0) + play.points,
   };
 
+  // Nothing paid, on either of the two branches below that pay nothing.
+  const unpaid: DayAward = { daily: 0, streak: 0 };
+
   // Already counted today. The second question of the day pays points, but one
   // day is one day however many questions are in it — and the coins are a
   // daily award, so they pay nothing the second time either.
-  if (record.lastPlayedDay === today) return { ...record, ...banked, coinsEarned: 0 };
+  if (record.lastPlayedDay === today) {
+    return { ...record, ...banked, coinsEarned: 0, earned: unpaid };
+  }
 
   const gap = record.lastPlayedDay === '' ? Infinity : daysBetween(record.lastPlayedDay, today);
 
@@ -176,22 +211,25 @@ export function advance(record: UserRecord, play: Play, today: string): Advanced
   // that went backwards, since the caller always passes today — but if it
   // happens it must not rewind `lastPlayedDay`, or the next real day would read
   // as a gap and destroy a live streak.
-  if (gap < 0) return { ...record, ...banked, coinsEarned: 0 };
+  if (gap < 0) return { ...record, ...banked, coinsEarned: 0, earned: unpaid };
 
   const streak = gap === 1 ? record.streak + 1 : 1;
 
   // Keyed on the streak this vote moved *to*, so the seven-day bonus pays on the
   // day the run reaches seven rather than the day after — and a run that reset
   // to 1 counts toward the next one from there.
-  const coinsEarned = coinsForNewDay(streak);
+  const earned = coinsForNewDay(streak);
+  const coinsEarned = earned.daily + earned.streak;
 
   return {
+    ...record,
     ...banked,
     streak,
     bestStreak: Math.max(record.bestStreak, streak),
     lastPlayedDay: today,
     coins: record.coins + coinsEarned,
     coinsEarned,
+    earned,
   };
 }
 
@@ -234,6 +272,14 @@ export async function recordPlay(
       ? await redis.hIncrBy(keys.user(userId), userFields.coins, next.coinsEarned)
       : record.coins;
 
+  // Two lines rather than one on a seventh day, because "turned up today" and
+  // "7 days in a row" are two different answers to where a coin came from. The
+  // streak line carries the run it was paid for as its detail.
+  if (next.earned.daily > 0) await logEarning(userId, 'daily', next.earned.daily);
+  if (next.earned.streak > 0) {
+    await logEarning(userId, 'streak', next.earned.streak, next.streak);
+  }
+
   await writeBoards(userId, next, record.weekKey !== next.weekKey, today);
   await rememberName(userId);
 
@@ -245,6 +291,10 @@ export async function recordPlay(
     totalPlayed: next.totalPlayed,
     totalHits: next.totalHits,
     extendedToday: next.lastPlayedDay === today,
+    // Anything logged a moment ago is by definition unseen, and the record read
+    // at the top of this function predates it — so a vote that paid lights the
+    // dot without re-reading the counters it just moved.
+    unseenEarnings: next.earnSeq > next.earnSeen || next.coinsEarned > 0,
   };
 }
 

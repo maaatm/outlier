@@ -14,6 +14,7 @@ import { previousDay, toDayKey } from '../../shared/day.js';
 import { percentAgreeing } from '../../shared/scoring.js';
 import { fitTitle } from '../../shared/validate.js';
 import { creditCoins } from './coins.js';
+import { logEarning } from './earnings.js';
 import { keys } from './keys.js';
 import { questionAtCursor, poolSize } from './pool.js';
 import { getQuestion, linkQuestionToPost, markAsDaily, writeQuestion } from './questions.js';
@@ -157,7 +158,12 @@ export async function postDaily(day: string = toDayKey()): Promise<PostDailyResu
      * author goes unpaid rather than being paid twice. That is the direction
      * worth failing in.
      */
-    await creditCoins(resolution.promotedFrom?.authorId ?? '', COINS_PROMOTION);
+    const promotedAuthor = resolution.promotedFrom?.authorId ?? '';
+    await creditCoins(promotedAuthor, COINS_PROMOTION);
+    // The receipt, on the one earn the author is not present for: their question
+    // was chosen while they were somewhere else. `logEarning` ignores an empty
+    // id the same way `creditCoins` does, so a house Daily records nothing.
+    await logEarning(promotedAuthor, 'promotion', COINS_PROMOTION);
 
     return { status: 'created', day, questionId: resolution.questionId, postId: post.id };
   } catch (error) {

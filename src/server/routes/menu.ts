@@ -186,8 +186,8 @@ menuRoutes.post('/internal/menu/pin-menu-post', async (c) => {
  *
  * Moderators only, re-checked here rather than trusted from the menu item's
  * `forUserType`, which hides a button and gates nothing. It exists for testing:
- * the four ways to earn are slow on purpose, and a wardrobe with no coins behind
- * it cannot be tried out.
+ * every way to earn is slow on purpose, and a wardrobe with no coins behind it
+ * cannot be tried out.
  *
  * The fields are prefilled with the account and the amount this was first needed
  * for, because a form whose defaults are the common case is one tap.

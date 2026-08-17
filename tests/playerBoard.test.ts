@@ -81,6 +81,21 @@ vi.mock('@devvit/web/server', () => {
         for (const member of members) zset(key).delete(member);
         return members.length;
       },
+      /** Inclusive, and negative indexes count back from the end, as Redis does. */
+      zRemRangeByRank: async (key: string, start: number, stop: number) => {
+        const rows = ordered(key);
+        const from = start < 0 ? Math.max(0, rows.length + start) : start;
+        const to = stop < 0 ? rows.length + stop : Math.min(stop, rows.length - 1);
+
+        let removed = 0;
+        for (let index = from; index <= to; index++) {
+          const row = rows[index];
+          if (!row) continue;
+          zset(key).delete(row.member);
+          removed++;
+        }
+        return removed;
+      },
       expire: async (key: string, seconds: number) => {
         store.expiries.set(key, seconds);
       },

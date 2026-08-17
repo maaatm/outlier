@@ -8,6 +8,8 @@ import type {
   BoxResponse,
   CommentResponse,
   DailyPointer,
+  EarningsResponse,
+  JoinResponse,
   PlayerBoardResponse,
   Reveal,
   StateResponse,
@@ -141,6 +143,31 @@ export function saveShowBlob(showBlob: boolean): Promise<AvatarResponse> {
  */
 export function openBox(): Promise<BoxResponse> {
   return request<BoxResponse>('/api/box/open', { method: 'POST' });
+}
+
+/**
+ * Where the coins came from.
+ *
+ * Fetched on opening Your record and nowhere else, which is also what marks the
+ * ledger seen — so the dot on the menu goes out because this ran, not because a
+ * second call said it had.
+ */
+export function fetchEarnings(): Promise<EarningsResponse> {
+  return request<EarningsResponse>('/api/earnings');
+}
+
+/**
+ * Join the subreddit and take the free box, or say no thanks.
+ *
+ * One call for both answers, because they are one decision written to one
+ * field. The server subscribes either way it is asked to join — the grant is
+ * the part that happens once.
+ */
+export function joinSubreddit(decline = false): Promise<JoinResponse> {
+  return request<JoinResponse>('/api/join', {
+    method: 'POST',
+    body: JSON.stringify({ decline }),
+  });
 }
 
 /**

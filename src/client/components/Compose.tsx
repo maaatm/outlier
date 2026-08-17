@@ -14,7 +14,7 @@
 import { Fragment, useLayoutEffect, useRef, useState } from 'react';
 
 import { buildComment, normalizeNote } from '../../shared/comment.js';
-import { NOTE_MAX_LENGTH } from '../../shared/config.js';
+import { COINS_COMMENT, NOTE_MAX_LENGTH } from '../../shared/config.js';
 import type { Question, Reveal } from '../../shared/types.js';
 import { ApiFailure, postComment } from '../api.js';
 
@@ -28,6 +28,10 @@ export function Compose({ postId, question, reveal }: Props): React.JSX.Element 
   const [note, setNote] = useState('');
   const [posting, setPosting] = useState(false);
   const [posted, setPosted] = useState(reveal.commented);
+  // What this post paid, as the server reported it. Zero on a reveal opened
+  // again later — the comment was posted on some earlier visit and the coins
+  // with it — which is why the receipt below is a branch and not a constant.
+  const [earned, setEarned] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const noteRef = useRef<HTMLTextAreaElement>(null);
 
@@ -48,10 +52,11 @@ export function Compose({ postId, question, reveal }: Props): React.JSX.Element 
     setPosting(true);
     setError(null);
     try {
-      await postComment(postId, note.trim() || undefined, {
+      const receipt = await postComment(postId, note.trim() || undefined, {
         choice: reveal.choice,
         guess: reveal.guess,
       });
+      setEarned(receipt.earned);
       setPosted(true);
     } catch (failure) {
       if (failure instanceof ApiFailure && failure.status === 409) setPosted(true);
@@ -72,7 +77,14 @@ export function Compose({ postId, question, reveal }: Props): React.JSX.Element 
           which is the whole receipt.
         */}
         <p className="compose__preview well--cut">
-          {posted ? 'Posted to the thread.' : <Bolded text={preview} />}
+          {posted ? (
+            // The payout goes in the sentence that was already there rather than
+            // in a block of its own: the well is filled, the button below has
+            // gone, and the whole receipt is one line longer than it was.
+            earned > 0 ? `Posted to the thread. +${earned} coins.` : 'Posted to the thread.'
+          ) : (
+            <Bolded text={preview} />
+          )}
         </p>
 
         {!posted && (
@@ -90,8 +102,12 @@ export function Compose({ postId, question, reveal }: Props): React.JSX.Element 
               placeholder="Anything you want to add."
               onChange={(event) => setNote(event.target.value)}
             />
+            {/* The one place the player is deciding whether to post, so it is
+                the one place worth saying what posting pays. It costs no
+                layout: the row was already there, carrying a line that said
+                what the orange button underneath it says. */}
             <div className="label label-row compose__foot">
-              <span>posts to the thread</span>
+              <span>+{COINS_COMMENT} coins</span>
               <span>
                 {note.length} / {NOTE_MAX_LENGTH}
               </span>

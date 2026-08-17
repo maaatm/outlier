@@ -79,7 +79,7 @@ logic. Thresholds live in `src/shared/config.ts`.
   habit metric. A missed day resets it to zero; `bestStreak` keeps the number it reached
   and is never reduced.
 - `points` — lifetime, banked per vote rather than per day. The score, and never spent.
-- `coins` — the spendable balance, earned four ways and sunk into gift boxes. A second
+- `coins` — the spendable balance, earned seven ways and sunk into gift boxes. A second
   ledger on the same record, not a second score. See below.
 
 **Every question counts** toward both: the Daily, an open question somebody submitted, or
@@ -118,7 +118,7 @@ record that ever goes down.
 Nothing in the economy reads, writes or decrements `points`. That is asserted directly in
 `tests/streaks.test.ts`.
 
-Four ways to earn, all of them earned-only:
+Seven ways to earn, all of them earned-only:
 
 | Event | Coins | Where it fires |
 |---|---|---|
@@ -126,6 +126,9 @@ Four ways to earn, all of them earned-only:
 | Every 7th consecutive day of streak | +20 | `advance()` in `core/users.ts` |
 | Question posted | +10 | `submitOpenQuestion` in `core/submit.ts` |
 | Question promoted to the Daily | +30 | `postDaily` in `core/daily.ts` |
+| The generated comment, posted | +5 | `POST /api/comment` |
+| Upvotes on that comment | +1 each, up to 10 | `sweepCommentRewards` in `core/commentRewards.ts` |
+| Every 100th answer on a question you asked | +1, up to 25 | `POST /api/vote` |
 
 The first two hang off the day boundary `advance()` already turns the streak on, so they
 are one branch on a function that was already pure and already tested. The seven-day bonus
@@ -135,6 +138,47 @@ there. Promotion pays the **author**, not the moderator who approved it and not 
 ran the job — the id comes off `q:{id}`, and the credit sits inside the `daily:claims`
 guard so a re-run of `post-daily` pays nobody a second time. A house question reaching the
 Daily slot pays nobody and does not error.
+
+**Comment coins are guarded by a claim, not a check.** `commented:{questionId}` is now
+claimed with `hSetNX` *before* the comment is submitted and written over with the real
+comment id afterwards, because a read-then-write guard in front of a payment is a double
+payment waiting for two taps. A submit that throws therefore leaves a claimed slot
+pointing at nothing: the player is refused and can post the comment themselves, which is
+the cheaper of the two ways to fail.
+
+**Upvote coins are a watermark, swept hourly.** `comments:paid` holds what each comment
+has been paid, and every settle pays the *difference* between what its score owes now and
+that number — so a skipped comment costs an hour of latency and never a coin, and a run
+that fires twice pays nothing the second time. Comments leave `comments:tracked` when
+they pass `COMMENT_TRACK_HOURS` or hit the cap, whichever comes first. Nothing is ever
+clawed back: a comment downvoted after payment keeps what it earned.
+
+**Royalties need no watermark at all.** They are keyed on the answer count *this vote
+produced* — the number `hIncrBy` handed back — so exactly one vote in a question's life
+ever observes each multiple of a hundred, however many are landing at once. The author's
+own vote is not excluded: self-farming would cost a hundred distinct accounts per coin,
+and filtering would be a read to defend nothing.
+
+**Joining the subreddit pays a box rather than coins.** `POST /api/join` subscribes and
+grants one free roll, once per account, tracked on `joined` — Devvit does not expose
+subscription state, so a local one-time grant is the only bound available. A free roll is
+spent before coins are, refunds nothing on a duplicate (a roll that took nothing in has
+nothing to make whole), and still advances pity.
+
+### Where the coins came from
+
+Four of those earns used to pay silently, and two of the three added since arrive hours
+after the thing that earned them. A payout the player never sees is not an incentive, so
+every one of them now writes a line to `earn:{userId}` — a zset holding the last
+`EARNINGS_LOG_SIZE` events, trimmed on write, in the same window-not-a-history shape
+`recent:{questionId}` has.
+
+`logEarning` deliberately does not pay: `creditCoins` moves the balance and this records
+why, so a payment that succeeds and a log line that fails costs a receipt rather than the
+coins. The ledger is read once, by Your record, through `GET /api/earnings` — and reading
+it is what marks it seen. `earnSeq` and `earnSeen` on the user hash carry that: unseen is
+`earnSeq > earnSeen`, which `projectStats` answers out of the `hGetAll` it was already
+making, so the dot on the menu costs no read anywhere.
 
 **The box** is the only sink. `POST /api/box/open` — the server rolls, the client
 animates; a client-side roll is a client-side inventory. Four rules:
@@ -156,7 +200,7 @@ and is tested against a seeded generator over tens of thousands of boxes, which 
 only way an assertion about a guarantee is a fact rather than a coin flip that passed
 today.
 
-**Granting coins for testing.** The four rates are slow on purpose, which makes the
+**Granting coins for testing.** The rates are slow on purpose, which makes the
 wardrobe hard to try out. `Outlier: grant coins` is a moderator-only menu item that adds
 to any account's balance by username — the only path that creates coins out of nothing,
 deliberately unreachable by a player, and mod-checked on the form endpoint as well as on
@@ -172,12 +216,16 @@ the earned side and to sell only known items directly, if anything is ever sold.
 
 ---
 
-## Replay mode — turn this off before release
+## Replay mode — off, and it stays off
 
-`REPLAY_MODE` in `src/shared/config.ts` is currently **on**. It exists so the
-game can be played repeatedly while testing: your answer is never written to
-`voted:{questionId}`, so opening a post always gives you the question again
-rather than the reveal you already earned.
+`REPLAY_MODE` in `src/shared/config.ts` is **off**. It was turned off when the
+incentives shipped, because three of them inflate under it and nothing measured
+while it is on is measuring the game. Turning it back on for an afternoon in the
+dev subreddit is still the intended use; leaving it on is not.
+
+It exists so the game can be played repeatedly while testing: your answer is
+never written to `voted:{questionId}`, so opening a post always gives you the
+question again rather than the reveal you already earned.
 
 It does this by disabling the server-side dedupe guard — the only thing stopping
 one account from voting a hundred times. Votes still count toward the tallies,
@@ -193,7 +241,14 @@ awards do not inflate**: they hang off the day-boundary branch in `advance()`, w
 date comparison the flag does not touch — the one part of the economy that behaves
 correctly in dev. **Submission coins do inflate**, because nothing rate-limits submission
 any more; a dev subreddit will accumulate them quickly, and that is expected rather than
-broken. Nothing in the economy checks the flag.
+broken. **Comment coins do too**: `claimComment` short-circuits with the flag on, so the
+same question can be commented on and paid for repeatedly. **Royalties do as well**, since
+`tallyVote` runs on the replay branch and one account can walk a question to a hundred
+answers by itself. Nothing in the economy checks the flag — those three are consequences
+of the one guard it disables, not branches anybody wrote.
+
+The **free roll for joining does not inflate**: it is claimed on the user hash, which the
+flag has no opinion about, so it is once per account in dev exactly as in production.
 
 **The crowd's cameos are absent under it**, and that is the flag working rather than a
 bug. `recent:{questionId}` is written on the same branch as `guesses:`, which the flag
@@ -202,8 +257,8 @@ side to draw anyone on. Nothing in `core/cameos.ts` checks the flag; the feature
 no data in a replay subreddit and is correct the moment the flag flips. Seeing cameos while
 developing means turning it off.
 
-The server logs a warning on boot while it is on. Set it to `false` before this
-goes anywhere real.
+The server logs a warning on boot while it is on. Anything turned on for an
+afternoon goes back off before the branch does.
 
 ## The invariant
 
@@ -270,14 +325,20 @@ votes:{questionId}     hash   a, b, guessSum, guessCount, errSum
 guesses:{questionId}   zset   userId -> guess     (the distribution record)
 voted:{questionId}     hash   userId -> "a:45:21" (dedupe guard + what to re-render)
 hist:{questionId}      hash   bucket -> count     (derived from guesses)
-commented:{questionId} hash   userId -> commentId
+commented:{questionId} hash   userId -> commentId, or "pending" between the
+                              claim and the post
 recent:{questionId}    zset   userId -> voted at  (capped window, for the cameos)
 
 user:{userId}          hash   streak, bestStreak, lastPlayedDay, points,
                               totalPlayed, totalHits, weekPoints, weekKey,
-                              coins, pity, subDay, subCount, showBlob
+                              coins, pity, subDay, subCount, showBlob,
+                              freeRolls, joined, earnSeq, earnSeen
 sub:recent:{userId}    hash   submission fingerprint -> "1", TTL 60s
 sub:count:{userId}:{day}  string  questions posted today, TTL 48h
+
+earn:{userId}          zset   encoded earning -> when it landed (capped window)
+comments:tracked       zset   "{userId}:{commentId}" -> posted at
+comments:paid          hash   commentId -> coins already paid for its upvotes
 
 queue:pending          zset   questionId -> upvotes
 queue:approved         zset   questionId -> upvotes
@@ -321,6 +382,15 @@ starter items are never written to it, because they are owned implicitly by ever
 now gates: `POST /api/avatar` refuses an item outside it, and the wardrobe's steppers walk
 it rather than the whole catalogue.
 
+**The incentive keys.** `earn:{userId}` is a window and not a history — the same shape and
+the same reasoning as `recent:{questionId}`, because its job is to answer "where did that
+come from", which is a question about the last few days and never about the last year. It
+is a zset rather than the capped list it would otherwise be because Devvit's Redis has no
+list commands. `comments:tracked` holds every comment still inside its accrual window and
+`comments:paid` is the watermark beside it; entries leave both together, on a comment's
+final settle or the moment it reaches the cap. `royalty:` has no key at all, deliberately —
+the answer count a vote produced is the sequence number, so there is nothing to remember.
+
 **Two ledgers, one hash.** `points` and `coins` sit on the same `user:` record and mean
 opposite things — see below. Crediting coins on a vote is therefore one more field moved
 on a write `recordPlay` was already making, rather than a second key and a second round
@@ -359,7 +429,12 @@ that has since moved would contradict the total it already added to.
 ```
 GET  /api/state/:postId       question, prior answer, tallies only if voted
 POST /api/vote                { postId, choice, guess } -> reveal
-POST /api/comment             posts the generated comment as this user
+POST /api/comment             posts the generated comment as this user, and pays for it
+                              -> { permalink, earned, coins }; 409 on a second attempt
+GET  /api/earnings            the last few coin events, newest first — and reading it
+                              is what marks them seen
+POST /api/join                { decline? } subscribe and take the free roll, once per
+                              account -> { joined, granted, freeRolls }
 POST /api/submit              { text, labelA, labelB, title? } -> the new post;
                               429 past the day's allowance, 409 on a repeat
 GET  /api/leaderboard/players?range=week|all   players by points banked
@@ -367,7 +442,8 @@ GET  /api/avatar              the pair you are wearing, what you own, your balan
                               and whether other players may see it
 POST /api/avatar              { face?, accessory?, showBlob? } -> the same shape;
                               403 if unowned, 400 if it asks for nothing
-POST /api/box/open            spend coins, roll an item -> { item, duplicate, refunded, coins }
+POST /api/box/open            spend a free roll or coins, roll an item
+                              -> { item, duplicate, refunded, coins, free, freeRolls }
 GET  /api/today               today's UTC day key
 GET  /api/daily?from={postId} where today's Daily is — a state and a permalink
 GET  /api/queue               mod-only
@@ -387,6 +463,13 @@ flag on a menu item hides a button; it does not gate the endpoint behind it.
 | `post-daily` | `0 0 * * *` | Resolve source, create the Daily post, write `daily:{date}` |
 | `summarize-daily` | `0 0 * * *` | Sticky where the *previous* day's split stands |
 | `refresh-queue` | hourly | Re-score `queue:pending` from live post upvotes |
+| `sweep-comments` | hourly | Pay tracked comments what their upvotes owe |
+
+`sweep-comments` is its own job rather than a second half of `refresh-queue`: they touch
+different data, and a throw in one must not take the other's run with it. It reads the
+expiring end of `comments:tracked` in full and the newest `COMMENT_SWEEP_BATCH` inside the
+window, which is where upvotes actually arrive — and the watermark is what makes bounding
+it safe, since a comment it skips is paid in full by the next run that reaches it.
 
 Both midnight jobs are idempotent and touch different day keys, so the order they fire
 in does not matter. `post-daily` guards on `daily:claims`, `summarize-daily` on
@@ -574,7 +657,7 @@ room at all.
 |---|---|
 | **Today's question** | leaves the post for today's Daily. Not a room |
 | Ask a question | write one for the subreddit and post it |
-| Your record | streak, best, points, coins, questions answered, read rate, and whether other players see your blob |
+| Your record | streak, best, points, coins, what you last earned, questions answered, read rate, and whether other players see your blob |
 | Wardrobe | your blob, your balance, the items you own, and the gift box |
 | Leaderboard | who has banked the most points, weekly or all time |
 
@@ -595,6 +678,25 @@ streak and the points, and `--sun` marks the streak alone; a third counter up th
 be a third thing to read before the question, and a third meaning of colour if it were
 ever accented. The two places coins appear are the two screens where they are relevant —
 the page of totals, and the room where they are spent.
+
+**Your record is also where a payout is explained.** One block under the figures lists the
+last few coin events in the words of what you did — `8 upvotes on your comment`, not a
+constant — and it is a *block* rather than a well, which is the one deliberate exception
+to the rule that a banked number sits in a well: everything else on that page is a total
+the player already knew, and this is the page telling them something they did not. When
+it is empty it renders the ways to earn instead, because a new player's ledger has nothing
+in it and an empty box is a worse first impression than no box. Both tables read their
+numbers from `shared/config.ts`, so neither can drift from what the game actually pays.
+
+An orange dot on the **Your record** row of the menu, and on the reveal's **Menu** button,
+says something has been paid since the ledger was last opened. It is `stats.unseenEarnings`,
+derived from two counters on the user hash inside a read every screen was already making —
+so the dot costs no round trip anywhere, and opening the record is what puts it out.
+
+**The incentive is stated before the action, not only after it.** The comment's foot row
+reads `+5 coins` where it used to say what the button underneath it says; the ask room's
+fine print says what posting pays and what promotion pays on top. Neither is a new screen
+or a new row.
 
 The wardrobe is the one room built to a height budget. A balance, a blob, two steppers and
 the gift box have to fit the card without scrolling at 512px — as short as Devvit's inline

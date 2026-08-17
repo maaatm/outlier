@@ -1,6 +1,7 @@
 /** Wire types shared by the client and the server. */
 
 import type { BadgeId } from './badges.js';
+import type { Earning } from './earnings.js';
 import type { Equipped } from './items.js';
 import type { Award } from './points.js';
 
@@ -107,6 +108,16 @@ export type Reveal = {
    * it. See `showBlob` on the user hash.
    */
   blobNotice: boolean;
+  /**
+   * Offer them the subreddit, and the free box that comes with it.
+   *
+   * Gated on `JOIN_OFFER_MIN_PLAYS` rather than firing on a first reveal: a
+   * player who has answered twice has shown up on purpose, and one who is on
+   * their first is still working out what the game is. It rides beside
+   * `blobNotice` and is deliberately not on the same slide — two first-run
+   * interruptions on one screen means both are dismissed unread.
+   */
+  joinOffer: boolean;
 };
 
 /** The two counters in the header, plus what the menu reads off them. */
@@ -131,6 +142,15 @@ export type PlayerStats = {
   totalHits: number;
   /** True once today's vote is in, so the streak tile can go live. */
   extendedToday: boolean;
+  /**
+   * Something has been paid since this player last opened their record.
+   *
+   * A boolean rather than a count: the marker is a dot, and a dot does not need
+   * a number. It is derived from two fields on the user hash, so `projectStats`
+   * answers it out of the `hGetAll` it was already making — the dot costs no
+   * read on the vote path, the state path, or anywhere else.
+   */
+  unseenEarnings: boolean;
 };
 
 /**
@@ -215,6 +235,43 @@ export type CommentRequest = {
 export type CommentResponse = {
   ok: true;
   permalink: string;
+  /**
+   * What posting it paid, which is `COINS_COMMENT` or nothing at all.
+   *
+   * Zero is reachable: a comment posted a second time is refused before it
+   * reaches the payment, and the client renders the receipt without it. Both
+   * this and the balance ride on the response so the share slide can say what
+   * happened without a second fetch.
+   */
+  earned: number;
+  /** The balance afterwards. */
+  coins: number;
+};
+
+/**
+ * `GET /api/earnings` — the last few coin events, and what they add up to.
+ *
+ * Its own fetch rather than a field on `/api/state`: only the record room reads
+ * it, and every other screen would be paying a zset read for something nobody
+ * has opened. Reading it is also what marks it seen — see the route.
+ */
+export type EarningsResponse = {
+  /** Newest first, at most `EARNINGS_LOG_SIZE`. */
+  entries: Earning[];
+  /** The balance, so the room agrees with itself without a second read. */
+  coins: number;
+};
+
+/**
+ * `POST /api/join` — subscribe, and take the free box that comes with it.
+ *
+ * `granted` is false on the decline, and on a second tap by somebody who has
+ * already claimed: the subscription is idempotent and the grant is not.
+ */
+export type JoinResponse = {
+  joined: boolean;
+  granted: boolean;
+  freeRolls: number;
 };
 
 export type SubmitQuestionRequest = {
@@ -361,6 +418,14 @@ export type AvatarResponse = Equipped & {
    * note on `showBlob` in `server/core/keys.ts`.
    */
   showBlob: boolean;
+  /** Boxes owed that cost nothing. Spent before coins are. */
+  freeRolls: number;
+  /**
+   * The join grant has been taken. False while it is still on offer — which is
+   * what keeps the row in Your record for somebody who declined the reveal's
+   * version of it.
+   */
+  joined: boolean;
 };
 
 /**
@@ -386,10 +451,14 @@ export type BoxResponse = {
   item: string;
   /** Already owned. The refund is what happened instead of a new item. */
   duplicate: boolean;
-  /** Coins paid back for a duplicate, or 0. */
+  /** Coins paid back for a duplicate, or 0. A free roll never refunds. */
   refunded: number;
   /** The balance after the box was paid for and any refund applied. */
   coins: number;
+  /** Opened with a free roll, so the balance did not move. */
+  free: boolean;
+  /** Free rolls left. What the *next* tap will cost. */
+  freeRolls: number;
 };
 
 export type ApiError = {

@@ -26,7 +26,7 @@
     "reddit": {
       "enable": true,
       "scope": "moderator",
-      "asUser": ["SUBMIT_COMMENT", "SUBMIT_POST"]
+      "asUser": ["SUBMIT_COMMENT", "SUBMIT_POST", "SUBSCRIBE_TO_SUBREDDIT"]
     }
   },
 
@@ -95,6 +95,10 @@
       },
       "refresh-queue": {
         "endpoint": "/internal/tasks/refresh-queue",
+        "cron": "0 * * * *"
+      },
+      "sweep-comments": {
+        "endpoint": "/internal/tasks/sweep-comments",
         "cron": "0 * * * *"
       }
     }
