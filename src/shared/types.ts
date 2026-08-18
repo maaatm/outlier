@@ -109,6 +109,12 @@ export type Reveal = {
    */
   blobNotice: boolean;
   /**
+   * Ask this player, once, whether they want to be told when the next Daily
+   * goes up. Never true on the same reveal as `blobNotice` — see
+   * `shouldAskForPush`.
+   */
+  pushNotice: boolean;
+  /**
    * Offer them the subreddit, and the free box that comes with it.
    *
    * Gated on `JOIN_OFFER_MIN_PLAYS` rather than firing on a first reveal: a
@@ -422,6 +428,22 @@ export type AvatarResponse = Equipped & {
   showBlob: boolean;
   /** Boxes owed that cost nothing. Spent before coins are, and priced as free. */
   freeRolls: number;
+  /**
+   * Whether this player has said yes to push notifications, and whether the
+   * feature can be offered at all.
+   *
+   * Here for the same reason `showBlob` is here and not on a settings
+   * endpoint of its own: Your record is where a player reads and changes the
+   * things that are true of them, this response is what that room already
+   * waits for, and a third endpoint would be a third thing to keep in step.
+   *
+   * It costs the wardrobe one plugin call it has no use for, which is the
+   * price of not splitting the settings across two shapes. If the wardrobe
+   * ever gets slow, that call is the first thing to look at.
+   */
+  push: boolean;
+  /** False when the feature is off or the plugin did not answer. The switch does not render. */
+  pushAvailable: boolean;
 };
 
 /**
@@ -430,9 +452,11 @@ export type AvatarResponse = Equipped & {
  * The pair comes from the wardrobe, which knows what is equipped. `showBlob`
  * comes from the reveal's first-run notice, which does not — and making it go
  * and find out, so that it could send a pair back unchanged, would be a round
- * trip spent to say nothing. A request carrying neither is refused.
+ * trip spent to say nothing. `push` is the third caller and the same shape
+ * again: the reveal's push ask sends it alone, and Your record sends it alone
+ * from the other switch. A request carrying none of the three is refused.
  */
-export type AvatarRequest = Partial<Equipped> & { showBlob?: boolean };
+export type AvatarRequest = Partial<Equipped> & { showBlob?: boolean; push?: boolean };
 
 /**
  * `POST /api/box/open` — what one box gave you.

@@ -71,6 +71,7 @@ import {
   fetchEarnings,
   openBox,
   saveAvatar,
+  savePush,
   saveShowBlob,
   submitQuestion,
 } from '../api.js';
@@ -188,7 +189,7 @@ export function Menu({
    */
   const [balance, setBalance] = useState(stats.coins);
 
-  const { avatar, equip, absorb, show } = useAvatar(
+  const { avatar, equip, absorb, show, push } = useAvatar(
     panel === 'record' || panel === 'wardrobe',
     setBalance
   );
@@ -236,6 +237,7 @@ export function Menu({
             coins={balance}
             unseen={stats.unseenEarnings && !ledgerOpened}
             onShow={show}
+            onPush={push}
             onOpenLedger={() => setLedger(true)}
           />
         )}
@@ -311,6 +313,7 @@ function useAvatar(
   equip: (next: Equipped) => void;
   absorb: (box: BoxResponse) => void;
   show: (showBlob: boolean) => void;
+  push: (next: boolean) => void;
 } {
   const [avatar, setAvatar] = useState<AvatarResponse | null>(null);
 
@@ -399,7 +402,33 @@ function useAvatar(
     });
   }
 
-  return { avatar, equip, absorb, show };
+  /**
+   * Be told when the next Daily is up, or stop being told.
+   *
+   * Written exactly like `show` above — its own optimistic write, not folded
+   * into the coalescing one — with one difference that matters. `savePush` can
+   * resolve *successfully* carrying `push: false` after being asked for `true`,
+   * because Reddit owns the opt-in ledger and can refuse where nothing else in
+   * this app can. So the answer is reconciled against the response rather than
+   * only caught: a refusal is a resolved promise, and a handler that only
+   * catches would leave the switch showing a choice the player did not get.
+   */
+  function push(next: boolean): void {
+    setAvatar((current) => (current ? { ...current, push: next } : current));
+    savePush(next)
+      .then((response) => {
+        setAvatar((current) =>
+          current
+            ? { ...current, push: response.push, pushAvailable: response.pushAvailable }
+            : current
+        );
+      })
+      .catch(() => {
+        setAvatar((current) => (current ? { ...current, push: !next } : current));
+      });
+  }
+
+  return { avatar, equip, absorb, show, push };
 }
 
 /**
@@ -574,6 +603,7 @@ function Record({
   coins,
   unseen,
   onShow,
+  onPush,
   onOpenLedger,
 }: {
   stats: PlayerStats;
@@ -583,6 +613,7 @@ function Record({
   /** Something has been paid since the ledger was last opened. */
   unseen: boolean;
   onShow: (showBlob: boolean) => void;
+  onPush: (push: boolean) => void;
   onOpenLedger: () => void;
 }): React.JSX.Element {
   const rate =
@@ -607,6 +638,9 @@ function Record({
         <div className="record__side">
           <span className="record__title">This is you</span>
           {avatar?.canSave && <ShowBlob showBlob={avatar.showBlob} onShow={onShow} />}
+          {avatar?.canSave && avatar.pushAvailable && (
+            <PushSwitch push={avatar.push} onPush={onPush} />
+          )}
         </div>
       </div>
 
@@ -845,6 +879,56 @@ function ShowBlob({
         </span>
         <span className="switch__state" aria-hidden="true">
           {showBlob ? 'on' : 'off'}
+        </span>
+      </button>
+    </>
+  );
+}
+
+/**
+ * Be told when the next Daily goes up.
+ *
+ * The second switch on the page and the same control as the first, which is the
+ * whole reason it is here rather than in a room of its own: this is a setting
+ * about you, on the page about you, next to the only other setting in the game.
+ *
+ * It is the opposite of `ShowBlob` in one respect and the copy has to carry it.
+ * That one ships on and tells you so; this one ships off and stays off until it
+ * is pressed, because a crowd cameo is a drawing inside an app somebody already
+ * opened and this is the app reaching a phone in somebody's pocket. Absent
+ * consent is no.
+ *
+ * It renders only when the plugin answered — see `pushAvailable`. A switch for
+ * something that cannot be turned on is worse than no switch.
+ */
+function PushSwitch({
+  push,
+  onPush,
+}: {
+  push: boolean;
+  onPush: (push: boolean) => void;
+}): React.JSX.Element {
+  return (
+    <>
+      {/* A promise the code has to keep. If a second trigger is ever added,
+          this line changes in the same commit or the line is a lie. */}
+      <span className="record__note">
+        We&rsquo;ll send one notification a day, when the new question goes up. Nothing else,
+        and you can switch it off here.
+      </span>
+      <button
+        type="button"
+        className="switch"
+        role="switch"
+        aria-checked={push}
+        aria-label="Tell me when the new question is up"
+        onClick={() => onPush(!push)}
+      >
+        <span className="switch__track" aria-hidden="true">
+          <span className="switch__knob" />
+        </span>
+        <span className="switch__state" aria-hidden="true">
+          {push ? 'on' : 'off'}
         </span>
       </button>
     </>

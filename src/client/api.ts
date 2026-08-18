@@ -135,6 +135,27 @@ export function saveShowBlob(showBlob: boolean): Promise<AvatarResponse> {
 }
 
 /**
+ * Say yes or no to being told when the next Daily goes up.
+ *
+ * The same endpoint again, and a third function rather than a third argument to
+ * one of the others for the reason `saveShowBlob` is separate from `saveAvatar`:
+ * its two callers — the reveal's one-time ask and the switch in Your record —
+ * know about this and nothing else, and a shared call site would mean each of
+ * them sending back a stale opinion about the other's setting.
+ *
+ * What comes back is the state to render, and it is not necessarily what was
+ * asked for. Reddit owns the opt-in ledger and can refuse, so a resolved promise
+ * carrying `push: false` after asking for `true` is a refusal rather than a
+ * success — the caller reconciles against the response instead of only catching.
+ */
+export function savePush(push: boolean): Promise<AvatarResponse> {
+  return request<AvatarResponse>('/api/avatar', {
+    method: 'POST',
+    body: JSON.stringify({ push }),
+  });
+}
+
+/**
  * Open a gift box.
  *
  * No arguments, because there is nothing about this the client gets to decide:

@@ -12,12 +12,16 @@ assuming the previous prompt is still in the window.
 | 04 | [Coins and gift boxes](04-coins-and-gift-boxes.md) | 03 | large |
 | 05 | [Crowd cameos](05-crowd-cameos.md) | 03, 04 | medium |
 | 06 | [Ask a question](06-ask-a-question.md) | 01 | medium |
+| 07 | [Push notifications, opt-in](07-push-notifications.md) | 01, 03 | medium |
 
 Run them in order. 01 and 02 are independently shippable and touch nothing the others
 need. 03 is the point at which a player can see a blob at all; 04 is what makes acquiring
 one a loop; 05 is last on purpose, because it is the only one that touches the reveal.
 06 depends on 01 for the menu it adds a room to, and it is the first prompt that gives a
-player a control that writes to the subreddit.
+player a control that writes to the subreddit. 07 is last and is the only one that reaches
+a player who is not looking at the app; it depends on 03 for the `showBlob` switch and
+first-run notice it is modelled on, and it is the only prompt built on a plugin its own
+README calls experimental.
 
 ---
 
@@ -135,6 +139,27 @@ sitting is a normal thing to do and the day is the boundary the rest of the game
 turns on. The fingerprint dedupe 04 introduced stays: it guards a retried timeout, not a
 rate, and the two are not the same guard. `COIN_ELIGIBLE_SUBMISSIONS_PER_DAY` also stays,
 still `Infinity`, still capping only the reward.
+
+**Prompt 07's step 0 could not be run where the code was written, and two things follow.**
+The probe is a `devvit playtest` against `playoutlier_dev`, which needs Reddit auth the
+implementing session did not have. It is preserved as its own commit rather than run —
+check that commit out, fire the menu item, read the log — and the rest of the prompt was
+built on the assumption that it comes back clean. Consequently:
+
+- **`PUSH_ENABLED` ships `true`, unverified.** If the probe throws, that constant is the
+  whole rollback: one line, and the switch stops rendering, the ask stops firing and
+  nothing is enqueued.
+- **Step 7, the game badge, is not implemented.** Its own instruction was not to guess,
+  and whether `requestShowGameBadge` is app-wide or scoped to a user context is not
+  established by its type — only the probe could settle it. It is not shipped behind a
+  flag either, for the reason the prompt gives: a flag nobody comes back to resolve.
+
+**07's send also lands on the moderator menu item, not only the task.** The prompt's file
+table names `routes/tasks.ts` alone, but its own verification steps run **Outlier: post
+today's Daily now**, which is `routes/menu.ts` — as written, the two checks that matter
+most would have exercised a path that notifies nobody. The tail is on both. Both are the
+same act, one by cron and one by hand. `/internal/triggers/install` is still deliberately
+without it.
 
 ---
 

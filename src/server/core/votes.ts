@@ -25,10 +25,12 @@ import {
   HISTOGRAM_BUCKETS,
   JOIN_OFFER_MIN_PLAYS,
   PROVISIONAL_VOTE_FLOOR,
+  PUSH_ENABLED,
   RECENT_VOTER_CAP,
   REPLAY_MODE,
 } from '../../shared/config.js';
 import { awardFor } from '../../shared/points.js';
+import { shouldAskForPush } from '../../shared/push.js';
 import { scoreVote } from '../../shared/scoring.js';
 import type { Choice, PlayerStats, Reveal, Tally } from '../../shared/types.js';
 import { type StoredVote, decodeVote, encodeVote } from '../../shared/vote.js';
@@ -36,6 +38,7 @@ import { readBlobVisibility } from './avatars.js';
 import { readCameos } from './cameos.js';
 import { readJoinState } from './join.js';
 import { keys, voteFields } from './keys.js';
+import { readPushState } from './push.js';
 import { type QuestionRecord, toPublicQuestion } from './questions.js';
 
 export type { StoredVote };
@@ -96,13 +99,17 @@ export async function buildReveal(
   userId: string,
   stats: PlayerStats
 ): Promise<Reveal> {
-  const [tally, histogram, commented, cameos, visibility, join] = await Promise.all([
+  const [tally, histogram, commented, cameos, visibility, join, push] = await Promise.all([
     readTally(question.id),
     readHistogram(question.id),
     hasCommented(question.id, userId),
     readCameos(question.id, userId),
     readBlobVisibility(userId),
     readJoinState(userId),
+    // One more read in the wave rather than a round trip after it. The push ask
+    // needs to know both what Reddit's ledger says and whether we have asked
+    // before, and this screen is where the asking happens.
+    readPushState(userId),
   ]);
 
   const score = scoreVote(tally, vote.choice, vote.guess);
@@ -131,12 +138,27 @@ export async function buildReveal(
     // screen this belongs on, and it is this one — they voted, so they are in
     // the window already. Anything later would be telling them after the fact.
     blobNotice: !visibility.told,
+    pushNotice: false,
     // The same shape and the same gate, one screen further in: never offered
     // and never declined, and enough reveals behind them to have decided they
     // are playing. `totalPlayed` counts this vote, because `recordPlay` ran
     // before the reveal was built.
     joinOffer: !join.answered && stats.totalPlayed >= JOIN_OFFER_MIN_PLAYS,
   };
+
+  /*
+   * Settled after the object rather than inside it, because one of its gates is
+   * `blobNotice` — the two notices are one slot, and the blob's claim on it is
+   * older. Everything else about it is a fact the wave above already fetched.
+   */
+  reveal.pushNotice = shouldAskForPush({
+    enabled: PUSH_ENABLED,
+    available: push.available,
+    optedIn: push.optedIn,
+    asked: push.asked,
+    blobNotice: reveal.blobNotice,
+    streak: stats.streak,
+  });
 
   // Generated last: the comment quotes the numbers above it.
   reveal.commentPreview = buildComment(toPublicQuestion(question), reveal);

@@ -68,13 +68,6 @@
         "endpoint": "/internal/menu/post-leaderboard"
       },
       {
-        "label": "Outlier: push probe (temporary)",
-        "description": "Find out whether the experimental notifications plugin answers this app",
-        "location": "subreddit",
-        "forUserType": "moderator",
-        "endpoint": "/internal/menu/push-probe"
-      },
-      {
         "label": "Outlier: grant coins",
         "description": "Put coins in an account for testing the wardrobe",
         "location": "subreddit",

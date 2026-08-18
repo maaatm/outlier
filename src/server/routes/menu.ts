@@ -3,7 +3,7 @@
  * what to do next — usually open a form, sometimes just show a toast.
  */
 
-import { context, notifications, reddit } from '@devvit/web/server';
+import { context, reddit } from '@devvit/web/server';
 import type { UiResponse } from '@devvit/web/shared';
 import { Hono } from 'hono';
 
@@ -18,6 +18,7 @@ import { SUBMISSION_GUIDANCE } from '../../shared/validate.js';
 import { currentSubredditName, postDaily } from '../core/daily.js';
 import { pinMenuPost } from '../core/menuPost.js';
 import { isModerator } from '../core/mod.js';
+import { broadcastDaily, notifyPromotedAuthor } from '../core/push.js';
 import { listPending } from '../core/queue.js';
 import { misjudgedLeaderboard, renderLeaderboardPost } from '../core/stats.js';
 import { remainingSubmissions } from '../core/submit.js';
@@ -152,6 +153,15 @@ menuRoutes.post('/internal/menu/post-daily-now', async (c) => {
     return c.json<UiResponse>({ showToast: `Today's Daily is already up (${result.day}).` });
   }
 
+  // The same tail the scheduler's run has, because this *is* that run, fired by
+  // hand rather than by cron — a Daily posted from here is the one the
+  // subreddit gets today, and nobody would be told about it otherwise. The
+  // install trigger deliberately does not get this: a fresh install has nobody
+  // opted in, and a broadcast about a post nobody was waiting for is a worse
+  // introduction than silence.
+  await notifyPromotedAuthor(result.promotedAuthorId, result.postId, result.questionText);
+  await broadcastDaily(result.postId, result.questionText, result.promotedAuthorId || undefined);
+
   return c.json<UiResponse>({
     navigateTo: `https://reddit.com/comments/${result.postId.replace(/^t3_/, '')}`,
     showToast: { text: 'Daily posted.', appearance: 'success' },
@@ -227,41 +237,6 @@ menuRoutes.post('/internal/menu/grant-coins', async (c) => {
       },
     },
   });
-});
-
-/**
- * TEMPORARY — the step-0 probe from `docs/prompts/07-push-notifications.md`.
- *
- * `@devvit/notifications` ships marked experimental, and an experimental plugin
- * may simply not be switched on for this app. This asks it two questions that
- * change nothing — is there a badge, and is there anybody opted in — and reports
- * what came back. The only answer it is looking for is whether the call returns
- * or throws.
- *
- * Delete this handler and its menu item once the answer is in the logs. It is a
- * probe, not a feature.
- */
-menuRoutes.post('/internal/menu/push-probe', async (c) => {
-  if (!(await isModerator())) {
-    return c.json<UiResponse>({ showToast: 'Moderators only.' });
-  }
-
-  try {
-    const badge = await notifications.getGameBadgeStatus();
-    const optedIn = await notifications.listOptedInUsers({ limit: 1 });
-    console.log(
-      `push-probe: badge=${JSON.stringify(badge)} optedIn=${JSON.stringify(optedIn)}`
-    );
-    return c.json<UiResponse>({
-      showToast: `Plugin answered. Badge: ${badge.hasActiveBadge}. Opted in: ${optedIn.userIds.length}.`,
-    });
-  } catch (error) {
-    // The whole point of the probe. Logged in full, because the message is what
-    // decides whether `PUSH_ENABLED` ships true or false.
-    console.error('push-probe: the notifications plugin threw', error);
-    const reason = error instanceof Error ? error.message : String(error);
-    return c.json<UiResponse>({ showToast: `Plugin threw: ${reason}` });
-  }
 });
 
 /** "Post the misjudged leaderboard" — the recurring event post. */

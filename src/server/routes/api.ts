@@ -53,6 +53,7 @@ import { logEarning, markEarningsSeen, readEarnings } from '../core/earnings.js'
 import { claimJoin, declineJoin, readJoinState } from '../core/join.js';
 import { readPlayerBoard } from '../core/leaderboard.js';
 import { isMenuPost } from '../core/menuPost.js';
+import { readPushState, setPushOptIn } from '../core/push.js';
 import {
   type QuestionRecord,
   getQuestion,
@@ -365,15 +366,24 @@ api.get('/api/avatar', async (c) => {
       showBlob: true,
       // Nothing to spend without an account to hold it.
       freeRolls: 0,
+      // Nobody to reach and nobody to ask. The switch does not render on a
+      // response that cannot be saved anyway, but the fields are here because
+      // the shape is one shape.
+      push: false,
+      pushAvailable: false,
     });
   }
 
-  const [equipped, owned, coins, visibility, join] = await Promise.all([
+  const [equipped, owned, coins, visibility, join, push] = await Promise.all([
     readAvatar(userId),
     readInventory(userId),
     readCoins(userId),
     readBlobVisibility(userId),
     readJoinState(userId),
+    // Read from Reddit every time rather than cached anywhere, which is the
+    // whole reason the switch can be trusted: a player who turned this off in
+    // Reddit's own settings sees it off here on the next open.
+    readPushState(userId),
   ]);
   return c.json<AvatarResponse>({
     ...equipped,
@@ -382,6 +392,8 @@ api.get('/api/avatar', async (c) => {
     canSave: true,
     showBlob: visibility.showBlob,
     freeRolls: join.freeRolls,
+    push: push.optedIn,
+    pushAvailable: push.available,
   });
 });
 
@@ -414,14 +426,15 @@ api.post('/api/avatar', async (c) => {
 
   // Destructured so the type narrowing below survives: a check on `body.face`
   // does not travel, a check on a const does.
-  const { face: faceId, accessory: accessoryId, showBlob } = body;
+  const { face: faceId, accessory: accessoryId, showBlob, push } = body;
   const wantsPair = faceId !== undefined || accessoryId !== undefined;
   const wantsVisibility = typeof showBlob === 'boolean';
+  const wantsPush = typeof push === 'boolean';
 
   // Half a pair is not a request to change one layer — the wardrobe always
   // sends both — and a request asking for nothing at all is a client that has
   // gone wrong rather than one being economical.
-  if (!wantsPair && !wantsVisibility) {
+  if (!wantsPair && !wantsVisibility && !wantsPush) {
     return c.json<ApiError>({ error: 'Malformed request.' }, 400);
   }
   if (wantsPair && (typeof faceId !== 'string' || typeof accessoryId !== 'string')) {
@@ -437,12 +450,13 @@ api.post('/api/avatar', async (c) => {
   // One wave, whichever half of the request arrived: the response says what the
   // player is wearing, owns, can spend and has chosen, and three of those four
   // are unchanged by either write.
-  const [worn, owned, coins, visibility, join] = await Promise.all([
+  const [worn, owned, coins, visibility, join, pushState] = await Promise.all([
     readAvatar(userId),
     readInventory(userId),
     readCoins(userId),
     readBlobVisibility(userId),
     readJoinState(userId),
+    readPushState(userId),
   ]);
 
   if (face && accessory && (!ownsItem(owned, face) || !ownsItem(owned, accessory))) {
@@ -451,9 +465,10 @@ api.post('/api/avatar', async (c) => {
 
   const equipped: Equipped = face && accessory ? { face: face.id, accessory: accessory.id } : worn;
 
-  await Promise.all([
+  const [, , pushed] = await Promise.all([
     face && accessory ? equipAvatar(userId, equipped) : undefined,
     wantsVisibility ? setShowBlob(userId, showBlob) : undefined,
+    wantsPush ? setPushOptIn(userId, push) : undefined,
   ]);
 
   return c.json<AvatarResponse>({
@@ -464,6 +479,15 @@ api.post('/api/avatar', async (c) => {
     // What was asked for, not a re-read of what was just written.
     showBlob: wantsVisibility ? showBlob : visibility.showBlob,
     freeRolls: join.freeRolls,
+    /*
+     * And here, the opposite: what the write *answered with*, not what was
+     * asked for. This is the one setting in the app whose write can be refused
+     * by something other than us — Reddit holds the opt-in ledger and an
+     * experimental plugin may decline or fail — so echoing the request back
+     * would be a switch that shows a choice the player did not get.
+     */
+    push: pushed ? pushed.optedIn : pushState.optedIn,
+    pushAvailable: pushed ? pushed.available : pushState.available,
   });
 });
 

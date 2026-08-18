@@ -1309,6 +1309,47 @@ button {
 }
 
 /*
+ * The push ask, in the same slot on the same slide as the blob notice.
+ *
+ * A fork of `.blob-notice` rather than a modifier on it, because the control is
+ * a different control: that one has an X in the corner, which is why it carries
+ * 44px of right padding it does not otherwise need, and this one has two
+ * answers on a row. Same block, same size, same copy weight — what differs is
+ * underneath.
+ *
+ * Both answers are the same button, and that is the point rather than an
+ * oversight. Weighting one of them would be the app expressing a preference
+ * about whether it gets to reach somebody's phone, and colouring one would
+ * spend an accent on it — `--signal` is you, and it is not "yes".
+ */
+.push-notice {
+  margin-top: 12px;
+  padding: 12px 14px;
+  flex: none;
+}
+
+.push-notice__copy {
+  margin: 0;
+  font-weight: 500;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ink-body-cream);
+}
+
+.push-notice__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.push-notice__answer {
+  flex: 1;
+  padding: 10px;
+  font-size: 14px;
+  border-radius: 9px;
+}
+
+/*
  * The join offer, under the award on the score slide.
  *
  * It inherits the award's own idiom — a block, because something is being
@@ -2094,6 +2135,18 @@ button {
   outline: 3px solid var(--ink);
   outline-offset: 3px;
   border-radius: var(--r-well);
+}
+
+/*
+ * Two settings stacked, told apart by the gap between them.
+ *
+ * A note following a switch is the start of the next setting rather than more
+ * of the last one, and at the note's own 3px it reads as a caption under the
+ * knob. One sibling selector rather than a modifier class, because nothing
+ * about either switch changes — only the distance between two of them.
+ */
+.switch + .record__note {
+  margin-top: 14px;
 }
 
 /*

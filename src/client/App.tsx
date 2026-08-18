@@ -12,7 +12,7 @@ import { CROWD_SIZE } from '../shared/config.js';
 import type { Equipped } from '../shared/items.js';
 import { getBand, type Award } from '../shared/points.js';
 import type { Choice, Question, QuestionState, Reveal, StateResponse } from '../shared/types.js';
-import { ApiFailure, castVote, fetchState, joinSubreddit, saveShowBlob } from './api.js';
+import { ApiFailure, castVote, fetchState, joinSubreddit, savePush, saveShowBlob } from './api.js';
 import { Blob } from './components/Blob.js';
 import { Compose } from './components/Compose.js';
 import { Cross } from './components/Cross.js';
@@ -126,6 +126,15 @@ export function App(): React.JSX.Element {
           state: { ...state, reveal: { ...state.reveal, blobNotice: false } },
         });
       }}
+      // The push ask, answered. Same reason it is held here as the notice above
+      // it: the two share one slot on one slide, and neither may come back.
+      onPushAnswered={() => {
+        if (!state.reveal) return;
+        setPhase({
+          name: 'ready',
+          state: { ...state, reveal: { ...state.reveal, pushNotice: false } },
+        });
+      }}
       // Held here for the same reason, and it matters more: the offer sits on a
       // slide the player can walk back to, and an offer that returns after it
       // has been answered is one that was not answered.
@@ -156,6 +165,7 @@ function Game({
   onOpenMenu,
   onReveal,
   onBlobNoticed,
+  onPushAnswered,
   onJoinAnswered,
   onPaid,
 }: {
@@ -167,6 +177,7 @@ function Game({
   onOpenMenu: () => void;
   onReveal: (reveal: Reveal) => void;
   onBlobNoticed: () => void;
+  onPushAnswered: () => void;
   onJoinAnswered: () => void;
   onPaid: (coins: number) => void;
 }): React.JSX.Element {
@@ -191,6 +202,7 @@ function Game({
           onSlide={onSlide}
           onOpenMenu={onOpenMenu}
           onBlobNoticed={onBlobNoticed}
+          onPushAnswered={onPushAnswered}
           onJoinAnswered={onJoinAnswered}
           onPaid={onPaid}
         />
@@ -542,6 +554,7 @@ function RevealView({
   onSlide,
   onOpenMenu,
   onBlobNoticed,
+  onPushAnswered,
   onJoinAnswered,
   onPaid,
 }: {
@@ -553,6 +566,7 @@ function RevealView({
   onSlide: (slide: number) => void;
   onOpenMenu: () => void;
   onBlobNoticed: () => void;
+  onPushAnswered: () => void;
   onJoinAnswered: () => void;
   onPaid: (coins: number) => void;
 }): React.JSX.Element {
@@ -623,6 +637,9 @@ function RevealView({
           </div>
 
           {reveal.blobNotice && <BlobNotice onAnswered={onBlobNoticed} />}
+          {/* The same slot as the notice above, and never at the same time as
+              it — `shouldAskForPush` is what guarantees that, on the server. */}
+          {reveal.pushNotice && <PushNotice onAnswered={onPushAnswered} />}
         </div>
       )}
 
@@ -782,6 +799,79 @@ function BlobNotice({ onAnswered }: { onAnswered: () => void }): React.JSX.Eleme
       </button>
       {failed && (
         <p className="notice notice--quiet notice--cream">That did not save. We will ask again.</p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The one time this game asks to reach somebody who is not looking at it.
+ *
+ * A fork of `BlobNotice` rather than a variant of it, because the control is a
+ * different control. That notice has an X: the default is on, closing it is
+ * accepting the default, and the close *is* the write. This one has no default
+ * to accept — off is the default and it is not negotiable — so it has two
+ * answers and **neither of them is the quiet one**. Both write, because a
+ * dismissal that records nothing is a notice that fires again tomorrow.
+ *
+ * No colour on either button. The two-accents rule is not suspended for a
+ * consent panel, and `--signal` is you — it is not "yes".
+ *
+ * It never appears on the same reveal as the blob notice, which is decided on
+ * the server by `shouldAskForPush` rather than here: two consent questions on
+ * one screen reads as a permissions wizard and both get dismissed unread.
+ */
+function PushNotice({ onAnswered }: { onAnswered: () => void }): React.JSX.Element {
+  const [working, setWorking] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  async function answer(next: boolean): Promise<void> {
+    setWorking(true);
+    setFailed(false);
+    try {
+      const response = await savePush(next);
+      // A resolved promise is not yet a yes. Reddit owns the opt-in ledger and
+      // can refuse, and a refusal comes back as a successful response carrying
+      // the answer that did *not* change — so the response is what settles
+      // this, not the fact that nothing threw.
+      if (response.push !== next) {
+        setFailed(true);
+        setWorking(false);
+        return;
+      }
+      onAnswered();
+    } catch {
+      setFailed(true);
+      setWorking(false);
+    }
+  }
+
+  return (
+    <div className="push-notice block block--cream block--sm" role="status">
+      <p className="push-notice__copy">
+        Want to be told when the next question goes up? One notification a day, nothing
+        else, and you can switch it off in Your record.
+      </p>
+      <div className="push-notice__actions">
+        <button
+          type="button"
+          className="button block block--cream block--sm push-notice__answer"
+          disabled={working}
+          onClick={() => void answer(true)}
+        >
+          Notify me
+        </button>
+        <button
+          type="button"
+          className="button block block--cream block--sm push-notice__answer"
+          disabled={working}
+          onClick={() => void answer(false)}
+        >
+          No thanks
+        </button>
+      </div>
+      {failed && (
+        <p className="notice notice--quiet notice--cream">That did not go through. Try again.</p>
       )}
     </div>
   );
