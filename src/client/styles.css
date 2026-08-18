@@ -2053,19 +2053,49 @@ button {
 }
 
 /*
+ * The two settings, side by side rather than one under the other.
+ *
+ * Stacked, they made this card 325px of a 740px screen: two captions and two
+ * knobs in a single 180px column, with the drawing the card is named for
+ * stranded in the middle of it. Side by side they cost one caption's height
+ * instead of two, which puts the card back under the counter's own — 159px,
+ * where the slot alone is 156px. The settings are, in effect, free.
+ *
+ * `flex-wrap` with a basis of 78px is the whole responsive rule, and 78px is
+ * not a guess: it is what a knob and the word beside it measure. Two of them
+ * and a gap need 168px, so above that they sit in a row, and in a column
+ * narrower than that they fall back to stacked rather than clipping. There is
+ * no breakpoint here because the thing that decides is the width of the
+ * control, which the control already knows.
+ */
+.record__settings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px 12px;
+  margin-top: 7px;
+}
+
+.setting {
+  display: flex;
+  flex-direction: column;
+  /* Grow to share the row evenly, and wrap below the width of one switch. */
+  flex: 1 1 78px;
+  min-width: 0;
+}
+
+/*
  * A caption on a control, and sized to stay one.
  *
- * It was a paragraph while there was one setting here and the column had the
- * counter's whole height to spend. There are two now, and two paragraphs made
- * this card 325px on a 740px screen — half the room, to say a thing the reveal
- * has already said once. So each is a line and a half that carries the fact
- * that could not be got anywhere else: that the crowd setting reaches backwards,
- * and how often the other one fires. The long version of both lives where the
- * consent is actually given, in the first-run notices on the reveal.
+ * Each was a paragraph while there was one setting here and the column had the
+ * counter's whole height to spend. In a half-width column a sentence is four
+ * ragged lines, so what is left is the fact that could not be got from the
+ * switch itself: that the crowd setting reaches backwards, and how often the
+ * other one fires. The long version of both lives where the consent is actually
+ * given, in the first-run notices on the reveal — and the whole of each is in
+ * the `aria-label`, which is read without the heading or the drawing beside it.
  */
-.record__note {
+.setting__label {
   display: block;
-  margin: 2px 0 0;
   font-weight: 500;
   font-size: 11.5px;
   line-height: 1.4;
@@ -2108,10 +2138,11 @@ button {
   display: flex;
   align-items: center;
   gap: 10px;
-  /* Close to the line above it, which is its label — the gap that separates
-     one setting from the next is `.switch + .record__note`, and it is bigger
-     than this one on purpose. */
-  margin-top: 6px;
+  /* Pushed to the bottom of its column, so two knobs sit on one line however
+     many lines their labels ran to. The padding is the gap above it — margin
+     would be swallowed by the `auto`. */
+  margin-top: auto;
+  padding-top: 6px;
   padding: 0;
   border: 0;
   background: none;
@@ -2158,19 +2189,6 @@ button {
   outline: 3px solid var(--ink);
   outline-offset: 3px;
   border-radius: var(--r-well);
-}
-
-/*
- * Two settings stacked, told apart by the gap between them.
- *
- * A note following a switch is the start of the next setting rather than more
- * of the last one, so this gap is twice the one above a knob and that ratio is
- * the only thing grouping them. One sibling selector rather than a modifier
- * class, because nothing about either switch changes — only the distance
- * between two of them.
- */
-.switch + .record__note {
-  margin-top: 13px;
 }
 
 /*
@@ -3396,7 +3414,7 @@ button {
     font-size: 19px;
   }
 
-  .record__note {
+  .setting__label {
     font-size: 11px;
     line-height: 1.45;
   }

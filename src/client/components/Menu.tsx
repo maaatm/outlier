@@ -637,9 +637,38 @@ function Record({
         </span>
         <div className="record__side">
           <span className="record__title">This is you</span>
-          {avatar?.canSave && <ShowBlob showBlob={avatar.showBlob} onShow={onShow} />}
-          {avatar?.canSave && avatar.pushAvailable && (
-            <PushSwitch push={avatar.push} onPush={onPush} />
+          {avatar?.canSave && (
+            <div className="record__settings">
+              {/* The one thing about this that cannot be guessed from a switch:
+                  turning it off is retroactive. It is a filter applied every
+                  time a crowd is drawn rather than a flag stamped on a vote, so
+                  switching it off takes the counter out of questions answered
+                  months ago as well as the next one. The rest of the sentence
+                  is on the reveal's first-run notice, which is where the player
+                  is actually told. */}
+              <Setting
+                label={<>In other players&rsquo; crowds, old ones too</>}
+                name="Show my counter to other players"
+                on={avatar.showBlob}
+                onChange={onShow}
+              />
+              {/* Rendered only when the plugin answered — a switch for something
+                  that cannot be turned on is worse than no switch.
+
+                  "One a day" is a promise the code has to keep, and it is made
+                  twice: here, and in `PushNotice` on the reveal, which is the
+                  fuller version because it is where the player says yes. If a
+                  second trigger is ever added, both lines change in the same
+                  commit or both are a lie. */}
+              {avatar.pushAvailable && (
+                <Setting
+                  label="One notification a day"
+                  name="Tell me when the new question is up"
+                  on={avatar.push}
+                  onChange={onPush}
+                />
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -840,102 +869,53 @@ export function UnseenDot(): React.JSX.Element {
 }
 
 /**
- * Whether your counter stands in other people's crowds.
+ * One setting: what it decides, and a switch that says where it stands.
  *
- * One line of plain copy, because the thing it decides is not obvious from the
- * switch and is worth being unambiguous about: turning it off is retroactive.
- * It is a filter applied every time a crowd is drawn rather than a flag stamped
- * on a vote, so switching it off takes the counter out of questions answered
- * months ago as well as the next one.
+ * The two settings in this room are the same control with different words on
+ * it, so this is one component rather than two copies of the switch markup —
+ * which is also what makes them a matched pair standing side by side rather
+ * than two things that happen to look alike.
  *
- * A switch rather than two buttons, because this is a setting being read as
- * often as it is changed, and a setting should show its state without being
- * pressed. The state is written out beside it as well: the knob's position is
- * the signal and the word is the confirmation, and neither is a colour.
+ * A switch rather than two buttons, because a setting is read more often than
+ * it is changed and should show its state without being pressed. The state is
+ * written out beside the knob as well: the knob's position is the signal and
+ * the word is the confirmation, and neither is a colour.
+ *
+ * `label` is the visible words and `name` is what a screen reader is handed.
+ * They differ on purpose — in a column this narrow the visible line has room
+ * for the fact you could not guess, and the spoken one has to name the setting
+ * on its own, with no counter drawn next to it and no heading above it.
  */
-function ShowBlob({
-  showBlob,
-  onShow,
+function Setting({
+  label,
+  name,
+  on,
+  onChange,
 }: {
-  showBlob: boolean;
-  onShow: (showBlob: boolean) => void;
+  label: React.ReactNode;
+  name: string;
+  on: boolean;
+  onChange: (next: boolean) => void;
 }): React.JSX.Element {
   return (
-    <>
-      {/* One line and a half, not the paragraph this was. The full version is
-          on the reveal's first-run notice, which is where the player is
-          actually told; what has to survive here is the half nobody could work
-          out from the switch — that turning it off reaches backwards. */}
-      <span className="record__note">
-        Seen in other players&rsquo; crowds, old questions included.
-      </span>
+    <div className="setting">
+      <span className="setting__label">{label}</span>
       <button
         type="button"
         className="switch"
         role="switch"
-        aria-checked={showBlob}
-        aria-label="Show my counter to other players"
-        onClick={() => onShow(!showBlob)}
+        aria-checked={on}
+        aria-label={name}
+        onClick={() => onChange(!on)}
       >
         <span className="switch__track" aria-hidden="true">
           <span className="switch__knob" />
         </span>
         <span className="switch__state" aria-hidden="true">
-          {showBlob ? 'on' : 'off'}
+          {on ? 'on' : 'off'}
         </span>
       </button>
-    </>
-  );
-}
-
-/**
- * Be told when the next Daily goes up.
- *
- * The second switch on the page and the same control as the first, which is the
- * whole reason it is here rather than in a room of its own: this is a setting
- * about you, on the page about you, next to the only other setting in the game.
- *
- * It is the opposite of `ShowBlob` in one respect and the copy has to carry it.
- * That one ships on and tells you so; this one ships off and stays off until it
- * is pressed, because a crowd cameo is a drawing inside an app somebody already
- * opened and this is the app reaching a phone in somebody's pocket. Absent
- * consent is no.
- *
- * It renders only when the plugin answered — see `pushAvailable`. A switch for
- * something that cannot be turned on is worse than no switch.
- */
-function PushSwitch({
-  push,
-  onPush,
-}: {
-  push: boolean;
-  onPush: (push: boolean) => void;
-}): React.JSX.Element {
-  return (
-    <>
-      {/* A promise the code has to keep, and it is made twice: here, and in
-          `PushNotice` on the reveal, which is the fuller version because it is
-          where the player says yes. If a second trigger is ever added, both
-          lines change in the same commit or both are a lie. */}
-      <span className="record__note">
-        One notification a day, when the new question goes up.
-      </span>
-      <button
-        type="button"
-        className="switch"
-        role="switch"
-        aria-checked={push}
-        aria-label="Tell me when the new question is up"
-        onClick={() => onPush(!push)}
-      >
-        <span className="switch__track" aria-hidden="true">
-          <span className="switch__knob" />
-        </span>
-        <span className="switch__state" aria-hidden="true">
-          {push ? 'on' : 'off'}
-        </span>
-      </button>
-    </>
+    </div>
   );
 }
 
