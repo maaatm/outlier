@@ -23,9 +23,17 @@ type Props = {
   postId: string;
   question: Question;
   reveal: Reveal;
+  /**
+   * The balance after posting, for the counter in the header.
+   *
+   * The receipt below is this slide's business, but the header is not — and it
+   * is on screen while this pays. The response carries the new balance, so
+   * telling the screen above costs nothing but this line.
+   */
+  onPaid: (coins: number) => void;
 };
 
-export function Compose({ postId, question, reveal }: Props): React.JSX.Element {
+export function Compose({ postId, question, reveal, onPaid }: Props): React.JSX.Element {
   const [note, setNote] = useState('');
   const [posting, setPosting] = useState(false);
   const [posted, setPosted] = useState(reveal.commented);
@@ -59,6 +67,7 @@ export function Compose({ postId, question, reveal }: Props): React.JSX.Element 
       });
       setEarned(receipt.earned);
       setPosted(true);
+      onPaid(receipt.coins);
     } catch (failure) {
       if (failure instanceof ApiFailure && failure.status === 409) setPosted(true);
       else setError(failure instanceof Error ? failure.message : 'That did not post.');

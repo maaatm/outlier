@@ -136,6 +136,13 @@ export function App(): React.JSX.Element {
           state: { ...state, reveal: { ...state.reveal, joinOffer: false } },
         });
       }}
+      // The comment pays while the header is on screen, and the response
+      // already carries the balance afterwards — so the counter changes with
+      // the receipt rather than staying on the old number until the post is
+      // opened again.
+      onPaid={(coins) => {
+        setPhase({ name: 'ready', state: { ...state, stats: { ...state.stats, coins } } });
+      }}
     />
   );
 }
@@ -150,6 +157,7 @@ function Game({
   onReveal,
   onBlobNoticed,
   onJoinAnswered,
+  onPaid,
 }: {
   postId: string;
   state: QuestionState;
@@ -160,6 +168,7 @@ function Game({
   onReveal: (reveal: Reveal) => void;
   onBlobNoticed: () => void;
   onJoinAnswered: () => void;
+  onPaid: (coins: number) => void;
 }): React.JSX.Element {
   const { question, reveal, stats, canVote, authorAvatar } = state;
 
@@ -183,6 +192,7 @@ function Game({
           onOpenMenu={onOpenMenu}
           onBlobNoticed={onBlobNoticed}
           onJoinAnswered={onJoinAnswered}
+          onPaid={onPaid}
         />
       ) : (
         <PlayView
@@ -533,6 +543,7 @@ function RevealView({
   onOpenMenu,
   onBlobNoticed,
   onJoinAnswered,
+  onPaid,
 }: {
   postId: string;
   question: Question;
@@ -543,6 +554,7 @@ function RevealView({
   onOpenMenu: () => void;
   onBlobNoticed: () => void;
   onJoinAnswered: () => void;
+  onPaid: (coins: number) => void;
 }): React.JSX.Element {
   const mine = reveal.choice === 'a' ? question.labelA : question.labelB;
   const theirs = reveal.choice === 'a' ? question.labelB : question.labelA;
@@ -666,7 +678,7 @@ function RevealView({
 
       {slide === 2 && (
         <div className="slide fade-in" key="share">
-          <Compose postId={postId} question={question} reveal={reveal} />
+          <Compose postId={postId} question={question} reveal={reveal} onPaid={onPaid} />
         </div>
       )}
 

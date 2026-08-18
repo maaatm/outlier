@@ -674,15 +674,32 @@ other players see that blob in the crowd. It is not in the wardrobe, because the
 is about what your blob looks like and this is about who it is shown to. One line of copy
 says what it does, including that turning it off is retroactive.
 
-**The balance is in Your record and the wardrobe, not the header.** The header shows the
-streak and the points, and `--sun` marks the streak alone; a third counter up there would
-be a third thing to read before the question, and a third meaning of colour if it were
-ever accented. The two places coins appear are the two screens where they are relevant —
-the page of totals, and the room where they are spent.
+**The balance is the middle counter in the header**, between the streak that pays it and
+the points it is not, and it is read again in full in Your record and in the wardrobe where
+it is spent. Colour keeps the three apart and each colour means one thing: `--sun` is the
+streak and only while it is alive, orange is coins everywhere they are counted, and the
+points take no accent at all, which is what leaves the other two legible.
 
-**Where a payout is explained is a sheet, not a room.** Your record carries a button —
-`What you have earned` — and pressing it lays the ledger over the whole menu, closed by the
-X in its corner or by pressing the felt around it. It is a sheet rather than a block on the
+That row is the one part of the app with no slack in it — a lockup and three counters, all
+as wide as their own contents, in a line that cannot wrap or scroll — so it is sized
+against the width it is handed rather than at one size with a breakpoint under it. The
+counters and the lockup are `clamp`ed from a floor that fits four figures in a 320px post
+up to the sizes they have always been, reached around 430px. A breakpoint fits the width
+you tested and clips the last counter at the next one.
+
+Because the header is on screen while things are being paid for, anything that moves a
+balance hands the new one back on its own response: `POST /api/comment` answers with the
+balance after paying, and the share slide passes it up to the header rather than leaving
+it on the number the post loaded with. The menu does the same from below — a box opened in
+the wardrobe, or the ledger's own read, both write into the one balance the menu's header
+shows.
+
+**Where a payout is explained is a sheet, not a room.** The coins tile in Your record
+carries a small block — `where from` — standing in the well beside the balance, and
+pressing it lays the ledger over the whole menu, closed by the X in its corner or by
+pressing the felt around it. It is inside that tile because where a coin came from is a
+question about that number and no other, and it shares the balance's line so the tile is no
+taller than the three beside it and the grid does not move. It is a sheet rather than a block on the
 page because the room it opens from is a page of totals the player already knew, and this
 is the one thing in the menu telling them something they did not: it earns covering the
 screen by being asked for, and the room underneath gives up no height for a table nobody
@@ -692,8 +709,9 @@ ledger has nothing in it and an empty sheet is a worse first impression than no 
 tables read their numbers from `shared/config.ts`, so neither can drift from what the game
 actually pays.
 
-An orange dot on the **Your record** row of the menu, on the button inside it, and on the
-reveal's **Menu** button says something has been paid since the ledger was last opened. It
+An orange dot on the **Your record** row of the menu, on the chip inside the coins tile,
+and on the reveal's **Menu** button says something has been paid since the ledger was last
+opened. It
 is `stats.unseenEarnings`, derived from two counters on the user hash inside a read every
 screen was already making — so the dot costs no round trip anywhere, and opening the ledger
 is what puts it out.

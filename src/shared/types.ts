@@ -132,9 +132,11 @@ export type PlayerStats = {
    * The spendable balance. A different ledger from `points` and never the same
    * number: this one goes down when a box is opened.
    *
-   * It rides on the stats because "Your record" is where a player reads their
-   * own totals. It is deliberately *not* rendered in the header `StatBar`,
-   * which shows the streak and the points and nothing else.
+   * It is the middle counter in the header `StatBar`, between the streak that
+   * pays it and the points it is not, and it is read again in full in "Your
+   * record" and in the wardrobe where it is spent. Because it is on screen
+   * while things are being paid for, anything that moves a balance hands the
+   * new one back on its own response rather than leaving this to go stale.
    */
   coins: number;
   totalPlayed: number;

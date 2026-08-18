@@ -512,6 +512,10 @@ button {
   justify-content: space-between;
   gap: var(--s2);
   flex: none;
+  /* The lockup shrinks with the post, by the one number it is drawn from —
+     see `.wordmark`. It is the decoration in this row and the counters are the
+     information, so it is the half that gives way first. */
+  --wm-step: clamp(15px, 4.6vw, 22px);
 }
 
 /*
@@ -533,10 +537,21 @@ button {
   white-space: nowrap;
 }
 
+/*
+ * Three counters and a lockup, all of them as wide as their own contents, in
+ * the one row of the app that cannot wrap or scroll. That is what the clamps
+ * below are for: the header has no slack to give, so it is sized against the
+ * width it was handed rather than at one size with a breakpoint under it —
+ * a breakpoint fits the width you tested and clips the counter at the next one.
+ *
+ * The floors are set by the worst case a real account reaches: a 320px post
+ * with four figures in two of the three counters. The ceilings are the sizes
+ * this row has always been, reached by about 430px and held from there up.
+ */
 .stats {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: clamp(4px, 1.4vw, 7px);
   flex: none;
 }
 
@@ -642,33 +657,38 @@ button {
 .stat {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 5px 9px;
+  gap: clamp(3px, 1vw, 5px);
+  padding: 5px clamp(4.5px, 1.7vw, 9px);
   white-space: nowrap;
 }
 
 .stat__label {
   font-family: var(--font-body);
   font-weight: 700;
-  font-size: 9.5px;
-  letter-spacing: 0.14em;
+  font-size: clamp(7.5px, 2.2vw, 9.5px);
+  letter-spacing: clamp(0.05em, 0.32vw, 0.14em);
   text-transform: uppercase;
   color: var(--ink-soft-felt);
 }
 
 .stat__count {
   font-family: var(--font-display);
-  font-size: 15px;
+  font-size: clamp(11.5px, 3.4vw, 15px);
   line-height: 1.1;
   color: var(--ink-on-felt);
   font-variant-numeric: tabular-nums;
 }
 
-/* The streak is the one number in the header that can be lit, and yellow is
-   the only thing it is ever lit with. */
-.stat--live .stat__count,
-.stat--coins .stat__count {
+/* Yellow is the streak, and only while it is alive. It is the one thing in
+   this app that colour ever means. */
+.stat--live .stat__count {
   color: var(--yellow);
+}
+
+/* Orange is coins — the same orange the record's tile, the coin tags and the
+   unseen dot use, so the balance is the same colour wherever it is counted. */
+.stat--coins .stat__count {
+  color: var(--orange);
 }
 
 /* ── The question ───────────────────────────────────────────────────────── */
@@ -1461,6 +1481,36 @@ button {
   color: var(--orange);
 }
 
+/*
+ * The coins tile, which is the only one with something to press in it.
+ *
+ * The button shares the balance's line rather than taking one under it. That is
+ * not tidiness: these tiles are a two-by-two grid, and a taller fourth cell
+ * would push the row it is in down past the row above and leave the record's
+ * bottom half sitting a button's height lower than it does now. The balance is
+ * 32px and the button is shorter than that, so the tile is exactly the height
+ * it was before there was anything in it to press.
+ */
+.figure__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.figure__ledger {
+  /* Buttons are full width by default, which is right for every other one in
+     the app and wrong for a chip sitting beside a number. */
+  width: auto;
+  flex: none;
+  /* The dot brings its own gap, the way the coin tag does. */
+  gap: 0;
+  padding: 5px 8px;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
 .figure__value--yellow {
   color: var(--yellow);
 }
@@ -2177,44 +2227,6 @@ button {
   text-transform: uppercase;
   white-space: nowrap;
   color: var(--orange-face);
-}
-
-/*
- * The way into it, in Your record.
- *
- * A cream block like the menu's own entries, and shaped like one — a label with
- * a dry line under it — because that is what it is: a way somewhere else, on a
- * page otherwise made of wells that go nowhere.
- */
-.record__ledger {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  padding: 11px 14px;
-  margin-top: 14px;
-  border-radius: 10px;
-  text-align: left;
-  flex: none;
-}
-
-.record__ledger-label {
-  font-family: var(--font-display);
-  font-size: 17px;
-  line-height: 1.15;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  color: var(--ink);
-}
-
-.record__ledger-hint {
-  font-family: var(--font-body);
-  font-weight: 500;
-  font-size: 11.5px;
-  line-height: 1.4;
-  letter-spacing: normal;
-  text-transform: none;
-  color: var(--ink-body-cream);
 }
 
 /*
