@@ -3,7 +3,7 @@
  * what to do next — usually open a form, sometimes just show a toast.
  */
 
-import { context, reddit } from '@devvit/web/server';
+import { context, notifications, reddit } from '@devvit/web/server';
 import type { UiResponse } from '@devvit/web/shared';
 import { Hono } from 'hono';
 
@@ -227,6 +227,41 @@ menuRoutes.post('/internal/menu/grant-coins', async (c) => {
       },
     },
   });
+});
+
+/**
+ * TEMPORARY — the step-0 probe from `docs/prompts/07-push-notifications.md`.
+ *
+ * `@devvit/notifications` ships marked experimental, and an experimental plugin
+ * may simply not be switched on for this app. This asks it two questions that
+ * change nothing — is there a badge, and is there anybody opted in — and reports
+ * what came back. The only answer it is looking for is whether the call returns
+ * or throws.
+ *
+ * Delete this handler and its menu item once the answer is in the logs. It is a
+ * probe, not a feature.
+ */
+menuRoutes.post('/internal/menu/push-probe', async (c) => {
+  if (!(await isModerator())) {
+    return c.json<UiResponse>({ showToast: 'Moderators only.' });
+  }
+
+  try {
+    const badge = await notifications.getGameBadgeStatus();
+    const optedIn = await notifications.listOptedInUsers({ limit: 1 });
+    console.log(
+      `push-probe: badge=${JSON.stringify(badge)} optedIn=${JSON.stringify(optedIn)}`
+    );
+    return c.json<UiResponse>({
+      showToast: `Plugin answered. Badge: ${badge.hasActiveBadge}. Opted in: ${optedIn.userIds.length}.`,
+    });
+  } catch (error) {
+    // The whole point of the probe. Logged in full, because the message is what
+    // decides whether `PUSH_ENABLED` ships true or false.
+    console.error('push-probe: the notifications plugin threw', error);
+    const reason = error instanceof Error ? error.message : String(error);
+    return c.json<UiResponse>({ showToast: `Plugin threw: ${reason}` });
+  }
 });
 
 /** "Post the misjudged leaderboard" — the recurring event post. */
