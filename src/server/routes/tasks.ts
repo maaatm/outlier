@@ -4,6 +4,7 @@
  *   post-daily       00:00 UTC  resolve the source, post the Daily, write daily:{date}
  *   summarize-daily  00:00 UTC  sticky where yesterday's split stands. Voting stays open.
  *   refresh-queue    hourly     re-score the pending queue from live post upvotes
+ *   sweep-comments   hourly     pay tracked comments what their upvotes owe
  *
  * Both midnight jobs are idempotent, so the order they fire in does not matter:
  * `summarize-daily` works on yesterday's key and `post-daily` on today's.
@@ -14,6 +15,7 @@ import type { T3 } from '@devvit/web/shared';
 import { Hono } from 'hono';
 
 import { previousDay, toDayKey } from '../../shared/day.js';
+import { sweepCommentRewards } from '../core/commentRewards.js';
 import { postDaily, summarizeDaily } from '../core/daily.js';
 import { getQuestion } from '../core/questions.js';
 import {
@@ -69,6 +71,18 @@ taskRoutes.post('/internal/tasks/refresh-queue', async (c) => {
   }
 
   console.log(`refresh-queue: rescored ${refreshed} questions`);
+  return c.json({});
+});
+
+/**
+ * Pay tracked comments what their upvotes owe.
+ *
+ * Its own task rather than a second half of `refresh-queue`: they touch
+ * different data, and a throw in one must not take the other's run with it.
+ */
+taskRoutes.post('/internal/tasks/sweep-comments', async (c) => {
+  const result = await sweepCommentRewards();
+  console.log(`sweep-comments: paid ${result.paid} coins, settled ${result.settled}`);
   return c.json({});
 });
 

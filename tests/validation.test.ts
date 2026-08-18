@@ -295,6 +295,7 @@ describe('the generated comment', () => {
     // these reaches it, and the assertions below are what say so.
     cameos: [],
     blobNotice: false,
+    joinOffer: false,
     award: { base: 10, bonus: 0, total: 10, band: 'cold' },
     stats: {
       streak: 12,
@@ -304,6 +305,7 @@ describe('the generated comment', () => {
       totalPlayed: 30,
       totalHits: 11,
       extendedToday: true,
+      unseenEarnings: false,
     },
   };
 

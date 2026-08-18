@@ -87,12 +87,45 @@ export const keys = {
    */
   recent: (questionId: string) => `recent:${questionId}`,
 
-  /** hash: userId -> commentId. */
+  /** hash: userId -> commentId, or `"pending"` between the claim and the post. */
   commented: (questionId: string) => `commented:${questionId}`,
 
   /**
+   * zset: encoded earning -> when it landed. The player's last
+   * `EARNINGS_LOG_SIZE` coin events, trimmed on write.
+   *
+   * A window, not a history — the same shape and the same reasoning as
+   * `recent:{questionId}`. Its job is to answer "where did that come from",
+   * which is a question about the last few days and never about the last year.
+   *
+   * Devvit's Redis has no list commands, which is why this is a zset and not the
+   * capped list it would otherwise be.
+   */
+  earnings: (userId: string) => `earn:${userId}`,
+
+  /**
+   * zset: `"{userId}:{commentId}"` -> posted at, in ms.
+   *
+   * Every comment still inside its accrual window. Entries leave on their final
+   * settle, or the moment one hits `COMMENT_UPVOTE_COIN_CAP` — a comment that can
+   * earn nothing more is a Reddit API call per sweep for no reason.
+   */
+  commentsTracked: 'comments:tracked',
+
+  /**
+   * hash: commentId -> coins already paid for its upvotes.
+   *
+   * The watermark, and the reason a partial or a missed sweep is safe: every
+   * settle pays the difference between what is owed now and what has been paid,
+   * so a run that skips a comment costs it latency and never money. Deleted with
+   * the tracking entry.
+   */
+  commentsPaid: 'comments:paid',
+
+  /**
    * hash: streak, bestStreak, lastPlayedDay, points, totalPlayed, totalHits,
-   * weekPoints, weekKey, coins, pity, subDay, subCount
+   * weekPoints, weekKey, coins, pity, subDay, subCount, showBlob, freeRolls,
+   * joined, earnSeq, earnSeen
    *
    * Two ledgers on one hash. `points` is the leaderboard score and only ever
    * increases; `coins` is the spendable balance and goes both ways. Crediting
@@ -221,6 +254,30 @@ export const userFields = {
    * that notice writes something here, which is what stops it firing twice.
    */
   showBlob: 'showBlob',
+
+  /** Boxes owed to this player that cost nothing. Spent before coins are. */
+  freeRolls: 'freeRolls',
+
+  /**
+   * `"1" | "0"` — the join offer, in the `showBlob` idiom.
+   *
+   * Absent means never offered and never granted; `"1"` means the free roll has
+   * been handed out; `"0"` means they were offered it and said no. Three states
+   * on one field, and the `hSetNX` that grants it is the same atomic claim
+   * `voted:` uses — two taps racing each other can only produce one free roll.
+   */
+  joined: 'joined',
+
+  /**
+   * Two counters, and the whole unseen-earnings marker.
+   *
+   * `earnSeq` increments on every coin event; `earnSeen` is set to it when the
+   * ledger is opened. Unseen is `earnSeq > earnSeen`, which `projectStats` can
+   * answer out of the `hGetAll` it was already making — so the dot on the menu
+   * costs no read anywhere.
+   */
+  earnSeq: 'earnSeq',
+  earnSeen: 'earnSeen',
 } as const;
 
 /** Field names on the `votes:` hash, kept in one place to avoid typos. */

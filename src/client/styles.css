@@ -484,6 +484,9 @@ button {
  * between slides never resizes anything.
  */
 .app {
+  /* Positioned so a sheet laid over the screen — the ledger — measures itself
+     against the app rather than against the viewport behind it. */
+  position: relative;
   height: 100vh;
   height: 100dvh;
   padding: 20px;
@@ -509,6 +512,10 @@ button {
   justify-content: space-between;
   gap: var(--s2);
   flex: none;
+  /* The lockup shrinks with the post, by the one number it is drawn from —
+     see `.wordmark`. It is the decoration in this row and the counters are the
+     information, so it is the half that gives way first. */
+  --wm-step: clamp(15px, 4.6vw, 22px);
 }
 
 /*
@@ -530,10 +537,21 @@ button {
   white-space: nowrap;
 }
 
+/*
+ * Three counters and a lockup, all of them as wide as their own contents, in
+ * the one row of the app that cannot wrap or scroll. That is what the clamps
+ * below are for: the header has no slack to give, so it is sized against the
+ * width it was handed rather than at one size with a breakpoint under it —
+ * a breakpoint fits the width you tested and clips the counter at the next one.
+ *
+ * The floors are set by the worst case a real account reaches: a 320px post
+ * with four figures in two of the three counters. The ceilings are the sizes
+ * this row has always been, reached by about 430px and held from there up.
+ */
 .stats {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: clamp(4px, 1.4vw, 7px);
   flex: none;
 }
 
@@ -639,33 +657,38 @@ button {
 .stat {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 5px 9px;
+  gap: clamp(3px, 1vw, 5px);
+  padding: 5px clamp(4.5px, 1.7vw, 9px);
   white-space: nowrap;
 }
 
 .stat__label {
   font-family: var(--font-body);
   font-weight: 700;
-  font-size: 9.5px;
-  letter-spacing: 0.14em;
+  font-size: clamp(7.5px, 2.2vw, 9.5px);
+  letter-spacing: clamp(0.05em, 0.32vw, 0.14em);
   text-transform: uppercase;
   color: var(--ink-soft-felt);
 }
 
 .stat__count {
   font-family: var(--font-display);
-  font-size: 15px;
+  font-size: clamp(11.5px, 3.4vw, 15px);
   line-height: 1.1;
   color: var(--ink-on-felt);
   font-variant-numeric: tabular-nums;
 }
 
-/* The streak is the one number in the header that can be lit, and yellow is
-   the only thing it is ever lit with. */
-.stat--live .stat__count,
-.stat--coins .stat__count {
+/* Yellow is the streak, and only while it is alive. It is the one thing in
+   this app that colour ever means. */
+.stat--live .stat__count {
   color: var(--yellow);
+}
+
+/* Orange is coins — the same orange the record's tile, the coin tags and the
+   unseen dot use, so the balance is the same colour wherever it is counted. */
+.stat--coins .stat__count {
+  color: var(--orange);
 }
 
 /* ── The question ───────────────────────────────────────────────────────── */
@@ -1285,6 +1308,81 @@ button {
   outline-offset: -2px;
 }
 
+/*
+ * The join offer, under the award on the score slide.
+ *
+ * It inherits the award's own idiom — a block, because something is being
+ * handed to you — and sits directly under it, so the slide reads as one thing
+ * arriving and then a second. Two controls on one row: the offer is a block
+ * standing on the surface and declining is the same X that closes anything,
+ * which is the same weighting the guess screen gives Change and Lock it in.
+ */
+.join-offer {
+  margin-top: 10px;
+  padding: 11px 13px;
+  flex: none;
+}
+
+.join-offer__copy {
+  margin: 0;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--ink-body-cream);
+}
+
+.join-offer__copy strong {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.join-offer__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 9px;
+}
+
+.join-offer__take {
+  flex: 1;
+  padding: 11px;
+  font-size: 17px;
+  border-radius: 9px;
+}
+
+.join-offer__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Bigger than the glyph: a 16px X is not a target. */
+  width: 40px;
+  height: 40px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-well);
+  background: none;
+  color: var(--ink-soft-cream);
+  cursor: pointer;
+  transition: color 100ms ease-out;
+}
+
+.join-offer__close:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .join-offer__close:hover:not(:disabled) {
+    color: var(--ink);
+  }
+}
+
+.join-offer__close:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: -2px;
+}
+
 /* ── The reveal ─────────────────────────────────────────────────────────── */
 
 /*
@@ -1381,6 +1479,36 @@ button {
 
 .figure__value--orange {
   color: var(--orange);
+}
+
+/*
+ * The coins tile, which is the only one with something to press in it.
+ *
+ * The button shares the balance's line rather than taking one under it. That is
+ * not tidiness: these tiles are a two-by-two grid, and a taller fourth cell
+ * would push the row it is in down past the row above and leave the record's
+ * bottom half sitting a button's height lower than it does now. The balance is
+ * 32px and the button is shorter than that, so the tile is exactly the height
+ * it was before there was anything in it to press.
+ */
+.figure__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.figure__ledger {
+  /* Buttons are full width by default, which is right for every other one in
+     the app and wrong for a chip sitting beside a number. */
+  width: auto;
+  flex: none;
+  /* The dot brings its own gap, the way the coin tag does. */
+  gap: 0;
+  padding: 5px 8px;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
 }
 
 .figure__value--yellow {
@@ -1966,6 +2094,185 @@ button {
   outline: 3px solid var(--ink);
   outline-offset: 3px;
   border-radius: var(--r-well);
+}
+
+/*
+ * ── The ledger ─────────────────────────────────────────────────────────────
+ *
+ * A sheet laid over the whole menu, opened from Your record. It is the one
+ * thing in here that tells the player something they did not already know, and
+ * it earns covering the screen by being asked for — the room underneath is a
+ * page of totals and gives up no height for it.
+ */
+.ledger {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+/* The felt, dimmed, and a way out for a thumb that lands anywhere. */
+.ledger__scrim {
+  position: absolute;
+  inset: 0;
+  padding: 0;
+  border: 0;
+  background: rgba(8, 42, 25, 0.55);
+  cursor: pointer;
+  animation: ledger-dim 140ms ease-out both;
+}
+
+@keyframes ledger-dim {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/*
+ * The sheet itself: a cream block, arriving the way every block in this app
+ * arrives — down and settling, never a fade or a scale.
+ */
+.ledger__sheet {
+  position: relative;
+  width: 100%;
+  max-width: 360px;
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 14px 16px 16px;
+  border-radius: 12px;
+  animation: land-block 200ms var(--spring) both;
+}
+
+/* The heading and the way out share a line, so the rows start at the top. */
+.ledger__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.ledger__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Bigger than the glyph: a 16px X is not a target. */
+  width: 32px;
+  height: 32px;
+  flex: none;
+  margin: -6px -6px -6px 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-well);
+  background: none;
+  color: var(--ink-soft-cream);
+  cursor: pointer;
+  transition: color 100ms ease-out;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ledger__close:hover {
+    color: var(--ink);
+  }
+}
+
+.ledger__close:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: -2px;
+}
+
+.earnings__list {
+  margin: 7px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+/*
+ * One line per earning: what happened, and what it paid. The reason gives way
+ * first — a long sentence is truncated rather than allowed to push the amount
+ * off its column, because a column of numbers that does not line up is a column
+ * nobody can read down.
+ */
+.earnings__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 0;
+}
+
+.earnings__reason {
+  font-weight: 500;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--ink-body-cream);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The amount is set in the display face for the same reason the figures are:
+   it is a number, and these are read as a column. */
+.earnings__amount {
+  flex: none;
+  font-family: var(--font-display);
+  font-size: 15px;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--orange-face);
+}
+
+/*
+ * What a control pays, on the control.
+ *
+ * Its own colour so it reads as a second thing on the same line, and which
+ * colour depends on what it is standing on: the deep orange coins already carry
+ * on a cream block, and the dark ink on an orange one, where that orange would
+ * be invisible. Neither is a new accent, and the number is bracketed as well as
+ * coloured — nothing here rests on colour alone.
+ */
+.coin-tag {
+  /* The gap lives here rather than as a space in the markup, so all three
+     callers get the same one and none of them can lose it to JSX. */
+  margin-left: 0.45em;
+  font-family: var(--font-display);
+  font-size: 0.72em;
+  letter-spacing: 0.02em;
+  /* Set as written rather than shouted with the label it follows. The case is
+     half of what separates the two — the colour is the other half, and neither
+     is doing the job alone. */
+  text-transform: none;
+  white-space: nowrap;
+  color: var(--orange-face);
+}
+
+.block--orange .coin-tag,
+.button.block--orange .coin-tag {
+  color: var(--ink);
+}
+
+/*
+ * Something has been paid since this player last looked.
+ *
+ * The orange coins already carry on this page and in the box's result, never
+ * `--sun`, which is the streak and nothing else. Six pixels, and no number: a
+ * dot that needed one would be a badge.
+ */
+.unseen-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 7px;
+  border-radius: 50%;
+  background: var(--orange);
+  vertical-align: 0.35em;
 }
 
 /* ── The leaderboard ────────────────────────────────────────────────────── */

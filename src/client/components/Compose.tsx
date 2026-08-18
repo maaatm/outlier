@@ -14,20 +14,33 @@
 import { Fragment, useLayoutEffect, useRef, useState } from 'react';
 
 import { buildComment, normalizeNote } from '../../shared/comment.js';
-import { NOTE_MAX_LENGTH } from '../../shared/config.js';
+import { COINS_COMMENT, NOTE_MAX_LENGTH } from '../../shared/config.js';
 import type { Question, Reveal } from '../../shared/types.js';
 import { ApiFailure, postComment } from '../api.js';
+import { CoinTag } from './CoinTag.js';
 
 type Props = {
   postId: string;
   question: Question;
   reveal: Reveal;
+  /**
+   * The balance after posting, for the counter in the header.
+   *
+   * The receipt below is this slide's business, but the header is not — and it
+   * is on screen while this pays. The response carries the new balance, so
+   * telling the screen above costs nothing but this line.
+   */
+  onPaid: (coins: number) => void;
 };
 
-export function Compose({ postId, question, reveal }: Props): React.JSX.Element {
+export function Compose({ postId, question, reveal, onPaid }: Props): React.JSX.Element {
   const [note, setNote] = useState('');
   const [posting, setPosting] = useState(false);
   const [posted, setPosted] = useState(reveal.commented);
+  // What this post paid, as the server reported it. Zero on a reveal opened
+  // again later — the comment was posted on some earlier visit and the coins
+  // with it — which is why the receipt below is a branch and not a constant.
+  const [earned, setEarned] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const noteRef = useRef<HTMLTextAreaElement>(null);
 
@@ -48,11 +61,13 @@ export function Compose({ postId, question, reveal }: Props): React.JSX.Element 
     setPosting(true);
     setError(null);
     try {
-      await postComment(postId, note.trim() || undefined, {
+      const receipt = await postComment(postId, note.trim() || undefined, {
         choice: reveal.choice,
         guess: reveal.guess,
       });
+      setEarned(receipt.earned);
       setPosted(true);
+      onPaid(receipt.coins);
     } catch (failure) {
       if (failure instanceof ApiFailure && failure.status === 409) setPosted(true);
       else setError(failure instanceof Error ? failure.message : 'That did not post.');
@@ -72,7 +87,14 @@ export function Compose({ postId, question, reveal }: Props): React.JSX.Element 
           which is the whole receipt.
         */}
         <p className="compose__preview well--cut">
-          {posted ? 'Posted to the thread.' : <Bolded text={preview} />}
+          {posted ? (
+            // The payout goes in the sentence that was already there rather than
+            // in a block of its own: the well is filled, the button below has
+            // gone, and the whole receipt is one line longer than it was.
+            earned > 0 ? `Posted to the thread. +${earned} coins.` : 'Posted to the thread.'
+          ) : (
+            <Bolded text={preview} />
+          )}
         </p>
 
         {!posted && (
@@ -107,7 +129,16 @@ export function Compose({ postId, question, reveal }: Props): React.JSX.Element 
           onClick={submit}
           disabled={posting}
         >
-          {posting ? 'Posting...' : 'Post comment'}
+          {posting ? (
+            'Posting...'
+          ) : (
+            <>
+              {/* What it pays, on the control that pays it — the same tag the
+                  ask room's button carries, and the one place the player is
+                  deciding whether to post at all. */}
+              Post comment<CoinTag coins={COINS_COMMENT} />
+            </>
+          )}
         </button>
       )}
 

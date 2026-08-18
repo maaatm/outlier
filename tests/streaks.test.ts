@@ -18,6 +18,8 @@ const fresh = (): UserRecord => ({
   weekPoints: 0,
   weekKey: '',
   coins: 0,
+  earnSeq: 0,
+  earnSeen: 0,
 });
 
 /** A player mid-run, with everything they have banked in the week of `day`. */
@@ -31,6 +33,10 @@ const on = (day: string, streak: number, bestStreak: number = streak): UserRecor
   weekPoints: 100,
   weekKey: toWeekKey(fromDayKey(day)),
   coins: 40,
+  // Four earnings recorded and three of them read, so this player is carrying a
+  // dot — which nothing in `advance` may put out.
+  earnSeq: 4,
+  earnSeen: 3,
 });
 
 /** Answer one question a day, starting from nothing. */
@@ -437,6 +443,63 @@ describe('coins', () => {
       expect(next.weekPoints).toBeLessThanOrEqual(next.points);
       expect(next.coins).toBeGreaterThanOrEqual(record.coins);
     }
+  });
+
+  it('reports the day’s coins split by what paid them', () => {
+    // The ledger names them separately — "turned up today" and "7 days in a
+    // row" — and the sum is still what lands in the balance.
+    const ordinary = advance(on('2026-04-01', 3), play, '2026-04-02');
+    expect(ordinary.earned).toEqual({ daily: COINS_FIRST_VOTE, streak: 0 });
+
+    const seventh = advance(on('2026-04-06', 6), play, '2026-04-07');
+    expect(seventh.earned).toEqual({
+      daily: COINS_FIRST_VOTE,
+      streak: COINS_STREAK_BONUS,
+    });
+    expect(seventh.earned.daily + seventh.earned.streak).toBe(seventh.coinsEarned);
+  });
+
+  it('reports nothing earned on the days that pay nothing', () => {
+    const twice = advance(advance(fresh(), play, '2026-04-01'), hit, '2026-04-01');
+    expect(twice.earned).toEqual({ daily: 0, streak: 0 });
+
+    const backdated = advance(on('2026-04-05', 9), hit, '2026-04-03');
+    expect(backdated.earned).toEqual({ daily: 0, streak: 0 });
+  });
+});
+
+/*
+ * The incentives shipped alongside the ledger — comment coins, comment upvotes,
+ * question royalties and the free roll for joining — are all coins, and this is
+ * where that is written down.
+ *
+ * `advance` is the only place a vote can move a total, so it is the only place
+ * one of them could have leaked into `points`. The rest of the rule is
+ * structural: `royaltyFor` and `commentUpvoteOwed` return coins, `creditCoins`
+ * is the only writer they reach, and neither it nor `logEarning` can name
+ * `points`. The leaderboard is therefore unaffected by all five features, which
+ * is what keeps it a ranking of who reads the room rather than who posts most.
+ */
+describe('the incentives and the leaderboard', () => {
+  it('leaves points and both weekly totals untouched by every coin path', () => {
+    // Nothing outside `advance` moves a point, and inside it the only thing the
+    // coins can do is add to a balance the boards never read.
+    const record = on('2026-04-06', 6);
+    const next = advance(record, play, '2026-04-07');
+
+    expect(next.points).toBe(record.points + play.points);
+    expect(next.weekPoints).toBe(record.weekPoints + play.points);
+    // The seventh day paid 25 coins on this very vote.
+    expect(next.coinsEarned).toBe(COINS_FIRST_VOTE + COINS_STREAK_BONUS);
+  });
+
+  it('never puts out a dot it did not read', () => {
+    // `advance` is pure and knows nothing about the ledger. The counters it was
+    // handed come back exactly as they went in, whatever the vote paid.
+    const record = on('2026-04-06', 6);
+    const next = advance(record, hit, '2026-04-07');
+    expect(next.earnSeq).toBe(record.earnSeq);
+    expect(next.earnSeen).toBe(record.earnSeen);
   });
 });
 

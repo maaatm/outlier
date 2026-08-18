@@ -28,13 +28,23 @@
 import { navigateTo } from '@devvit/web/client';
 import { useEffect, useRef, useState } from 'react';
 
+import { royaltyFor } from '../../shared/coins.js';
 import {
   BOX_PRICE,
+  COINS_COMMENT,
+  COINS_FIRST_VOTE,
+  COINS_PROMOTION,
+  COINS_STREAK_BONUS,
+  COINS_SUBMISSION,
+  COMMENT_UPVOTE_COIN_CAP,
   HIT_THRESHOLD,
+  ROYALTY_VOTES_PER_COIN,
+  STREAK_BONUS_EVERY,
   SUBMITTED_LABEL_MAX_LENGTH,
   SUBMITTED_QUESTION_MAX_LENGTH,
   TITLE_MAX_LENGTH,
 } from '../../shared/config.js';
+import { EARN_COPY, type Earning } from '../../shared/earnings.js';
 import {
   ACCESSORIES,
   type Equipped,
@@ -58,6 +68,7 @@ import { normalizeTitle, validateSubmission } from '../../shared/validate.js';
 import {
   fetchAvatar,
   fetchDaily,
+  fetchEarnings,
   openBox,
   saveAvatar,
   saveShowBlob,
@@ -67,6 +78,8 @@ import { coalescingWriter } from '../coalesce.js';
 import { COUNTER_SIZE } from '../counterArt.js';
 import { WORDMARK_SIZE } from '../wordmarkArt.js';
 import { Blob } from './Blob.js';
+import { CoinTag } from './CoinTag.js';
+import { Cross } from './Cross.js';
 import { PlayerBoard } from './PlayerBoard.js';
 import { StatBar, StatPill } from './StatBar.js';
 import { Wordmark } from './Wordmark.js';
@@ -162,7 +175,36 @@ export function Menu({
     };
   }, [postId]);
 
-  const { avatar, equip, absorb, show } = useAvatar(panel === 'record' || panel === 'wardrobe');
+  /*
+   * The balance this screen shows, wherever the newest word about it came from.
+   *
+   * `stats` was settled when the post loaded, and three things in here are
+   * newer than that: the wardrobe's fetch, a box opened out of it, and the
+   * ledger's own read. Each of them pushes what it learned in here as it
+   * happens, so the last word wins — which is the right rule, because the last
+   * word is the most recent one. Held at this level because the header is at
+   * this level: a counter in the header that a room below it can spend has to
+   * be owned above both of them.
+   */
+  const [balance, setBalance] = useState(stats.coins);
+
+  const { avatar, equip, absorb, show } = useAvatar(
+    panel === 'record' || panel === 'wardrobe',
+    setBalance
+  );
+  // The ledger is a sheet over the whole menu rather than a block inside a
+  // room, so whether it is open is the menu's business and not the room's.
+  const [ledger, setLedger] = useState(false);
+  const entries = useEarnings(ledger, setBalance);
+
+  // The dot is a question about the moment the menu was opened, and opening the
+  // ledger is what answers it — the fetch above marks it seen on the server,
+  // and this is the same fact on this side of the wire. Held here rather than
+  // in `Root`, which remounts on every trip out of a room and back.
+  const [ledgerOpened, setLedgerOpened] = useState(false);
+  useEffect(() => {
+    if (ledger) setLedgerOpened(true);
+  }, [ledger]);
 
   return (
     <main className="app">
@@ -174,14 +216,29 @@ export function Menu({
       */}
       <header className="header">
         <span className="header__label">{panel === null ? ROOT_TITLE : TITLES[panel]}</span>
-        <HeaderStats panel={panel} stats={stats} avatar={avatar} />
+        <HeaderStats panel={panel} stats={{ ...stats, coins: balance }} avatar={avatar} />
       </header>
 
       {/* Keyed so a page change remounts and cross-fades, and so a room opened
           after a long one starts at the top rather than mid-scroll. */}
       <div className="menu__body fade-in" key={panel ?? 'root'}>
-        {panel === null && <Root onOpen={setPanel} daily={daily} />}
-        {panel === 'record' && <Record stats={stats} avatar={avatar} onShow={show} />}
+        {panel === null && (
+          <Root
+            onOpen={setPanel}
+            daily={daily}
+            unseen={stats.unseenEarnings && !ledgerOpened}
+          />
+        )}
+        {panel === 'record' && (
+          <Record
+            stats={stats}
+            avatar={avatar}
+            coins={balance}
+            unseen={stats.unseenEarnings && !ledgerOpened}
+            onShow={show}
+            onOpenLedger={() => setLedger(true)}
+          />
+        )}
         {panel === 'wardrobe' && (
           <Wardrobe avatar={avatar} onEquip={equip} onOpened={absorb} />
         )}
@@ -198,6 +255,12 @@ export function Menu({
           {panel === null ? 'Back to the question' : 'Back to menu'}
         </button>
       )}
+
+      {/* Last in the tree so it lays over everything above it, and mounted by
+          the menu rather than by the room that opens it — a sheet belongs to the
+          screen it covers, and this one stays put while the room behind it
+          scrolls or changes. */}
+      {ledger && <Ledger entries={entries} onClose={() => setLedger(false)} />}
     </main>
   );
 }
@@ -224,7 +287,7 @@ function HeaderStats({
   // Absent rather than zero when signed out: a balance of nothing reads as an
   // account with nothing in it, and there is no account.
   if (panel === 'wardrobe') {
-    return avatar?.canSave ? <StatPill label="coins" value={avatar.coins} lit /> : null;
+    return avatar?.canSave ? <StatPill label="coins" value={avatar.coins} tone="coins" /> : null;
   }
 
   return <StatPill label="pts" value={stats.points} />;
@@ -239,7 +302,11 @@ function HeaderStats({
  * between the two and flash the starter counter in the gap. The menu root never
  * pays for it at all, because nothing there shows a counter.
  */
-function useAvatar(needed: boolean): {
+function useAvatar(
+  needed: boolean,
+  /** Called with the balance every time this hook learns a newer one. */
+  onBalance: (coins: number) => void
+): {
   avatar: AvatarResponse | null;
   equip: (next: Equipped) => void;
   absorb: (box: BoxResponse) => void;
@@ -251,14 +318,18 @@ function useAvatar(needed: boolean): {
     if (!needed || avatar !== null) return;
     let live = true;
     fetchAvatar()
-      .then((next) => live && setAvatar(next))
+      .then((next) => {
+        if (!live) return;
+        setAvatar(next);
+        onBalance(next.coins);
+      })
       // Nothing to say if it never arrives: the rooms render the starter pair
       // while this is null, which is what the player would be wearing anyway.
       .catch(() => {});
     return () => {
       live = false;
     };
-  }, [needed, avatar]);
+  }, [needed, avatar, onBalance]);
 
   /*
    * One writer for the life of the menu, built on first render rather than in a
@@ -292,12 +363,17 @@ function useAvatar(needed: boolean): {
    * a chance for the screen to flicker back to what it already knows.
    */
   function absorb(box: BoxResponse): void {
+    // A box is the one thing in the menu that *spends*, so the header has to
+    // hear about it too — otherwise the balance up there is the one from before
+    // the purchase until the whole post is loaded again.
+    onBalance(box.coins);
     setAvatar((current) =>
       current === null
         ? current
         : {
             ...current,
             coins: box.coins,
+            freeRolls: box.freeRolls,
             owned: current.owned.includes(box.item) ? current.owned : [...current.owned, box.item],
           }
     );
@@ -326,13 +402,61 @@ function useAvatar(needed: boolean): {
   return { avatar, equip, absorb, show };
 }
 
+/**
+ * The ledger, fetched the first time Your record is opened and held for the rest
+ * of the menu's life.
+ *
+ * Held up here for the same reason the avatar is: `Record` unmounts on every
+ * trip out of the room, and state inside it would refetch on the way back — but
+ * this fetch is also what marks the ledger seen, and asking the server twice to
+ * be told the same thing is a round trip spent to say nothing.
+ *
+ * A failure leaves it null, and the block renders its empty state rather than an
+ * error: a receipt that did not arrive is worth less than the room around it.
+ *
+ * The balance rides back with the entries, because the two are read together on
+ * the server and this one is newer than the one the post loaded with — an hourly
+ * sweep can pay somebody between the two. It goes straight out to `onBalance`
+ * rather than being returned: the ledger sheet does not show a total, and the
+ * screens that do are above this hook rather than beside it.
+ */
+function useEarnings(
+  needed: boolean,
+  onBalance: (coins: number) => void
+): Earning[] | null {
+  const [entries, setEntries] = useState<Earning[] | null>(null);
+
+  useEffect(() => {
+    if (!needed || entries !== null) return;
+    let live = true;
+    fetchEarnings()
+      .then((response) => {
+        if (!live) return;
+        setEntries(response.entries);
+        onBalance(response.coins);
+      })
+      // Nothing arrived, so the block teaches instead of waiting forever. The
+      // ways to earn are true whether or not this call worked, and the balance
+      // stays the one the page was opened with.
+      .catch(() => live && setEntries([]));
+    return () => {
+      live = false;
+    };
+  }, [needed, entries, onBalance]);
+
+  return entries;
+}
+
 /** The list itself, under the wordmark, with the one way out above it. */
 function Root({
   onOpen,
   daily,
+  unseen,
 }: {
   onOpen: (id: PanelId) => void;
   daily: DailyPointer | null;
+  /** Something has been paid since this player last opened their record. */
+  unseen: boolean;
 }): React.JSX.Element {
   return (
     <div className="menu__root">
@@ -363,7 +487,11 @@ function Root({
               className="button block block--cream block--sm menu__item"
               onClick={() => onOpen(entry.id)}
             >
-              <span className="menu__item-label">{TITLES[entry.id]}</span>
+              <span className="menu__item-label">
+                {TITLES[entry.id]}
+                {entry.id === 'ask' && <CoinTag coins={COINS_SUBMISSION} />}
+                {entry.id === 'record' && unseen && <UnseenDot />}
+              </span>
               <span className="menu__item-blurb">{entry.blurb}</span>
             </button>
           </li>
@@ -432,20 +560,30 @@ function Footnote({ children }: { children: React.ReactNode }): React.JSX.Elemen
  * Banked state, read off the same counters the header shows — and the counter
  * those numbers belong to.
  *
- * The counter is here to say whose record this is. The one thing on this page
- * that can be pressed sits beside it, and it is not about what the counter
- * looks like — that is the wardrobe's job — but about who else gets to see it.
- * It belongs here for the same reason the drawing does: this is the page about
- * you.
+ * The counter is here to say whose record this is, and the switch beside it is
+ * the app's one setting. That setting is not about what the counter looks like
+ * — the wardrobe's job — but about who else gets to see it, which belongs here
+ * for the same reason the drawing does: this is the page about you.
+ *
+ * The only other thing on the page that presses is inside the coins tile, and
+ * it goes to the ledger. Everything else is a well, and wells go nowhere.
  */
 function Record({
   stats,
   avatar,
+  coins,
+  unseen,
   onShow,
+  onOpenLedger,
 }: {
   stats: PlayerStats;
   avatar: AvatarResponse | null;
+  /** The newest balance the menu knows, which may be fresher than `stats`. */
+  coins: number;
+  /** Something has been paid since the ledger was last opened. */
+  unseen: boolean;
   onShow: (showBlob: boolean) => void;
+  onOpenLedger: () => void;
 }): React.JSX.Element {
   const rate =
     stats.totalPlayed > 0 ? Math.round((stats.totalHits / stats.totalPlayed) * 100) : 0;
@@ -490,9 +628,30 @@ function Record({
           <span className="label label--felt">points</span>
           <span className="figure__value">{stats.points}</span>
         </div>
-        <div className="figure well">
+        {/* The one tile with something to press in it. Where a coin came from
+            is a question about this number and no other, so the way to ask it
+            is inside the well that holds it rather than a row of its own under
+            the grid — and a small block standing in a well is the same shape
+            the gift box's button already is. It sits on the balance's line, so
+            the tile is no taller than the three beside it and the grid does not
+            move. The dot rides on the button that answers it. */}
+        <div className="figure figure--coins well">
           <span className="label label--felt">coins</span>
-          <span className="figure__value figure__value--orange">{stats.coins}</span>
+          <div className="figure__row">
+            <span className="figure__value figure__value--orange">{coins}</span>
+            {/* The visible words are the start of the accessible name rather
+                than all of it: two of them are enough to press beside the
+                balance, and not enough to hear on their own. */}
+            <button
+              type="button"
+              className="button block block--cream block--sm figure__ledger"
+              aria-label="Where from: what you have earned"
+              onClick={onOpenLedger}
+            >
+              where from
+              {unseen && <UnseenDot />}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -513,6 +672,137 @@ function Record({
       </div>
     </div>
   );
+}
+
+/**
+ * Where the coins came from, and — when there are none — where they come from.
+ *
+ * A sheet laid over the whole menu rather than a block inside Your record. The
+ * room it opens from is a page of totals the player already knew; this is the
+ * one thing in the menu that tells them something they did not, and it earns
+ * the interruption by being asked for. It also means the list of earns can be
+ * as long as it needs to be without the room underneath giving up height for a
+ * table nobody has opened.
+ *
+ * One way out, in the corner, and the same X that closes everything else.
+ *
+ * Two states, one sheet. A new player's ledger is empty, and an empty sheet is
+ * a worse first impression than no sheet — so it teaches instead, mirroring the
+ * `Nothing to show yet` branch `record__read` already has. Both tables read
+ * their numbers from `shared/config.ts`, so neither can drift from what the
+ * game actually pays.
+ */
+function Ledger({
+  entries,
+  onClose,
+}: {
+  entries: Earning[] | null;
+  onClose: () => void;
+}): React.JSX.Element {
+  const earned = entries !== null && entries.length > 0;
+
+  return (
+    /* Labelled by its own heading rather than by a string repeated here, so a
+       reader hears the same words a looker sees. */
+    <div className="ledger" role="dialog" aria-modal="true" aria-labelledby="ledger-title">
+      {/* The felt, dimmed. Pressing it closes, because a sheet that can only be
+          dismissed from a 40px target in the corner is a sheet somebody is
+          stuck under. */}
+      <button
+        type="button"
+        className="ledger__scrim"
+        aria-label="Close"
+        tabIndex={-1}
+        onClick={onClose}
+      />
+
+      <div className="ledger__sheet block block--cream block--lg">
+        <div className="ledger__head">
+          <span className="label" id="ledger-title">
+            {earned ? 'what you have earned' : 'ways to earn'}
+          </span>
+          <button
+            type="button"
+            className="ledger__close"
+            aria-label="Close"
+            onClick={onClose}
+          >
+            <Cross />
+          </button>
+        </div>
+
+        {entries === null ? (
+          <p className="record__line">Loading...</p>
+        ) : (
+          <ul className="earnings__list">
+            {earned
+              ? entries.map((entry) => (
+                  <EarnRow
+                    // The timestamp is what makes a member unique in the ledger
+                    // itself, so it is what identifies a row here too.
+                    key={`${entry.at}:${entry.reason}`}
+                    label={EARN_COPY[entry.reason](entry.detail)}
+                    // The free roll pays a box rather than coins, and a row
+                    // reading `+0` reads as a bug rather than as a gift.
+                    amount={entry.reason === 'join' ? 'free box' : `+${entry.coins}`}
+                  />
+                ))
+              : WAYS_TO_EARN.map((way) => (
+                  <EarnRow key={way.label} label={way.label} amount={way.amount} />
+                ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * What the game pays, in the order a player meets it.
+ *
+ * Every number is read from `config.ts` rather than typed here, which is the
+ * whole point of the table: a rate that changes changes this screen with it.
+ */
+const WAYS_TO_EARN: readonly { label: string; amount: string }[] = [
+  { label: 'turn up', amount: `+${COINS_FIRST_VOTE}` },
+  { label: `every ${STREAK_BONUS_EVERY}th day in a row`, amount: `+${COINS_STREAK_BONUS}` },
+  { label: 'post your comment', amount: `+${COINS_COMMENT}` },
+  { label: 'upvotes on it', amount: `up to +${COMMENT_UPVOTE_COIN_CAP}` },
+  { label: 'ask a question', amount: `+${COINS_SUBMISSION}` },
+  { label: '...it becomes the Daily', amount: `+${COINS_PROMOTION}` },
+  {
+    label: `...every ${ROYALTY_VOTES_PER_COIN} people answer it`,
+    // Asked of the rule rather than written down: what a hundredth answer pays
+    // is `royaltyFor`'s answer and nothing else's.
+    amount: `+${royaltyFor(ROYALTY_VOTES_PER_COIN)}`,
+  },
+];
+
+/**
+ * One line of the ledger: what happened on the left, what it paid on the right.
+ *
+ * The amount is `DM Mono`'s job in the stylesheet and the reason is body copy,
+ * matching the wardrobe's item meta line — a column of numbers that do not line
+ * up is a column nobody can read down.
+ */
+function EarnRow({ label, amount }: { label: string; amount: string }): React.JSX.Element {
+  return (
+    <li className="earnings__row">
+      <span className="earnings__reason">{label}</span>
+      <span className="earnings__amount">{amount}</span>
+    </li>
+  );
+}
+
+/**
+ * Something has been paid since this player last looked.
+ *
+ * A dot, in the orange coins already carry on this page and in `BoxResult` —
+ * deliberately not `--sun`, which is the streak and nothing else. It says
+ * nothing about how much, because a dot that needed a number would be a badge.
+ */
+export function UnseenDot(): React.JSX.Element {
+  return <span className="unseen-dot" aria-label="new earnings" role="img" />;
 }
 
 /**
@@ -673,7 +963,9 @@ function GiftBox({
   const [result, setResult] = useState<BoxResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const affordable = avatar.coins >= BOX_PRICE;
+  // A free roll is spent before coins are, on the server and therefore here.
+  const free = avatar.freeRolls > 0;
+  const affordable = free || avatar.coins >= BOX_PRICE;
 
   async function open(): Promise<void> {
     setOpening(true);
@@ -701,8 +993,13 @@ function GiftBox({
         ) : (
           <div className="label label--felt label-row">
             <span>gift box</span>
+            {/* The price line says what the next tap costs, and a free roll is
+                what it costs. The catalogue count moves to the result row,
+                where it always was on the other side of a press. */}
             <span>
-              you own {avatar.owned.length} of {ITEMS.length}
+              {free
+                ? `${avatar.freeRolls} free ${avatar.freeRolls === 1 ? 'roll' : 'rolls'}`
+                : `you own ${avatar.owned.length} of ${ITEMS.length}`}
             </span>
           </div>
         )}
@@ -716,9 +1013,11 @@ function GiftBox({
       >
         {opening
           ? 'Opening...'
-          : affordable
-            ? `${result ? 'Open another' : 'Open a box'} · ${BOX_PRICE}`
-            : `${BOX_PRICE - avatar.coins} coins short`}
+          : free
+            ? `${result ? 'Open another' : 'Open a box'} — free`
+            : affordable
+              ? `${result ? 'Open another' : 'Open a box'} · ${BOX_PRICE}`
+              : `${BOX_PRICE - avatar.coins} coins short`}
       </button>
 
       {error && <p className="notice notice--quiet notice--spaced">{error}</p>}
@@ -765,8 +1064,15 @@ function BoxResult({
     >
       <span className="box__result-head">
         <span className="box__result-name">{item.name}</span>
+        {/* A free roll has no refund line to show, because it took nothing in.
+            Everything else about the receipt is the same one a paid box gets. */}
         <span className="box__result-meta">
-          {item.rarity} · {result.duplicate ? `duplicate · +${result.refunded} coins` : 'new'}
+          {item.rarity} ·{' '}
+          {result.duplicate
+            ? result.free
+              ? 'duplicate'
+              : `duplicate · +${result.refunded} coins`
+            : 'new'}
         </span>
       </span>
       <span className="box__result-count">
@@ -1040,7 +1346,13 @@ function Ask({ canSubmit }: { canSubmit: boolean }): React.JSX.Element {
         disabled={!ready}
         onClick={() => void post()}
       >
-        {posting ? 'Posting...' : 'Post it'}
+        {posting ? (
+          'Posting...'
+        ) : (
+          <>
+            Post it<CoinTag coins={COINS_SUBMISSION} />
+          </>
+        )}
       </button>
 
       {error ? (

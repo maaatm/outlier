@@ -30,12 +30,15 @@ import type {
   CommentRequest,
   CommentResponse,
   DailyPointer,
+  EarningsResponse,
+  JoinResponse,
   PlayerBoardResponse,
   StateResponse,
   VoteRequest,
 } from '../../shared/types.js';
+import { royaltyFor } from '../../shared/coins.js';
 import { toDayKey } from '../../shared/day.js';
-import { BOX_PRICE, REPLAY_MODE } from '../../shared/config.js';
+import { BOX_PRICE, COINS_COMMENT, JOIN_FREE_ROLLS, REPLAY_MODE } from '../../shared/config.js';
 import {
   equipAvatar,
   readAvatar,
@@ -44,8 +47,10 @@ import {
   setShowBlob,
 } from '../core/avatars.js';
 import { openBox } from '../core/boxes.js';
-import { readCoins } from '../core/coins.js';
+import { creditCoins, readCoins } from '../core/coins.js';
 import { getDailyQuestionId } from '../core/daily.js';
+import { logEarning, markEarningsSeen, readEarnings } from '../core/earnings.js';
+import { claimJoin, declineJoin, readJoinState } from '../core/join.js';
 import { readPlayerBoard } from '../core/leaderboard.js';
 import { isMenuPost } from '../core/menuPost.js';
 import {
@@ -55,7 +60,14 @@ import {
   toPublicQuestion,
 } from '../core/questions.js';
 import { EMPTY_USER, getUser, projectStats, recordPlay } from '../core/users.js';
-import { buildReveal, castVote, getStoredVote, recordComment } from '../core/votes.js';
+import {
+  buildReveal,
+  castVote,
+  claimComment,
+  getStoredVote,
+  recordComment,
+} from '../core/votes.js';
+import { trackComment } from '../core/commentRewards.js';
 
 export const api = new Hono();
 
@@ -165,6 +177,19 @@ api.post('/api/vote', async (c) => {
   const award = awardFor(result.error);
   const stats = await recordPlay(userId, { hit: result.hit, points: award.total });
 
+  // Paid to the author of the question, not to the player who answered it. A
+  // house question has no author, and `creditCoins` treats an empty id as
+  // nobody to pay rather than as an error.
+  //
+  // It is keyed on the count this vote produced, so exactly one vote in the
+  // question's life pays each coin — no watermark, and no way for two votes
+  // landing together to both pay it.
+  const royalty = royaltyFor(result.voteCount);
+  if (royalty > 0 && question.authorId) {
+    await creditCoins(question.authorId, royalty);
+    await logEarning(question.authorId, 'royalty', royalty, result.voteCount);
+  }
+
   const reveal = await buildReveal(question, result.vote, userId, stats);
   return c.json(reveal);
 });
@@ -199,11 +224,15 @@ api.post('/api/comment', async (c) => {
 
   const stats = projectStats(await getUser(userId));
   const reveal = await buildReveal(question, vote, userId, stats);
-  if (reveal.commented) {
-    return c.json<ApiError>({ error: 'You have already posted this one.' }, 409);
-  }
 
   const text = buildComment(toPublicQuestion(question), reveal, normalizeNote(body.note));
+
+  // The claim, not the `reveal.commented` read above it, is what guards the
+  // payment. A read taken several awaits ago is a double payment waiting for two
+  // taps; this is the same atomic claim `voted:` uses.
+  if (!(await claimComment(questionId, userId))) {
+    return c.json<ApiError>({ error: 'You have already posted this one.' }, 409);
+  }
 
   const comment = await reddit.submitComment({
     id: (question.postId || body.postId) as T3,
@@ -212,7 +241,102 @@ api.post('/api/comment', async (c) => {
   });
 
   await recordComment(questionId, userId, comment.id);
-  return c.json<CommentResponse>({ ok: true, permalink: comment.permalink });
+
+  // Track before paying. A tracked comment that was not paid for is a comment
+  // that earns its upvote bonus anyway; a paid comment that was not tracked
+  // silently never earns one.
+  await trackComment(userId, comment.id);
+
+  const coins = await creditCoins(userId, COINS_COMMENT);
+  await logEarning(userId, 'comment', COINS_COMMENT);
+
+  return c.json<CommentResponse>({
+    ok: true,
+    permalink: comment.permalink,
+    earned: COINS_COMMENT,
+    coins,
+  });
+});
+
+/**
+ * Join the subreddit, and take the box that comes with it.
+ *
+ * The subscribe goes **first**, and the order is the whole failure plan: it is
+ * the thing the player actually asked for, and it is idempotent — Reddit's own
+ * call is a no-op for somebody already subscribed. So a subscribe that throws
+ * leaves nothing claimed and the offer still standing, where the other order
+ * would hand over the box and leave them unsubscribed with nothing left to tap.
+ *
+ * The grant is once per account, and `claimJoin` is what makes it once however
+ * many taps arrive together.
+ *
+ * `{ decline: true }` is the same decision answered the other way: one field,
+ * three states, exactly the `showBlob` idiom. It stops the offer firing on a
+ * reveal and does not stop a later claim — which is why the claim reads and
+ * writes the field rather than only setting it if absent.
+ */
+api.post('/api/join', async (c) => {
+  const userId = context.userId;
+  if (!userId) return c.json<ApiError>({ error: 'Sign in first.' }, 401);
+
+  const body = await c.req.json<{ decline?: boolean }>().catch(() => null);
+
+  if (body?.decline === true) {
+    await declineJoin(userId);
+    const state = await readJoinState(userId);
+    return c.json<JoinResponse>({
+      joined: state.joined,
+      granted: false,
+      freeRolls: state.freeRolls,
+    });
+  }
+
+  // Subscribing is what they asked for, and it is idempotent — Reddit's own
+  // call is a no-op for somebody already subscribed. So it happens whatever the
+  // claim does, and only the box is once per account.
+  await reddit.subscribeToCurrentSubreddit();
+
+  const claim = await claimJoin(userId, JOIN_FREE_ROLLS);
+
+  if (claim.status === 'busy') {
+    return c.json<ApiError>(
+      { error: 'Something changed while that was going through. Try again.' },
+      409
+    );
+  }
+
+  if (claim.status === 'granted') await logEarning(userId, 'join', 0);
+
+  return c.json<JoinResponse>({
+    joined: true,
+    granted: claim.status === 'granted',
+    freeRolls: claim.freeRolls,
+  });
+});
+
+/**
+ * Where the coins came from — the last few, newest first.
+ *
+ * **Reading it is what "seen" means.** `markEarningsSeen` runs as a side effect
+ * of rendering, because a separate acknowledge endpoint would be a second round
+ * trip to say what the first one already said. The dot on the menu goes out with
+ * this response and not before it.
+ *
+ * Only the record room calls it, so it is a fetch on entering that room rather
+ * than another field on `/api/state` for every screen to pay for.
+ *
+ * A signed-out reader gets an empty ledger rather than a 401: there is nothing
+ * to show and nothing to refuse, and the room renders the ways-to-earn table on
+ * exactly this shape.
+ */
+api.get('/api/earnings', async (c) => {
+  const userId = context.userId;
+  if (!userId) return c.json<EarningsResponse>({ entries: [], coins: 0 });
+
+  const [entries, coins] = await Promise.all([readEarnings(userId), readCoins(userId)]);
+  await markEarningsSeen(userId);
+
+  return c.json<EarningsResponse>({ entries, coins });
 });
 
 /**
@@ -239,14 +363,17 @@ api.get('/api/avatar', async (c) => {
       // Nothing to show and nowhere to show it: a signed-out reader has never
       // voted on anything, so they are in no crowd either way.
       showBlob: true,
+      // Nothing to spend without an account to hold it.
+      freeRolls: 0,
     });
   }
 
-  const [equipped, owned, coins, visibility] = await Promise.all([
+  const [equipped, owned, coins, visibility, join] = await Promise.all([
     readAvatar(userId),
     readInventory(userId),
     readCoins(userId),
     readBlobVisibility(userId),
+    readJoinState(userId),
   ]);
   return c.json<AvatarResponse>({
     ...equipped,
@@ -254,6 +381,7 @@ api.get('/api/avatar', async (c) => {
     coins,
     canSave: true,
     showBlob: visibility.showBlob,
+    freeRolls: join.freeRolls,
   });
 });
 
@@ -309,11 +437,12 @@ api.post('/api/avatar', async (c) => {
   // One wave, whichever half of the request arrived: the response says what the
   // player is wearing, owns, can spend and has chosen, and three of those four
   // are unchanged by either write.
-  const [worn, owned, coins, visibility] = await Promise.all([
+  const [worn, owned, coins, visibility, join] = await Promise.all([
     readAvatar(userId),
     readInventory(userId),
     readCoins(userId),
     readBlobVisibility(userId),
+    readJoinState(userId),
   ]);
 
   if (face && accessory && (!ownsItem(owned, face) || !ownsItem(owned, accessory))) {
@@ -334,6 +463,7 @@ api.post('/api/avatar', async (c) => {
     canSave: true,
     // What was asked for, not a re-read of what was just written.
     showBlob: wantsVisibility ? showBlob : visibility.showBlob,
+    freeRolls: join.freeRolls,
   });
 });
 
@@ -367,6 +497,8 @@ api.post('/api/box/open', async (c) => {
     duplicate: outcome.duplicate,
     refunded: outcome.refunded,
     coins: outcome.coins,
+    free: outcome.free,
+    freeRolls: outcome.freeRolls,
   });
 });
 

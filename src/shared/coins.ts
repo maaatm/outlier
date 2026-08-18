@@ -14,12 +14,24 @@
 import {
   BOX_PRICE,
   COINS_FIRST_VOTE,
+  COINS_PER_COMMENT_UPVOTE,
   COINS_STREAK_BONUS,
   COIN_ELIGIBLE_SUBMISSIONS_PER_DAY,
   COINS_SUBMISSION,
+  COMMENT_UPVOTE_COIN_CAP,
   DUPLICATE_REFUND_FRACTION,
+  ROYALTY_COIN_CAP,
+  ROYALTY_VOTES_PER_COIN,
   STREAK_BONUS_EVERY,
 } from './config.js';
+
+/** What the day's first vote paid, split by what paid it. */
+export type DayAward = {
+  /** Turning up. Paid on every day's first vote. */
+  daily: number;
+  /** The seventh-day bonus, or zero. */
+  streak: number;
+};
 
 /**
  * What the day's first vote pays, given the streak it just moved to.
@@ -27,10 +39,14 @@ import {
  * The bonus is keyed on the *new* streak value, so it pays on the day the
  * streak reaches seven rather than the day after, and a streak that reset to 1
  * starts counting toward the next one from there.
+ *
+ * The two halves are reported apart rather than summed, because the ledger says
+ * where a coin came from and "turned up today" and "7 days in a row" are two
+ * different answers. Callers that only want the balance add them.
  */
-export function coinsForNewDay(streak: number): number {
+export function coinsForNewDay(streak: number): DayAward {
   const bonus = streak > 0 && streak % STREAK_BONUS_EVERY === 0 ? COINS_STREAK_BONUS : 0;
-  return COINS_FIRST_VOTE + bonus;
+  return { daily: COINS_FIRST_VOTE, streak: bonus };
 }
 
 /** The submission counter as it stands on the user hash, and what it pays. */
@@ -71,4 +87,49 @@ export function submissionAward(
 /** What a duplicate pays back. Rounded, because coins are whole things. */
 export function duplicateRefund(price: number = BOX_PRICE): number {
   return Math.round(price * DUPLICATE_REFUND_FRACTION);
+}
+
+/**
+ * What a comment's upvotes owe, in total, given its current score.
+ *
+ * Reddit scores a comment 1 on submission — that is the author's own automatic
+ * upvote and is not an endorsement by anybody. Subtracting it is what makes
+ * "+3" mean three people rather than two people and yourself.
+ *
+ * Total owed rather than an increment, so the caller pays the difference from
+ * the watermark. The clamp at zero matters: a comment that is downvoted below
+ * its own upvote owes nothing, and nothing is ever taken back.
+ */
+export function commentUpvoteOwed(score: number): number {
+  const upvotes = Math.max(0, score - 1);
+  return Math.min(upvotes * COINS_PER_COMMENT_UPVOTE, COMMENT_UPVOTE_COIN_CAP);
+}
+
+/** What is still to pay, given what has been. Never negative. */
+export function commentUpvoteDue(score: number, paid: number): number {
+  return Math.max(0, commentUpvoteOwed(score) - paid);
+}
+
+/** A comment at the ceiling stops being worth an API call. */
+export function commentIsSettled(paid: number): boolean {
+  return paid >= COMMENT_UPVOTE_COIN_CAP;
+}
+
+/**
+ * What the vote that took a question to `voteCount` answers owes its author.
+ *
+ * Keyed on the count *this vote produced* rather than on a running total, which
+ * is what removes the need for a watermark: `hIncrBy` hands back a different
+ * number to every vote, so exactly one vote in the app's history ever observes
+ * each multiple of a hundred. No second key, no read-then-write, and no way for
+ * two votes landing together to both pay the same coin.
+ */
+export function royaltyFor(voteCount: number): number {
+  // `0 % 100 === 0` is the same trap `coinsForNewDay` guards at zero. No vote
+  // ever produces a count of nothing, and a rule that paid for one would be a
+  // coin conjured by a question nobody has answered.
+  if (voteCount <= 0) return 0;
+  if (voteCount % ROYALTY_VOTES_PER_COIN !== 0) return 0;
+  if (voteCount > ROYALTY_VOTES_PER_COIN * ROYALTY_COIN_CAP) return 0;
+  return 1;
 }

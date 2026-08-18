@@ -23,6 +23,7 @@ import { redis } from '@devvit/web/server';
 import { buildComment } from '../../shared/comment.js';
 import {
   HISTOGRAM_BUCKETS,
+  JOIN_OFFER_MIN_PLAYS,
   PROVISIONAL_VOTE_FLOOR,
   RECENT_VOTER_CAP,
   REPLAY_MODE,
@@ -33,6 +34,7 @@ import type { Choice, PlayerStats, Reveal, Tally } from '../../shared/types.js';
 import { type StoredVote, decodeVote, encodeVote } from '../../shared/vote.js';
 import { readBlobVisibility } from './avatars.js';
 import { readCameos } from './cameos.js';
+import { readJoinState } from './join.js';
 import { keys, voteFields } from './keys.js';
 import { type QuestionRecord, toPublicQuestion } from './questions.js';
 
@@ -94,12 +96,13 @@ export async function buildReveal(
   userId: string,
   stats: PlayerStats
 ): Promise<Reveal> {
-  const [tally, histogram, commented, cameos, visibility] = await Promise.all([
+  const [tally, histogram, commented, cameos, visibility, join] = await Promise.all([
     readTally(question.id),
     readHistogram(question.id),
     hasCommented(question.id, userId),
     readCameos(question.id, userId),
     readBlobVisibility(userId),
+    readJoinState(userId),
   ]);
 
   const score = scoreVote(tally, vote.choice, vote.guess);
@@ -128,6 +131,11 @@ export async function buildReveal(
     // screen this belongs on, and it is this one — they voted, so they are in
     // the window already. Anything later would be telling them after the fact.
     blobNotice: !visibility.told,
+    // The same shape and the same gate, one screen further in: never offered
+    // and never declined, and enough reveals behind them to have decided they
+    // are playing. `totalPlayed` counts this vote, because `recordPlay` ran
+    // before the reveal was built.
+    joinOffer: !join.answered && stats.totalPlayed >= JOIN_OFFER_MIN_PLAYS,
   };
 
   // Generated last: the comment quotes the numbers above it.
@@ -136,7 +144,20 @@ export async function buildReveal(
 }
 
 export type CastResult =
-  | { status: 'ok'; vote: StoredVote; error: number; hit: boolean }
+  | {
+      status: 'ok';
+      vote: StoredVote;
+      error: number;
+      hit: boolean;
+      /**
+       * How many answers this question has now, counting this one.
+       *
+       * The number `tallyVote`'s own increment handed back, carried out rather
+       * than re-read: it is the one value a second read could not reproduce,
+       * because by then somebody else has voted. The royalty is keyed on it.
+       */
+      voteCount: number;
+    }
   | { status: 'duplicate'; vote: StoredVote };
 
 /**
@@ -158,8 +179,8 @@ export async function castVote(
     // Nothing is claimed and nothing is remembered, so the next open starts
     // over. See the warning on REPLAY_MODE — this is the dedupe guard, off, and
     // with it off the same account can bank points repeatedly.
-    await tallyVote(questionId, choice, guess);
-    return finishVote(questionId, userId, choice, guess);
+    const replayCount = await tallyVote(questionId, choice, guess);
+    return finishVote(questionId, userId, choice, guess, replayCount);
   }
 
   const claimed = await redis.hSetNX(keys.voted(questionId), userId, encodeVote(choice, guess));
@@ -174,13 +195,13 @@ export async function castVote(
     }
   }
 
-  await Promise.all([
+  const [voteCount] = await Promise.all([
     tallyVote(questionId, choice, guess),
     redis.zAdd(keys.guesses(questionId), { member: userId, score: guess }),
     rememberVoter(questionId, userId),
   ]);
 
-  return finishVote(questionId, userId, choice, guess);
+  return finishVote(questionId, userId, choice, guess, voteCount);
 }
 
 /**
@@ -203,14 +224,23 @@ async function rememberVoter(questionId: string, userId: string): Promise<void> 
   await redis.zRemRangeByRank(keys.recent(questionId), 0, -(RECENT_VOTER_CAP + 1));
 }
 
-/** The counters every vote moves, whether or not the voter is remembered. */
-async function tallyVote(questionId: string, choice: Choice, guess: number): Promise<void> {
-  await Promise.all([
+/**
+ * The counters every vote moves — and the sequence number one of them hands
+ * back.
+ *
+ * `guessCount` after this vote is a number no other vote will ever see, which
+ * is what makes the royalty exact without a watermark: exactly one vote in a
+ * question's life observes each multiple of a hundred, so exactly one vote pays
+ * each coin, however many are landing at once.
+ */
+async function tallyVote(questionId: string, choice: Choice, guess: number): Promise<number> {
+  const [, , count] = await Promise.all([
     redis.hIncrBy(keys.votes(questionId), choice === 'a' ? voteFields.a : voteFields.b, 1),
     redis.hIncrBy(keys.votes(questionId), voteFields.guessSum, guess),
     redis.hIncrBy(keys.votes(questionId), voteFields.guessCount, 1),
     redis.hIncrBy(keys.histogram(questionId), String(bucketFor(guess)), 1),
   ]);
+  return count;
 }
 
 /** Score against the tally that includes this vote — you are one of the crowd. */
@@ -218,7 +248,8 @@ async function finishVote(
   questionId: string,
   userId: string,
   choice: Choice,
-  guess: number
+  guess: number,
+  voteCount: number
 ): Promise<CastResult> {
   const tally = await readTally(questionId);
   const score = scoreVote(tally, choice, guess);
@@ -242,7 +273,30 @@ async function finishVote(
     vote: { choice, guess, error: score.error },
     error: score.error,
     hit: score.hit,
+    voteCount,
   };
+}
+
+/**
+ * Claim this player's comment slot on this question.
+ *
+ * `hSetNX` rather than `hSet`, for the same reason `voted:` uses it: this is now
+ * a guard in front of a payment, and a read-then-write guard in front of a
+ * payment is a double payment waiting for two taps. Answers `true` if the claim
+ * was won.
+ *
+ * The claim goes in before the Reddit call and is written over with the real
+ * comment id after, so a submit that throws leaves a claimed slot pointing at
+ * nothing. That is the safe direction: the player retries and is refused, which
+ * costs them a comment they can post themselves, where the other direction
+ * costs the app a second payment.
+ */
+export async function claimComment(questionId: string, userId: string): Promise<boolean> {
+  // Replay mode forgets the comment along with the vote, so the slide stays
+  // playable — and comment coins inflate with it, exactly as submission coins
+  // already do. See the note on REPLAY_MODE.
+  if (REPLAY_MODE) return true;
+  return (await redis.hSetNX(keys.commented(questionId), userId, 'pending')) === 1;
 }
 
 export async function recordComment(
