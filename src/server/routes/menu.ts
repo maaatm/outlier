@@ -18,6 +18,7 @@ import { SUBMISSION_GUIDANCE } from '../../shared/validate.js';
 import { currentSubredditName, postDaily } from '../core/daily.js';
 import { pinMenuPost } from '../core/menuPost.js';
 import { isModerator } from '../core/mod.js';
+import { broadcastDaily, notifyPromotedAuthor } from '../core/push.js';
 import { listPending } from '../core/queue.js';
 import { misjudgedLeaderboard, renderLeaderboardPost } from '../core/stats.js';
 import { remainingSubmissions } from '../core/submit.js';
@@ -151,6 +152,15 @@ menuRoutes.post('/internal/menu/post-daily-now', async (c) => {
   if (result.status === 'exists') {
     return c.json<UiResponse>({ showToast: `Today's Daily is already up (${result.day}).` });
   }
+
+  // The same tail the scheduler's run has, because this *is* that run, fired by
+  // hand rather than by cron — a Daily posted from here is the one the
+  // subreddit gets today, and nobody would be told about it otherwise. The
+  // install trigger deliberately does not get this: a fresh install has nobody
+  // opted in, and a broadcast about a post nobody was waiting for is a worse
+  // introduction than silence.
+  await notifyPromotedAuthor(result.promotedAuthorId, result.postId, result.questionText);
+  await broadcastDaily(result.postId, result.questionText, result.promotedAuthorId || undefined);
 
   return c.json<UiResponse>({
     navigateTo: `https://reddit.com/comments/${result.postId.replace(/^t3_/, '')}`,

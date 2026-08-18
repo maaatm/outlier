@@ -289,3 +289,45 @@ export const REPLAY_MODE = false;
 /** Post flair applied to player-submitted questions. */
 export const OPEN_QUESTION_FLAIR = 'Open question';
 export const DAILY_FLAIR = 'Daily';
+
+/*
+ * ── Push notifications ────────────────────────────────────────────────────
+ *
+ * Opt-in, off by default, and the only part of this game that reaches a
+ * player who is not currently looking at it. Reddit holds the opt-in ledger;
+ * everything here is about what we do with it once somebody has said yes.
+ */
+
+/**
+ * The master switch. `@devvit/notifications` ships marked experimental, so
+ * this exists to turn the whole feature off without unpicking it: false means
+ * the switch never renders, the ask never fires, and nothing is ever enqueued.
+ */
+export const PUSH_ENABLED = true;
+
+/**
+ * The streak at which a player is asked, once, whether they want this.
+ *
+ * Not their first answer — `blobNotice` has that moment, and two consent
+ * questions on one reveal is a permissions wizard. Two days running is the
+ * first point at which "want to be told when the next one is up" is a
+ * description of what they are already doing rather than a guess.
+ */
+export const PUSH_ASK_AFTER_STREAK = 2;
+
+/** `enqueue` takes at most this many recipients. Reddit's cap, not a taste call. */
+export const PUSH_BATCH_SIZE = 1000;
+
+/**
+ * The most recipients one broadcast will walk before it stops and says so.
+ *
+ * A bound rather than a plan: at fifty batches this is already a scheduler run
+ * doing nothing else, and a run that times out halfway leaves an unknown
+ * fraction notified. If the subreddit ever gets near this the fan-out needs a
+ * resumable cursor, which is a different prompt. Until then the cap logs what
+ * it dropped — a silent truncation reads as "everybody got it".
+ */
+export const PUSH_MAX_RECIPIENTS_PER_RUN = 50_000;
+
+/** How much of a question fits in a notification body before it is trimmed. */
+export const PUSH_BODY_MAX_LENGTH = 120;

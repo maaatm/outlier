@@ -125,7 +125,7 @@ export const keys = {
   /**
    * hash: streak, bestStreak, lastPlayedDay, points, totalPlayed, totalHits,
    * weekPoints, weekKey, coins, pity, subDay, subCount, showBlob, freeRolls,
-   * joined, earnSeq, earnSeen
+   * joined, earnSeq, earnSeen, pushAsked
    *
    * Two ledgers on one hash. `points` is the leaderboard score and only ever
    * increases; `coins` is the spendable balance and goes both ways. Crediting
@@ -254,6 +254,21 @@ export const userFields = {
    * that notice writes something here, which is what stops it firing twice.
    */
   showBlob: 'showBlob',
+
+  /**
+   * `"1"` — has this player been asked about push notifications?
+   *
+   * Deliberately *not* the answer. Reddit holds the opt-in ledger and a player
+   * can change it somewhere this app never sees, so a cached copy here would
+   * eventually be a boolean that lies on the one screen that shows it. This
+   * records only that the question was put to them, which is ours to know and
+   * which is what stops the ask firing twice.
+   *
+   * Unlike `showBlob` above, absent does not mean on. It means never asked
+   * *and* not opted in, because the default for reaching somebody's phone is
+   * no and a missing field is not consent.
+   */
+  pushAsked: 'pushAsked',
 
   /** Boxes owed to this player that cost nothing. Spent before coins are. */
   freeRolls: 'freeRolls',
