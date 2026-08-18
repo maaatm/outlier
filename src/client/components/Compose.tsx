@@ -17,6 +17,7 @@ import { buildComment, normalizeNote } from '../../shared/comment.js';
 import { COINS_COMMENT, NOTE_MAX_LENGTH } from '../../shared/config.js';
 import type { Question, Reveal } from '../../shared/types.js';
 import { ApiFailure, postComment } from '../api.js';
+import { CoinTag } from './CoinTag.js';
 
 type Props = {
   postId: string;
@@ -102,12 +103,8 @@ export function Compose({ postId, question, reveal }: Props): React.JSX.Element 
               placeholder="Anything you want to add."
               onChange={(event) => setNote(event.target.value)}
             />
-            {/* The one place the player is deciding whether to post, so it is
-                the one place worth saying what posting pays. It costs no
-                layout: the row was already there, carrying a line that said
-                what the orange button underneath it says. */}
             <div className="label label-row compose__foot">
-              <span>+{COINS_COMMENT} coins</span>
+              <span>posts to the thread</span>
               <span>
                 {note.length} / {NOTE_MAX_LENGTH}
               </span>
@@ -123,7 +120,16 @@ export function Compose({ postId, question, reveal }: Props): React.JSX.Element 
           onClick={submit}
           disabled={posting}
         >
-          {posting ? 'Posting...' : 'Post comment'}
+          {posting ? (
+            'Posting...'
+          ) : (
+            <>
+              {/* What it pays, on the control that pays it — the same tag the
+                  ask room's button carries, and the one place the player is
+                  deciding whether to post at all. */}
+              Post comment<CoinTag coins={COINS_COMMENT} />
+            </>
+          )}
         </button>
       )}
 

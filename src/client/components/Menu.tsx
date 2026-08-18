@@ -37,7 +37,6 @@ import {
   COINS_STREAK_BONUS,
   COINS_SUBMISSION,
   COMMENT_UPVOTE_COIN_CAP,
-  EARNINGS_LOG_SIZE,
   HIT_THRESHOLD,
   ROYALTY_VOTES_PER_COIN,
   STREAK_BONUS_EVERY,
@@ -63,7 +62,6 @@ import type {
   AvatarResponse,
   BoxResponse,
   DailyPointer,
-  JoinResponse,
   PlayerStats,
 } from '../../shared/types.js';
 import { normalizeTitle, validateSubmission } from '../../shared/validate.js';
@@ -71,7 +69,6 @@ import {
   fetchAvatar,
   fetchDaily,
   fetchEarnings,
-  joinSubreddit,
   openBox,
   saveAvatar,
   saveShowBlob,
@@ -81,6 +78,8 @@ import { coalescingWriter } from '../coalesce.js';
 import { COUNTER_SIZE } from '../counterArt.js';
 import { WORDMARK_SIZE } from '../wordmarkArt.js';
 import { Blob } from './Blob.js';
+import { CoinTag } from './CoinTag.js';
+import { Cross } from './Cross.js';
 import { PlayerBoard } from './PlayerBoard.js';
 import { StatBar, StatPill } from './StatBar.js';
 import { Wordmark } from './Wordmark.js';
@@ -176,19 +175,20 @@ export function Menu({
     };
   }, [postId]);
 
-  const { avatar, equip, absorb, show, joined } = useAvatar(
-    panel === 'record' || panel === 'wardrobe'
-  );
-  const { entries, coins, add } = useEarnings(panel === 'record');
+  const { avatar, equip, absorb, show } = useAvatar(panel === 'record' || panel === 'wardrobe');
+  // The ledger is a sheet over the whole menu rather than a block inside a
+  // room, so whether it is open is the menu's business and not the room's.
+  const [ledger, setLedger] = useState(false);
+  const { entries, coins } = useEarnings(ledger);
 
   // The dot is a question about the moment the menu was opened, and opening the
-  // record is what answers it — the fetch above marks the ledger seen on the
-  // server, and this is the same fact on this side of the wire. Held here rather
-  // than in `Root`, which remounts on every trip out of a room and back.
+  // ledger is what answers it — the fetch above marks it seen on the server,
+  // and this is the same fact on this side of the wire. Held here rather than
+  // in `Root`, which remounts on every trip out of a room and back.
   const [ledgerOpened, setLedgerOpened] = useState(false);
   useEffect(() => {
-    if (panel === 'record') setLedgerOpened(true);
-  }, [panel]);
+    if (ledger) setLedgerOpened(true);
+  }, [ledger]);
 
   return (
     <main className="app">
@@ -217,13 +217,10 @@ export function Menu({
           <Record
             stats={stats}
             avatar={avatar}
-            entries={entries}
             coins={coins}
+            unseen={stats.unseenEarnings && !ledgerOpened}
             onShow={show}
-            onJoined={(response) => {
-              joined(response);
-              if (response.granted) add({ reason: 'join', coins: 0, at: Date.now(), detail: 0 });
-            }}
+            onOpenLedger={() => setLedger(true)}
           />
         )}
         {panel === 'wardrobe' && (
@@ -242,6 +239,12 @@ export function Menu({
           {panel === null ? 'Back to the question' : 'Back to menu'}
         </button>
       )}
+
+      {/* Last in the tree so it lays over everything above it, and mounted by
+          the menu rather than by the room that opens it — a sheet belongs to the
+          screen it covers, and this one stays put while the room behind it
+          scrolls or changes. */}
+      {ledger && <Ledger entries={entries} onClose={() => setLedger(false)} />}
     </main>
   );
 }
@@ -288,7 +291,6 @@ function useAvatar(needed: boolean): {
   equip: (next: Equipped) => void;
   absorb: (box: BoxResponse) => void;
   show: (showBlob: boolean) => void;
-  joined: (response: JoinResponse) => void;
 } {
   const [avatar, setAvatar] = useState<AvatarResponse | null>(null);
 
@@ -350,22 +352,6 @@ function useAvatar(needed: boolean): {
   }
 
   /**
-   * Fold a join into what is held.
-   *
-   * The same reasoning as `absorb`: the response carries both halves of what
-   * changed — the grant and the rolls it left — so the wardrobe's box knows what
-   * the next tap costs without a refetch, and the row that offered it goes away
-   * because `joined` is now true rather than because the room reloaded.
-   */
-  function joined(response: JoinResponse): void {
-    setAvatar((current) =>
-      current === null
-        ? current
-        : { ...current, joined: response.joined, freeRolls: response.freeRolls }
-    );
-  }
-
-  /**
    * Show the counter to other players, or stop.
    *
    * Its own write rather than a field on the coalescing one above. That writer
@@ -385,7 +371,7 @@ function useAvatar(needed: boolean): {
     });
   }
 
-  return { avatar, equip, absorb, show, joined };
+  return { avatar, equip, absorb, show };
 }
 
 /**
@@ -404,7 +390,6 @@ function useEarnings(needed: boolean): {
   entries: Earning[] | null;
   /** The balance as the ledger read it. Null until it has been read. */
   coins: number | null;
-  add: (entry: Earning) => void;
 } {
   const [entries, setEntries] = useState<Earning[] | null>(null);
   // The balance comes back with the ledger because the two are read together on
@@ -431,12 +416,7 @@ function useEarnings(needed: boolean): {
     };
   }, [needed, entries]);
 
-  /** A line earned while the room is open, put where it would have arrived. */
-  function add(entry: Earning): void {
-    setEntries((current) => [entry, ...(current ?? [])].slice(0, EARNINGS_LOG_SIZE));
-  }
-
-  return { entries, coins, add };
+  return { entries, coins };
 }
 
 /** The list itself, under the wordmark, with the one way out above it. */
@@ -481,6 +461,7 @@ function Root({
             >
               <span className="menu__item-label">
                 {TITLES[entry.id]}
+                {entry.id === 'ask' && <CoinTag coins={COINS_SUBMISSION} />}
                 {entry.id === 'record' && unseen && <UnseenDot />}
               </span>
               <span className="menu__item-blurb">{entry.blurb}</span>
@@ -560,18 +541,19 @@ function Footnote({ children }: { children: React.ReactNode }): React.JSX.Elemen
 function Record({
   stats,
   avatar,
-  entries,
   coins,
+  unseen,
   onShow,
-  onJoined,
+  onOpenLedger,
 }: {
   stats: PlayerStats;
   avatar: AvatarResponse | null;
-  entries: Earning[] | null;
   /** The balance the ledger read, which is fresher than the one on `stats`. */
   coins: number | null;
+  /** Something has been paid since the ledger was last opened. */
+  unseen: boolean;
   onShow: (showBlob: boolean) => void;
-  onJoined: (response: JoinResponse) => void;
+  onOpenLedger: () => void;
 }): React.JSX.Element {
   const rate =
     stats.totalPlayed > 0 ? Math.round((stats.totalHits / stats.totalPlayed) * 100) : 0;
@@ -625,13 +607,22 @@ function Record({
         </div>
       </div>
 
-      {/* The offer, kept until it is taken. It is here rather than in the
-          wardrobe — the obvious home and the wrong one — because that room is
-          measured to fit 512px without scrolling and has already given its fine
-          print to the box. This page has no height budget. */}
-      {avatar?.canSave && !avatar.joined && <JoinRow onJoined={onJoined} />}
-
-      <Earnings entries={entries} />
+      {/* The way into the ledger, not the ledger itself. The figures above are
+          totals, and where a coin came from is a different question asked at a
+          different moment — so it opens over the menu instead of sitting under
+          the tiles pushing the page down. The dot rides on the button that
+          answers it. */}
+      <button
+        type="button"
+        className="button block block--cream block--md record__ledger"
+        onClick={onOpenLedger}
+      >
+        <span className="record__ledger-label">
+          What you have earned
+          {unseen && <UnseenDot />}
+        </span>
+        <span className="record__ledger-hint">where your last coins came from</span>
+      </button>
 
       <div className="record__read block block--cream block--lg">
         <span className="label">how you read the room</span>
@@ -655,44 +646,82 @@ function Record({
 /**
  * Where the coins came from, and — when there are none — where they come from.
  *
- * A **block, not a well**, and that is the one deliberate exception to the rule
- * this design runs on: everything else on this page is a total the player
- * already knew, and this is the page telling them something they did not.
+ * A sheet laid over the whole menu rather than a block inside Your record. The
+ * room it opens from is a page of totals the player already knew; this is the
+ * one thing in the menu that tells them something they did not, and it earns
+ * the interruption by being asked for. It also means the list of earns can be
+ * as long as it needs to be without the room underneath giving up height for a
+ * table nobody has opened.
  *
- * Two states, one box. A new player's ledger is empty, and an empty box is a
- * worse first impression than no box — so the same block teaches instead,
- * mirroring the `Nothing to show yet` branch `record__read` already has. Both
- * tables read their numbers from `shared/config.ts`, so neither can drift from
- * what the game actually pays.
+ * One way out, in the corner, and the same X that closes everything else.
+ *
+ * Two states, one sheet. A new player's ledger is empty, and an empty sheet is
+ * a worse first impression than no sheet — so it teaches instead, mirroring the
+ * `Nothing to show yet` branch `record__read` already has. Both tables read
+ * their numbers from `shared/config.ts`, so neither can drift from what the
+ * game actually pays.
  */
-function Earnings({ entries }: { entries: Earning[] | null }): React.JSX.Element {
+function Ledger({
+  entries,
+  onClose,
+}: {
+  entries: Earning[] | null;
+  onClose: () => void;
+}): React.JSX.Element {
   const earned = entries !== null && entries.length > 0;
 
   return (
-    <div className="earnings block block--cream block--lg">
-      <span className="label">{earned ? 'what you have earned' : 'ways to earn'}</span>
+    /* Labelled by its own heading rather than by a string repeated here, so a
+       reader hears the same words a looker sees. */
+    <div className="ledger" role="dialog" aria-modal="true" aria-labelledby="ledger-title">
+      {/* The felt, dimmed. Pressing it closes, because a sheet that can only be
+          dismissed from a 40px target in the corner is a sheet somebody is
+          stuck under. */}
+      <button
+        type="button"
+        className="ledger__scrim"
+        aria-label="Close"
+        tabIndex={-1}
+        onClick={onClose}
+      />
 
-      {entries === null ? (
-        <p className="record__line">Loading...</p>
-      ) : (
-        <ul className="earnings__list">
-          {earned
-            ? entries.map((entry) => (
-                <EarnRow
-                  // The timestamp is what makes a member unique in the ledger
-                  // itself, so it is what identifies a row here too.
-                  key={`${entry.at}:${entry.reason}`}
-                  label={EARN_COPY[entry.reason](entry.detail)}
-                  // The free roll pays a box rather than coins, and a row
-                  // reading `+0` reads as a bug rather than as a gift.
-                  amount={entry.reason === 'join' ? 'free box' : `+${entry.coins}`}
-                />
-              ))
-            : WAYS_TO_EARN.map((way) => (
-                <EarnRow key={way.label} label={way.label} amount={way.amount} />
-              ))}
-        </ul>
-      )}
+      <div className="ledger__sheet block block--cream block--lg">
+        <div className="ledger__head">
+          <span className="label" id="ledger-title">
+            {earned ? 'what you have earned' : 'ways to earn'}
+          </span>
+          <button
+            type="button"
+            className="ledger__close"
+            aria-label="Close"
+            onClick={onClose}
+          >
+            <Cross />
+          </button>
+        </div>
+
+        {entries === null ? (
+          <p className="record__line">Loading...</p>
+        ) : (
+          <ul className="earnings__list">
+            {earned
+              ? entries.map((entry) => (
+                  <EarnRow
+                    // The timestamp is what makes a member unique in the ledger
+                    // itself, so it is what identifies a row here too.
+                    key={`${entry.at}:${entry.reason}`}
+                    label={EARN_COPY[entry.reason](entry.detail)}
+                    // The free roll pays a box rather than coins, and a row
+                    // reading `+0` reads as a bug rather than as a gift.
+                    amount={entry.reason === 'join' ? 'free box' : `+${entry.coins}`}
+                  />
+                ))
+              : WAYS_TO_EARN.map((way) => (
+                  <EarnRow key={way.label} label={way.label} amount={way.amount} />
+                ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }
@@ -731,48 +760,6 @@ function EarnRow({ label, amount }: { label: string; amount: string }): React.JS
       <span className="earnings__reason">{label}</span>
       <span className="earnings__amount">{amount}</span>
     </li>
-  );
-}
-
-/**
- * Join the subreddit, and take a box for it.
- *
- * A row rather than a block with a heading: it is an offer on a page of totals,
- * and it leaves for good the moment it is taken. Declining the reveal's version
- * of this does not remove it — that only stops the reveal asking again, and
- * somebody who said not now should still be able to say yes here.
- */
-function JoinRow({ onJoined }: { onJoined: (response: JoinResponse) => void }): React.JSX.Element {
-  const [joining, setJoining] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function join(): Promise<void> {
-    setJoining(true);
-    setError(null);
-    try {
-      onJoined(await joinSubreddit());
-    } catch (failure) {
-      setError(failure instanceof Error ? failure.message : 'That did not go through.');
-      setJoining(false);
-    }
-  }
-
-  return (
-    <div className="join block block--cream block--lg">
-      <span className="join__copy">
-        Join r/PlayOutlier and take a gift box on us. One tap, and the box is waiting in
-        your wardrobe.
-      </span>
-      <button
-        type="button"
-        className="button block block--orange block--md join__button"
-        disabled={joining}
-        onClick={() => void join()}
-      >
-        {joining ? 'Joining...' : 'Join and claim'}
-      </button>
-      {error && <p className="notice notice--quiet notice--cream">{error}</p>}
-    </div>
   );
 }
 
@@ -1328,7 +1315,13 @@ function Ask({ canSubmit }: { canSubmit: boolean }): React.JSX.Element {
         disabled={!ready}
         onClick={() => void post()}
       >
-        {posting ? 'Posting...' : 'Post it'}
+        {posting ? (
+          'Posting...'
+        ) : (
+          <>
+            Post it<CoinTag coins={COINS_SUBMISSION} />
+          </>
+        )}
       </button>
 
       {error ? (
@@ -1336,15 +1329,6 @@ function Ask({ canSubmit }: { canSubmit: boolean }): React.JSX.Element {
       ) : (
         started && !check.ok && <p className="notice notice--quiet notice--spaced">{check.reason}</p>
       )}
-
-      {/* What posting pays, at the point of decision — the same job the `+5
-          coins` on the comment's foot row does. It is the room's fine print
-          rather than a fifth field, because this room is measured to fit and a
-          rate is not something anybody types into. */}
-      <Footnote>
-        Posting pays +{COINS_SUBMISSION} coins, and {COINS_PROMOTION} more if it becomes the
-        Daily.
-      </Footnote>
     </div>
   );
 }

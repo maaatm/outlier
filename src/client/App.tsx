@@ -15,6 +15,7 @@ import type { Choice, Question, QuestionState, Reveal, StateResponse } from '../
 import { ApiFailure, castVote, fetchState, joinSubreddit, saveShowBlob } from './api.js';
 import { Blob } from './components/Blob.js';
 import { Compose } from './components/Compose.js';
+import { Cross } from './components/Cross.js';
 import { DotCrowd } from './components/DotCrowd.js';
 import { Histogram } from './components/Histogram.js';
 import { Menu, UnseenDot } from './components/Menu.js';
@@ -831,26 +832,6 @@ function JoinOffer({ onAnswered }: { onAnswered: () => void }): React.JSX.Elemen
         <p className="notice notice--quiet notice--cream">That did not go through. Try again.</p>
       )}
     </div>
-  );
-}
-
-/**
- * The X, drawn rather than typed, for the same reason the wardrobe's chevrons
- * are: the bundled fonts are subsetted to the Latin ranges they need, so a
- * multiplication sign or a dingbat would fall through to whatever the device
- * happens to have.
- */
-function Cross(): React.JSX.Element {
-  return (
-    <svg className="cross" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
-      <path
-        d="M 4 4 L 12 12 M 12 4 L 4 12"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-      />
-    </svg>
   );
 }
 

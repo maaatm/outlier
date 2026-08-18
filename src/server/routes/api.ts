@@ -363,9 +363,8 @@ api.get('/api/avatar', async (c) => {
       // Nothing to show and nowhere to show it: a signed-out reader has never
       // voted on anything, so they are in no crowd either way.
       showBlob: true,
-      // Nothing to spend and nothing to claim without an account to hold it.
+      // Nothing to spend without an account to hold it.
       freeRolls: 0,
-      joined: false,
     });
   }
 
@@ -383,7 +382,6 @@ api.get('/api/avatar', async (c) => {
     canSave: true,
     showBlob: visibility.showBlob,
     freeRolls: join.freeRolls,
-    joined: join.joined,
   });
 });
 
@@ -466,7 +464,6 @@ api.post('/api/avatar', async (c) => {
     // What was asked for, not a re-read of what was just written.
     showBlob: wantsVisibility ? showBlob : visibility.showBlob,
     freeRolls: join.freeRolls,
-    joined: join.joined,
   });
 });
 

@@ -163,7 +163,8 @@ and filtering would be a read to defend nothing.
 grants one free roll, once per account, tracked on `joined` — Devvit does not expose
 subscription state, so a local one-time grant is the only bound available. A free roll is
 spent before coins are, refunds nothing on a duplicate (a roll that took nothing in has
-nothing to make whole), and still advances pity.
+nothing to make whole), and still advances pity. It is offered in one place, on the
+reveal's score slide, under the award — the menu asks for nothing.
 
 ### Where the coins came from
 
@@ -175,8 +176,8 @@ every one of them now writes a line to `earn:{userId}` — a zset holding the la
 
 `logEarning` deliberately does not pay: `creditCoins` moves the balance and this records
 why, so a payment that succeeds and a log line that fails costs a receipt rather than the
-coins. The ledger is read once, by Your record, through `GET /api/earnings` — and reading
-it is what marks it seen. `earnSeq` and `earnSeen` on the user hash carry that: unseen is
+coins. The ledger is read once, by the sheet Your record opens, through
+`GET /api/earnings` — and reading it is what marks it seen. `earnSeq` and `earnSeen` on the user hash carry that: unseen is
 `earnSeq > earnSeen`, which `projectStats` answers out of the `hGetAll` it was already
 making, so the dot on the menu costs no read anywhere.
 
@@ -657,7 +658,7 @@ room at all.
 |---|---|
 | **Today's question** | leaves the post for today's Daily. Not a room |
 | Ask a question | write one for the subreddit and post it |
-| Your record | streak, best, points, coins, what you last earned, questions answered, read rate, and whether other players see your blob |
+| Your record | streak, best, points, coins, the way into the ledger, questions answered, read rate, and whether other players see your blob |
 | Wardrobe | your blob, your balance, the items you own, and the gift box |
 | Leaderboard | who has banked the most points, weekly or all time |
 
@@ -679,24 +680,30 @@ be a third thing to read before the question, and a third meaning of colour if i
 ever accented. The two places coins appear are the two screens where they are relevant —
 the page of totals, and the room where they are spent.
 
-**Your record is also where a payout is explained.** One block under the figures lists the
-last few coin events in the words of what you did — `8 upvotes on your comment`, not a
-constant — and it is a *block* rather than a well, which is the one deliberate exception
-to the rule that a banked number sits in a well: everything else on that page is a total
-the player already knew, and this is the page telling them something they did not. When
-it is empty it renders the ways to earn instead, because a new player's ledger has nothing
-in it and an empty box is a worse first impression than no box. Both tables read their
-numbers from `shared/config.ts`, so neither can drift from what the game actually pays.
+**Where a payout is explained is a sheet, not a room.** Your record carries a button —
+`What you have earned` — and pressing it lays the ledger over the whole menu, closed by the
+X in its corner or by pressing the felt around it. It is a sheet rather than a block on the
+page because the room it opens from is a page of totals the player already knew, and this
+is the one thing in the menu telling them something they did not: it earns covering the
+screen by being asked for, and the room underneath gives up no height for a table nobody
+has opened. Each line is in the words of what you did — `8 upvotes on your comment`, not a
+constant. When it is empty it renders the ways to earn instead, because a new player's
+ledger has nothing in it and an empty sheet is a worse first impression than no sheet. Both
+tables read their numbers from `shared/config.ts`, so neither can drift from what the game
+actually pays.
 
-An orange dot on the **Your record** row of the menu, and on the reveal's **Menu** button,
-says something has been paid since the ledger was last opened. It is `stats.unseenEarnings`,
-derived from two counters on the user hash inside a read every screen was already making —
-so the dot costs no round trip anywhere, and opening the record is what puts it out.
+An orange dot on the **Your record** row of the menu, on the button inside it, and on the
+reveal's **Menu** button says something has been paid since the ledger was last opened. It
+is `stats.unseenEarnings`, derived from two counters on the user hash inside a read every
+screen was already making — so the dot costs no round trip anywhere, and opening the ledger
+is what puts it out.
 
-**The incentive is stated before the action, not only after it.** The comment's foot row
-reads `+5 coins` where it used to say what the button underneath it says; the ask room's
-fine print says what posting pays and what promotion pays on top. Neither is a new screen
-or a new row.
+**The incentive is stated on the control that pays it.** `Ask a question` in the menu list,
+`Post it` in the ask room and `Post comment` on the share slide each carry a
+`(+10 Coins)` / `(+5 Coins)` tag in their own colour — the deep orange coins already use on
+a cream block, the dark ink on an orange one, where that orange would be invisible. Neither
+is a new accent, and both are bracketed numbers as well as a colour, so nothing rests on
+colour alone. No fine print under a button says what the button says.
 
 The wardrobe is the one room built to a height budget. A balance, a blob, two steppers and
 the gift box have to fit the card without scrolling at 512px — as short as Devvit's inline

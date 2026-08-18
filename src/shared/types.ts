@@ -418,14 +418,8 @@ export type AvatarResponse = Equipped & {
    * note on `showBlob` in `server/core/keys.ts`.
    */
   showBlob: boolean;
-  /** Boxes owed that cost nothing. Spent before coins are. */
+  /** Boxes owed that cost nothing. Spent before coins are, and priced as free. */
   freeRolls: number;
-  /**
-   * The join grant has been taken. False while it is still on offer — which is
-   * what keeps the row in Your record for somebody who declined the reveal's
-   * version of it.
-   */
-  joined: boolean;
 };
 
 /**
