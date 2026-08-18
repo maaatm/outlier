@@ -45,7 +45,7 @@ immediately rather than a wait until midnight.
 data/questions.json     130 hand-written house questions
 docs/writing-questions.md   the moderator guide — the thing that decides if this is fun
 src/shared/             scoring, badges, day math, coin rules, the box roll, the item
-                        catalogue, comment text — used by both sides
+                        catalogue, comment text, notification copy — both sides
 src/server/core/        redis-facing logic, one concern per file
 src/server/routes/      hono routers: api, submit, queue, menu, forms, tasks
 src/client/             react app, flat sticker-book UI
@@ -307,6 +307,32 @@ None of this weakens the tally invariant. Cameos ride on `Reveal` and on nothing
 they are behind the same `voted:{questionId}` gate — a viewer who has not answered cannot
 reach them, and a viewer who has already holds the tally those ten answers are part of.
 
+### Push notifications, opt-in
+
+The one part of the game that reaches a player who is not looking at it, and the one
+setting that ships **off**. A cameo is a drawing inside an app somebody already opened; a
+notification is this app reaching a phone in somebody's pocket, so absent consent is no.
+
+- **Reddit owns the ledger, not us.** `notifications.isOptedIn` is the record of truth and
+  is read every time the switch is drawn. Nothing is mirrored into Redis, because a cached
+  copy of a boolean a player can change in Reddit's own settings is a boolean that will
+  eventually lie on the one screen that shows it. The single thing stored is `pushAsked`,
+  which records that the question was put and not what the answer was.
+- **Two things are sent and nothing else.** The Daily is up, to everyone opted in; and —
+  to one author — your question is today's Daily. The second suppresses the first for that
+  person, because two buzzes about one post is how an opt-in becomes an opt-out.
+- **No copy carries a number** except the coin award on the promotion notice. A
+  notification reaches somebody who by definition has not voted on the question it is
+  about, so anything derived from the split would hand them the answer — the same
+  invariant, on the one shape that travels outside the app.
+- **The ask is one panel, once, at a streak of `PUSH_ASK_AFTER_STREAK`.** Not on a first
+  answer, where the blob notice already has that moment. Both of its buttons write, so a
+  no is recorded as an answer rather than as a dismissal.
+- **`PUSH_ENABLED` turns the whole thing off.** `@devvit/notifications` ships marked
+  experimental; false means the switch never renders, the ask never fires, and nothing is
+  ever enqueued. Nothing in `core/push.ts` throws, so a plugin that stops answering costs
+  the subreddit a buzz and never its Daily.
+
 ---
 
 ## Data model
@@ -333,7 +359,7 @@ recent:{questionId}    zset   userId -> voted at  (capped window, for the cameos
 user:{userId}          hash   streak, bestStreak, lastPlayedDay, points,
                               totalPlayed, totalHits, weekPoints, weekKey,
                               coins, pity, subDay, subCount, showBlob,
-                              freeRolls, joined, earnSeq, earnSeen
+                              freeRolls, joined, earnSeq, earnSeen, pushAsked
 sub:recent:{userId}    hash   submission fingerprint -> "1", TTL 60s
 sub:count:{userId}:{day}  string  questions posted today, TTL 48h
 
@@ -440,9 +466,10 @@ POST /api/submit              { text, labelA, labelB, title? } -> the new post;
                               429 past the day's allowance, 409 on a repeat
 GET  /api/leaderboard/players?range=week|all   players by points banked
 GET  /api/avatar              the pair you are wearing, what you own, your balance,
-                              and whether other players may see it
-POST /api/avatar              { face?, accessory?, showBlob? } -> the same shape;
-                              403 if unowned, 400 if it asks for nothing
+                              whether other players may see it, and whether you
+                              are opted in to push
+POST /api/avatar              { face?, accessory?, showBlob?, push? } -> the same
+                              shape; 403 if unowned, 400 if it asks for nothing
 POST /api/box/open            spend a free roll or coins, roll an item
                               -> { item, duplicate, refunded, coins, free, freeRolls }
 GET  /api/today               today's UTC day key
@@ -461,7 +488,7 @@ flag on a menu item hides a button; it does not gate the endpoint behind it.
 
 | Job | Cadence | Action |
 |---|---|---|
-| `post-daily` | `0 0 * * *` | Resolve source, create the Daily post, write `daily:{date}` |
+| `post-daily` | `0 0 * * *` | Resolve source, create the Daily post, write `daily:{date}`, then notify |
 | `summarize-daily` | `0 0 * * *` | Sticky where the *previous* day's split stands |
 | `refresh-queue` | hourly | Re-score `queue:pending` from live post upvotes |
 | `sweep-comments` | hourly | Pay tracked comments what their upvotes owe |
@@ -471,6 +498,12 @@ different data, and a throw in one must not take the other's run with it. It rea
 expiring end of `comments:tracked` in full and the newest `COMMENT_SWEEP_BATCH` inside the
 window, which is where upvotes actually arrive — and the watermark is what makes bounding
 it safe, since a comment it skips is paid in full by the next run that reaches it.
+
+The notifications hang off the end of `post-daily` rather than off `postDaily` itself: the
+`try`/`catch` in there releases `daily:claims` on any throw, and a notification failing
+inside it would release the claim on a day whose post already exists. A push is something
+that happens *because* the Daily was posted; it is not part of posting it. The install
+trigger deliberately does not notify — a fresh install has nobody opted in.
 
 Both midnight jobs are idempotent and touch different day keys, so the order they fire
 in does not matter. `post-daily` guards on `daily:claims`, `summarize-daily` on

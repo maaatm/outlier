@@ -17,6 +17,7 @@ import { Hono } from 'hono';
 import { previousDay, toDayKey } from '../../shared/day.js';
 import { sweepCommentRewards } from '../core/commentRewards.js';
 import { postDaily, summarizeDaily } from '../core/daily.js';
+import { broadcastDaily, notifyPromotedAuthor } from '../core/push.js';
 import { getQuestion } from '../core/questions.js';
 import {
   allApprovedIds,
@@ -31,9 +32,26 @@ taskRoutes.post('/internal/tasks/post-daily', async (c) => {
   const result = await postDaily(toDayKey());
   if (result.status === 'exists') {
     console.log(`post-daily: ${result.day} already has a question, nothing to do`);
-  } else {
-    console.log(`post-daily: ${result.day} -> ${result.questionId} on ${result.postId}`);
+    return c.json({});
   }
+
+  console.log(`post-daily: ${result.day} -> ${result.questionId} on ${result.postId}`);
+
+  /*
+   * The notifications, after the post exists and never before it.
+   *
+   * The author goes first, so that a run dying between the two leaves the one
+   * person with a specific reason to hear having heard — and because their
+   * notice is what replaces their copy of the broadcast, which is what
+   * `promotedAuthorId` is doing on the second call.
+   *
+   * **No `try`/`catch` here on purpose.** Both of these swallow their own
+   * failures — see the header on `core/push.ts` — and a catch around them would
+   * be a second one, catching nothing, implying they might throw.
+   */
+  await notifyPromotedAuthor(result.promotedAuthorId, result.postId, result.questionText);
+  await broadcastDaily(result.postId, result.questionText, result.promotedAuthorId || undefined);
+
   return c.json({});
 });
 

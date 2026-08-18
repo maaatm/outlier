@@ -91,7 +91,16 @@ function dailyTitle(day: string, text: string): string {
 }
 
 export type PostDailyResult =
-  | { status: 'created'; day: string; questionId: string; postId: string }
+  | {
+      status: 'created';
+      day: string;
+      questionId: string;
+      postId: string;
+      /** Empty on a house question. The author who is about to be told, and skipped in the broadcast. */
+      promotedAuthorId: string;
+      /** The question itself, so the task does not re-read the record to write a sentence. */
+      questionText: string;
+    }
   | { status: 'exists'; day: string; questionId: string };
 
 /**
@@ -165,7 +174,14 @@ export async function postDaily(day: string = toDayKey()): Promise<PostDailyResu
     // id the same way `creditCoins` does, so a house Daily records nothing.
     await logEarning(promotedAuthor, 'promotion', COINS_PROMOTION);
 
-    return { status: 'created', day, questionId: resolution.questionId, postId: post.id };
+    return {
+      status: 'created',
+      day,
+      questionId: resolution.questionId,
+      postId: post.id,
+      promotedAuthorId: promotedAuthor,
+      questionText: question.text,
+    };
   } catch (error) {
     // Release the claim, or the subreddit gets no Daily at all today.
     await redis.hDel(keys.dailyClaims, [day]);
