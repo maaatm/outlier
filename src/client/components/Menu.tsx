@@ -862,9 +862,12 @@ function ShowBlob({
 }): React.JSX.Element {
   return (
     <>
+      {/* One line and a half, not the paragraph this was. The full version is
+          on the reveal's first-run notice, which is where the player is
+          actually told; what has to survive here is the half nobody could work
+          out from the switch — that turning it off reaches backwards. */}
       <span className="record__note">
-        Other players see your counter on questions you have both answered, standing on the
-        side you picked. Switch it off and it leaves every crowd, old ones included.
+        Seen in other players&rsquo; crowds, old questions included.
       </span>
       <button
         type="button"
@@ -910,11 +913,12 @@ function PushSwitch({
 }): React.JSX.Element {
   return (
     <>
-      {/* A promise the code has to keep. If a second trigger is ever added,
-          this line changes in the same commit or the line is a lie. */}
+      {/* A promise the code has to keep, and it is made twice: here, and in
+          `PushNotice` on the reveal, which is the fuller version because it is
+          where the player says yes. If a second trigger is ever added, both
+          lines change in the same commit or both are a lie. */}
       <span className="record__note">
-        We&rsquo;ll send one notification a day, when the new question goes up. Nothing else,
-        and you can switch it off here.
+        One notification a day, when the new question goes up.
       </span>
       <button
         type="button"

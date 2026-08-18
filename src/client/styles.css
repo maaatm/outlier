@@ -1991,16 +1991,25 @@ button {
 /* ── Your record ────────────────────────────────────────────────────────── */
 
 /*
- * Your counter and the one decision attached to it, side by side. The counter
- * keeps its size and the setting takes the rest of the row: this room is a
- * page of totals, and the setting should read as a footnote to the drawing
+ * Your counter and the two decisions attached to it, side by side. The counter
+ * keeps its size and the settings take the rest of the row: this room is a
+ * page of totals, and a setting should read as a footnote to the drawing
  * rather than as a control the page is built around.
+ *
+ * Two of them nearly broke that. Each arrived as a paragraph and a switch, and
+ * the pair made this card 325px of a 740px screen — the drawing stranded in the
+ * middle of a wall of small type, with the totals the room is named for pushed
+ * under the fold. The column is 184px wide on a phone, which is about thirty
+ * characters, so prose here costs five lines to say what a caption says in two.
+ * What fixed it was the copy rather than the layout: at a line and a half each
+ * the card is 201px, which is less than it was when there was one setting in
+ * it. A third would need a different shape, not another trim.
  */
 .record__card {
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 16px 18px;
+  padding: 14px 16px;
   margin-top: 18px;
   border-radius: 11px;
   flex: none;
@@ -2043,12 +2052,23 @@ button {
   color: var(--ink);
 }
 
+/*
+ * A caption on a control, and sized to stay one.
+ *
+ * It was a paragraph while there was one setting here and the column had the
+ * counter's whole height to spend. There are two now, and two paragraphs made
+ * this card 325px on a 740px screen — half the room, to say a thing the reveal
+ * has already said once. So each is a line and a half that carries the fact
+ * that could not be got anywhere else: that the crowd setting reaches backwards,
+ * and how often the other one fires. The long version of both lives where the
+ * consent is actually given, in the first-run notices on the reveal.
+ */
 .record__note {
   display: block;
-  margin: 3px 0 0;
+  margin: 2px 0 0;
   font-weight: 500;
   font-size: 11.5px;
-  line-height: 1.5;
+  line-height: 1.4;
   color: var(--ink-body-cream);
 }
 
@@ -2088,7 +2108,10 @@ button {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-top: 11px;
+  /* Close to the line above it, which is its label — the gap that separates
+     one setting from the next is `.switch + .record__note`, and it is bigger
+     than this one on purpose. */
+  margin-top: 6px;
   padding: 0;
   border: 0;
   background: none;
@@ -2141,12 +2164,13 @@ button {
  * Two settings stacked, told apart by the gap between them.
  *
  * A note following a switch is the start of the next setting rather than more
- * of the last one, and at the note's own 3px it reads as a caption under the
- * knob. One sibling selector rather than a modifier class, because nothing
- * about either switch changes — only the distance between two of them.
+ * of the last one, so this gap is twice the one above a knob and that ratio is
+ * the only thing grouping them. One sibling selector rather than a modifier
+ * class, because nothing about either switch changes — only the distance
+ * between two of them.
  */
 .switch + .record__note {
-  margin-top: 14px;
+  margin-top: 13px;
 }
 
 /*
