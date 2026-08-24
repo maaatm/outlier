@@ -187,7 +187,7 @@ menuRoutes.post('/internal/menu/pin-menu-post', async (c) => {
     navigateTo: result.permalink,
     showToast: result.pinned
       ? { text: 'Menu post pinned.', appearance: 'success' }
-      : 'Menu post created, but it could not be pinned — check the sticky slots.',
+      : 'Menu post created, but it could not be pinned — pin it by hand, or add the app to the mod team.',
   });
 });
 

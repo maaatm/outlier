@@ -25,7 +25,7 @@
     "redis": true,
     "reddit": {
       "enable": true,
-      "scope": "moderator",
+      "scope": "user",
       "asUser": ["SUBMIT_COMMENT", "SUBMIT_POST", "SUBSCRIBE_TO_SUBREDDIT"]
     }
   },

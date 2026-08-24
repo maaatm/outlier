@@ -56,6 +56,7 @@ import {
 import { awardSubmissionCoins } from './coins.js';
 import { currentSubredditName } from './daily.js';
 import { filterText } from './filter.js';
+import { applyFlair } from './flair.js';
 import { keys } from './keys.js';
 import { linkQuestionToPost, newCommunityQuestionId, writeQuestion } from './questions.js';
 import { enqueuePending } from './queue.js';
@@ -187,12 +188,13 @@ export async function submitOpenQuestion(input: {
     source: 'community',
   });
 
+  const subredditName = await currentSubredditName();
+
   let post;
   try {
     post = await reddit.submitCustomPost({
-      subredditName: await currentSubredditName(),
+      subredditName,
       title,
-      flairText: OPEN_QUESTION_FLAIR,
       runAs: 'USER',
       // What Reddit's safety review reads. The title is user-authored content
       // that is not otherwise in here, and it is only left out when it is the
@@ -229,6 +231,14 @@ export async function submitOpenQuestion(input: {
   // Paid once the post exists, so a submission that fell over on the way there
   // pays nothing.
   const coins = await awardSubmissionCoins(userId);
+
+  // Last, after the post is reachable, queued and paid for. The label rode
+  // inside the submit as `flairText` until Devvit 0.14.1 took the app account's
+  // moderator scope away, which turned a cosmetic flair into something that
+  // could refuse a player's question outright and spend one of their three for
+  // the day on nothing. Out here it is expected to fail and costs the player
+  // nothing when it does — see `core/flair.ts`.
+  await applyFlair(subredditName, post.id, OPEN_QUESTION_FLAIR);
 
   return { status: 'ok', questionId, postId: post.id, permalink: post.permalink, coins };
 }
