@@ -885,24 +885,57 @@ function PushNotice({ onAnswered }: { onAnswered: () => void }): React.JSX.Eleme
  * offer for good, because both write to `joined` — the X so the reveal stops
  * asking, the button because the box has been handed over.
  *
- * A failure leaves the offer up and says so, the same way `BlobNotice` does:
- * the alternative is a player who tapped join, was subscribed to nothing, and
- * has no way to try again.
+ * A failure leaves the offer up and says **what the server said**, the same way
+ * the gift box does. It used to print one sentence over every refusal there is,
+ * which is how a dead button spent a release looking like a flaky one: a 401, a
+ * 409 and a 500 all reached the player as "that did not go through", and none
+ * of them told anybody which.
+ *
+ * The third state below is neither: Reddit refused the subscription and the box
+ * was granted anyway. That is not a failure to retry — nothing is left to claim
+ * — so it is a note that has to be read before the offer goes, which is why it
+ * holds the slot until it is dismissed instead of vanishing on its own.
  */
 function JoinOffer({ onAnswered }: { onAnswered: () => void }): React.JSX.Element {
   const [working, setWorking] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [unsubscribed, setUnsubscribed] = useState(false);
 
   async function answer(decline: boolean): Promise<void> {
     setWorking(true);
-    setFailed(false);
+    setError(null);
     try {
-      await joinSubreddit(decline);
+      const result = await joinSubreddit(decline);
+      if (!decline && !result.subscribed) {
+        setUnsubscribed(true);
+        setWorking(false);
+        return;
+      }
       onAnswered();
-    } catch {
-      setFailed(true);
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : 'That did not go through. Try again.');
       setWorking(false);
     }
+  }
+
+  if (unsubscribed) {
+    return (
+      <div className="join-offer block block--cream block--sm" role="status">
+        <p className="join-offer__copy">
+          <strong>The box is in your wardrobe.</strong> Reddit would not put the subscription
+          through, so join r/PlayOutlier from the subreddit itself — the box is yours either way.
+        </p>
+        <div className="join-offer__actions">
+          <button
+            type="button"
+            className="button block block--orange block--md join-offer__take"
+            onClick={onAnswered}
+          >
+            Got it
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -930,9 +963,7 @@ function JoinOffer({ onAnswered }: { onAnswered: () => void }): React.JSX.Elemen
           <Cross />
         </button>
       </div>
-      {failed && (
-        <p className="notice notice--quiet notice--cream">That did not go through. Try again.</p>
-      )}
+      {error !== null && <p className="notice notice--quiet notice--cream">{error}</p>}
     </div>
   );
 }

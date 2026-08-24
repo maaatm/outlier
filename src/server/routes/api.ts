@@ -262,19 +262,28 @@ api.post('/api/comment', async (c) => {
 /**
  * Join the subreddit, and take the box that comes with it.
  *
- * The subscribe goes **first**, and the order is the whole failure plan: it is
- * the thing the player actually asked for, and it is idempotent — Reddit's own
- * call is a no-op for somebody already subscribed. So a subscribe that throws
- * leaves nothing claimed and the offer still standing, where the other order
- * would hand over the box and leave them unsubscribed with nothing left to tap.
+ * The subscribe goes **first**, because it is the thing the player actually
+ * asked for and it is idempotent — Reddit's own call is a no-op for somebody
+ * already subscribed. But it does not get to sink the request, and that is the
+ * bug this route shipped with: one throw out of Reddit answered the tap with a
+ * 500, claimed nothing, and left the offer standing — so every retry ran the
+ * same call, failed the same way, and the button was dead for that account for
+ * good.
+ *
+ * So the call is attempted and its failure is recorded rather than raised. The
+ * grant is ours to give and the subscription is not: Devvit exposes no way to
+ * read subscription state back, this app already accepts that it cannot know
+ * who is subscribed, and a box in the wardrobe is worth more to the player than
+ * a refusal they can do nothing about. `subscribed: false` is what keeps that
+ * honest — the reveal says the box landed and the subscription did not, rather
+ * than quietly claiming a join that never happened.
  *
  * The grant is once per account, and `claimJoin` is what makes it once however
  * many taps arrive together.
  *
- * `{ decline: true }` is the same decision answered the other way: one field,
- * three states, exactly the `showBlob` idiom. It stops the offer firing on a
- * reveal and does not stop a later claim — which is why the claim reads and
- * writes the field rather than only setting it if absent.
+ * `{ decline: true }` is the same decision answered the other way. It stops the
+ * offer firing on a reveal and does not stop a later claim — which is why the
+ * answer and the claim are two fields rather than one.
  */
 api.post('/api/join', async (c) => {
   const userId = context.userId;
@@ -289,22 +298,23 @@ api.post('/api/join', async (c) => {
       joined: state.joined,
       granted: false,
       freeRolls: state.freeRolls,
+      // Nothing was asked of Reddit, so there is nothing to report either way.
+      subscribed: false,
     });
   }
 
-  // Subscribing is what they asked for, and it is idempotent — Reddit's own
-  // call is a no-op for somebody already subscribed. So it happens whatever the
-  // claim does, and only the box is once per account.
-  await reddit.subscribeToCurrentSubreddit();
+  let subscribed = true;
+  try {
+    await reddit.subscribeToCurrentSubreddit();
+  } catch (failure) {
+    // The only signal there will ever be that this half did not happen: the
+    // call returns `void` and the state behind it is private. Logged loudly
+    // here, because the response can say that it failed and never why.
+    subscribed = false;
+    console.error('subscribeToCurrentSubreddit failed', failure);
+  }
 
   const claim = await claimJoin(userId, JOIN_FREE_ROLLS);
-
-  if (claim.status === 'busy') {
-    return c.json<ApiError>(
-      { error: 'Something changed while that was going through. Try again.' },
-      409
-    );
-  }
 
   if (claim.status === 'granted') await logEarning(userId, 'join', 0);
 
@@ -312,6 +322,7 @@ api.post('/api/join', async (c) => {
     joined: true,
     granted: claim.status === 'granted',
     freeRolls: claim.freeRolls,
+    subscribed,
   });
 });
 

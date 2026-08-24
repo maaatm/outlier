@@ -160,11 +160,31 @@ own vote is not excluded: self-farming would cost a hundred distinct accounts pe
 and filtering would be a read to defend nothing.
 
 **Joining the subreddit pays a box rather than coins.** `POST /api/join` subscribes and
-grants one free roll, once per account, tracked on `joined` — Devvit does not expose
-subscription state, so a local one-time grant is the only bound available. A free roll is
-spent before coins are, refunds nothing on a duplicate (a roll that took nothing in has
-nothing to make whole), and still advances pity. It is offered in one place, on the
-reveal's score slide, under the award — the menu asks for nothing.
+grants one free roll, once per account — Devvit does not expose subscription state, so a
+local one-time grant is the only bound available. A free roll is spent before coins are,
+refunds nothing on a duplicate (a roll that took nothing in has nothing to make whole),
+and still advances pity. It is offered in one place, on the reveal's score slide, under
+the award — the menu asks for nothing.
+
+**Two fields carry it, and the split is the point.** `joined` is the *answer* in the
+`showBlob` idiom — absent, `"1"`, `"0"` — and a `"0"` is allowed to become a `"1"`, because
+a player who said "not now" must not have paid for it forever. A field that can be written
+over is a field `hSetNX` cannot guard, so the *claim* lives beside it on `joinGrant`, which
+is only ever claimed and never rewritten. That is the same atomic guard `voted:` and
+`commented:` use, and it is what makes the roll once per account however many taps arrive
+together. The claim is read past on accounts granted before it existed, which hold
+`joined === "1"` and nothing else. The route used to do this under a `watch` instead, and
+a lost transaction reported `busy` — a 409 the player could do nothing about, on the one
+screen where the offer appears.
+
+**The subscribe cannot strand the player.** `subscribeToCurrentSubreddit` returns `void`
+and the state behind it is private, so a throw is the only signal there will ever be that
+it did not happen — and it must not take the grant with it. It used to: one refusal
+answered the tap with a 500 and claimed nothing, so every retry ran the same call and
+failed the same way, and the button was dead for that account for good. The call is now
+attempted, its failure logged, and the box handed over regardless; `subscribed: false`
+comes back with it so the reveal can say the box landed and the subscription did not,
+rather than quietly claiming a join that never happened.
 
 ### Where the coins came from
 
@@ -359,7 +379,8 @@ recent:{questionId}    zset   userId -> voted at  (capped window, for the cameos
 user:{userId}          hash   streak, bestStreak, lastPlayedDay, points,
                               totalPlayed, totalHits, weekPoints, weekKey,
                               coins, pity, subDay, subCount, showBlob,
-                              freeRolls, joined, earnSeq, earnSeen, pushAsked
+                              freeRolls, joined, joinGrant, earnSeq,
+                              earnSeen, pushAsked
 sub:recent:{userId}    hash   submission fingerprint -> "1", TTL 60s
 sub:count:{userId}:{day}  string  questions posted today, TTL 48h
 
@@ -461,7 +482,9 @@ POST /api/comment             posts the generated comment as this user, and pays
 GET  /api/earnings            the last few coin events, newest first — and reading it
                               is what marks them seen
 POST /api/join                { decline? } subscribe and take the free roll, once per
-                              account -> { joined, granted, freeRolls }
+                              account -> { joined, granted, freeRolls, subscribed };
+                              `subscribed: false` means Reddit refused that half and
+                              the box was granted anyway
 POST /api/submit              { text, labelA, labelB, title? } -> the new post;
                               429 past the day's allowance, 409 on a repeat
 GET  /api/leaderboard/players?range=week|all   players by points banked
