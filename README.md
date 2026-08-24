@@ -867,6 +867,22 @@ just not the thing that should greet them. Ten rows of rank, name and points, wi
 viewer's own row pinned below the list whether or not they are on it — a board you are
 absent from is a board you stop opening.
 
+**The room scrolls, not the well.** Ten rows and your own is more than a short phone can
+show at once, and the board used to answer that by capping the well at whatever height the
+room had left and scrolling the list inside it. That put the only scrollable box on the
+screen in a strip a couple of hundred pixels tall — no scrollbar to say so, a hard clipped
+edge that read as the end of the board, and, inside a webview sitting in a native feed,
+the one drag a host is liable to claim for itself. On a screen as short as Devvit's inline
+post it held four of the ten rows and the other six were unreachable. The well is now as
+tall as the players in it and `.menu__body` — every other room's scroll surface already —
+is what moves, so a drag anywhere on the screen works and a normal phone fits the whole
+board without scrolling at all. `flex: 1 0 auto` on the well and on the list is the whole
+arrangement: grow into the room that is going, so a Monday with three players on it is
+still one tall well, and never give any back, so nobody falls off the bottom. Your own row
+is `position: sticky` against the room, which is what keeps it pinned now that the list
+below it no longer scrolls under it. A wide table is unchanged — two columns in a well the
+height of the room, and nothing scrolls there either.
+
 Ties are settled inside the score rather than left to Redis, which orders tied members
 lexically and would silently rank by account ID. `boardScore` in `src/shared/board.ts`
 adds a fraction below 1 that shrinks with each day since launch, so of two players on the

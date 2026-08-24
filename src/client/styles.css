@@ -2418,38 +2418,58 @@ button {
 
 /*
  * One tall well with the rows cut into it, and your own row pinned to its
- * floor. The list inside scrolls and the well does not — which is the whole
- * reason your row is a sibling of the list rather than the last thing in it.
- * On a wide table the same list reads across in two columns and stops
- * scrolling altogether.
+ * floor.
+ *
+ * The well is as tall as the players in it and nothing inside it scrolls. It
+ * used to be the other way round — the well took the height the room had left
+ * and the list scrolled inside it — which put the only scrollable box on the
+ * screen in a strip a couple of hundred pixels tall, with no scrollbar to say
+ * so and a hard clipped edge that read as the end of the board. On a phone
+ * short enough to be Devvit's inline post that strip held four of the ten rows,
+ * and the six under it were unreachable with a thumb: a nested scroller inside
+ * a webview is the one drag a host feed is liable to claim for itself.
+ *
+ * So the room scrolls instead. `.menu__body` is already every other room's
+ * scroll surface, it is the whole screen rather than a strip of it, and a drag
+ * that starts anywhere — the title, the tabs, the well, the footnote — moves
+ * it. On a normal phone the board now fits outright and nothing scrolls at all.
+ *
+ * Your row stays a sibling of the list rather than the last thing in it for the
+ * same reason as before: it is pinned, and `.board__you` is what pins it.
+ *
+ * `1 0 auto` is the whole arrangement in three words: take the room that is
+ * going, and never give up any of your own. Grow, so a fresh Monday with three
+ * players on it is still one tall well rather than a strip floating over a lot
+ * of empty felt; but never shrink, because shrinking is what used to cut six
+ * players off the bottom of a board that had nowhere to put them.
  */
 .board {
   display: flex;
   flex-direction: column;
-  flex: 1;
-  min-height: 0;
+  flex: 1 0 auto;
   margin-top: 18px;
   padding: 16px 16px 14px;
   border-radius: 11px;
   background: var(--well);
   box-shadow: var(--well-inset);
-  overflow: hidden;
 }
 
 /*
- * The list, and the one thing in the well that scrolls.
+ * The list. Nothing here clips, so nothing here needs an allowance: a counter's
+ * drawing is half again as tall as the disc in it and stands out of the top of
+ * its cell, and the well's own 16px of padding is what the first row's
+ * accessory stands in. That is the same arrangement the two-column board has
+ * always used, and it is now the only one.
  *
- * The top padding is the accessory allowance. A counter's drawing is half again
- * as tall as the disc in it and stands out of the top of its cell, but this box
- * scrolls and a scroll container clips — so the first row's ears were being cut
- * off against the top of the board. The padding is the overhang and the
- * negative margin hands it straight back, which keeps the first row exactly
- * where it was and moves only the edge that was doing the cutting.
+ * `1 0 auto` for the same reason the well is: it takes whatever height the well
+ * was given over and above the players in it, which is what leaves your own row
+ * standing on the floor rather than tucked under the third name on a Monday —
+ * and it never gives any back, which is what stops a row going missing.
  */
 .board__rows {
   list-style: none;
-  margin: -14px 0 0;
-  padding: 14px 0 0;
+  margin: 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
   /*
@@ -2459,9 +2479,7 @@ button {
    * hanging off the row above it.
    */
   gap: 16px;
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
+  flex: 1 0 auto;
 }
 
 /*
@@ -2548,11 +2566,34 @@ button {
  * Your own row, pinned to the floor of the same well while the list above it
  * swaps. Yellow, and the counter takes a yellow collar rather than the white
  * one it wears in a crowd — white on cream in a dark well is a smudge.
+ *
+ * `sticky` is what keeps it pinned now that the room scrolls rather than the
+ * list. It rides the bottom of the room while the players above it pass
+ * underneath, and settles onto the well's own floor once the board's end comes
+ * into view — so your standing is on screen from the moment the board opens,
+ * which is the whole reason the row is here. It can never leave the well:
+ * sticky is bounded by its containing block, and that is `.board`.
+ *
+ * The background is the well's floor rather than the well's colour, because it
+ * has players passing under it. `--well` is a dark wash at 30% and laying it
+ * over rows that are already there darkens them rather than hiding them, so the
+ * felt goes down first and the wash goes on top of it — the same two layers the
+ * well itself is, composited here instead of over the table. Written as a
+ * gradient because a layer above a colour is the only way the shorthand will
+ * take two of them, and kept in tokens so it cannot drift from the well it is
+ * standing in.
+ *
+ * Sticky also needs no scrolling ancestor between here and `.menu__body`, which
+ * is why the well no longer clips. Nothing overflows it, so nothing has to.
  */
 .board__you {
+  position: sticky;
+  bottom: 0;
   margin-top: 14px;
   padding-top: 14px;
   border-top: 2px solid rgba(255, 246, 231, 0.22);
+  background-color: var(--felt);
+  background-image: linear-gradient(var(--well), var(--well));
   flex: none;
 }
 
@@ -3293,13 +3334,21 @@ button {
     margin-top: 22px;
   }
 
-  /* The board reads across in two columns rather than scrolling, and your own
-     row stays where it is: on the floor of the well, under both of them. */
+  /* The board reads across in two columns, and your own row stays where it is:
+     on the floor of the well, under both of them. There is room for a well as
+     tall as the room here, so this is the one place the board still takes it —
+     and with the list beside itself rather than under itself, taking it costs
+     nothing. */
   .tabs {
     max-width: 560px;
   }
 
   .board {
+    flex: 1;
+    min-height: 0;
+    /* The only width where the well can be shorter than what is in it — a wide
+       window can still be a short one — so it is the only width that clips. */
+    overflow: hidden;
     margin-top: 22px;
     padding: 20px 22px 16px;
   }
@@ -3321,12 +3370,10 @@ button {
     grid-template-rows: repeat(var(--board-rows, 5), auto);
     align-content: start;
     gap: 18px 30px;
-    /* Nothing scrolls here, so nothing clips here: the well's own padding is
-       what the top row's accessory stands in, and the allowance the scrolling
-       version needs comes back off. */
-    overflow: visible;
-    margin: 0;
-    padding: 0;
+    /* The list fills the well it was given, which is what leaves your own row
+       nothing to do but sit on the floor of it. */
+    flex: 1;
+    min-height: 0;
   }
 
   .board__row {
@@ -3348,7 +3395,13 @@ button {
     font-size: 21px;
   }
 
+  /* Nothing scrolls past it here, so it is a row on a floor again rather than
+     one riding a scroll — and a row on a floor has nothing to hide behind it,
+     so it goes back to being the well showing through. */
   .board__you {
+    position: static;
+    background-color: transparent;
+    background-image: none;
     margin-top: auto;
     padding-top: 16px;
   }
