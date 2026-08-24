@@ -9,10 +9,21 @@
  * one-time and tracked locally, which is the only bound available, and by the
  * copy framing it as a welcome rather than as a bounty.
  *
- * `joined` is one field with three states, exactly the `showBlob` idiom:
- * absent is never offered and never granted, `"1"` is granted, `"0"` is offered
- * and declined. A decline stops the offer firing on a reveal again; it does not
- * stop a later claim, because the row in Your record stays until `"1"`.
+ * **Two fields, one job each.** `joined` is the answer, in the `showBlob`
+ * idiom: absent is never offered, `"1"` is yes, `"0"` is offered and declined.
+ * A decline stops the offer firing on a reveal again; it does not stop a later
+ * claim, because the row in Your record stays until `"1"`. `joinGrant` is the
+ * claim on the roll, and it is separate for one reason — a no is allowed to
+ * become a yes, so `joined` has to be writable over, and a field that can be
+ * written over is a field `hSetNX` cannot guard.
+ *
+ * That split is what lets this file hold nothing but single atomic commands.
+ * It used to read `joined` under a `watch` and write the grant back inside a
+ * transaction, which is the one shape in this app that can refuse for a reason
+ * the player cannot act on: an `exec` that loses its watch reports `busy`, the
+ * route turns that into a 409, and the offer comes back with nothing to do
+ * differently. An `hSetNX` on a field nothing else writes gives the same
+ * once-per-account guarantee with no losing branch at all.
  */
 
 import { redis } from '@devvit/web/server';
@@ -51,46 +62,46 @@ function decodeJoin(
 export type JoinClaim =
   | { status: 'granted'; freeRolls: number }
   /** Already claimed. The subscribe still happened; the box does not come twice. */
-  | { status: 'already'; freeRolls: number }
-  /** The hash moved under us. Same guarantee as the box: nothing happened. */
-  | { status: 'busy' };
+  | { status: 'already'; freeRolls: number };
 
 /**
- * Claim the grant and hand over the roll, together.
+ * Claim the grant and hand over the roll.
  *
- * A `watch` rather than the `hSetNX` the other once-only claims in this app use,
- * for one reason: `joined` is not a claim flag, it is a field with three states,
- * and a player who declined holds `"0"` — which an `hSetNX` can never move, so
- * declining once would quietly cost them the box forever. Reading the field and
- * writing over it is the only way to let a no become a yes, and a read-then-
- * write in front of a grant needs the same protection the box's debit needs.
+ * `hSetNX` on `joinGrant` is the whole guard, and it is the only thing in here
+ * that has to be atomic: however many taps arrive together, exactly one of them
+ * moves an absent field to `"1"` and every other one is told the box is already
+ * gone. There is deliberately no third outcome — nothing here can fail in a way
+ * the player is expected to retry.
  *
- * One attempt and `busy` if it loses, exactly as `openBox` does: a tap the
- * player can repeat is a better failure than a retry that might grant twice.
+ * The read in front of it is not the guard. It is there for accounts granted
+ * before `joinGrant` existed, which hold `joined === '1'` and no claim at all:
+ * without it the claim would be free to win and would pay them a second roll.
+ *
+ * The claim is taken before the roll is credited, which is the order every
+ * once-only payment in this app uses — see `commented:`. A throw in between
+ * costs the player the roll rather than paying it twice, and the tap that
+ * follows finds the offer answered rather than the grant still open.
  */
 export async function claimJoin(userId: string, rolls: number): Promise<JoinClaim> {
   const key = keys.user(userId);
 
-  // Watch first, then read: a value read before the watch is a value that could
-  // have moved without the transaction ever knowing.
-  const txn = await redis.watch(key);
+  const state = await readJoinState(userId);
+  if (state.joined) return { status: 'already', freeRolls: state.freeRolls };
 
-  const raw = await redis.hMGet(key, [userFields.joined, userFields.freeRolls]);
-  const state = decodeJoin(raw[0], raw[1]);
+  const claimed = (await redis.hSetNX(key, userFields.joinGrant, '1')) === 1;
 
-  if (state.joined) {
-    await txn.unwatch();
+  if (!claimed) {
+    // A second tap of the same offer, or a second device. The answer is still
+    // an answer, so `joined` is written either way — the loser of the race must
+    // not be left with an offer that keeps coming back.
+    await redis.hSet(key, { [userFields.joined]: '1' });
     return { status: 'already', freeRolls: state.freeRolls };
   }
 
-  await txn.multi();
-  await txn.hSet(key, { [userFields.joined]: '1' });
-  await txn.hIncrBy(key, userFields.freeRolls, rolls);
+  const freeRolls = await redis.hIncrBy(key, userFields.freeRolls, rolls);
+  await redis.hSet(key, { [userFields.joined]: '1' });
 
-  const applied = await txn.exec();
-  if (applied.length === 0) return { status: 'busy' };
-
-  return { status: 'granted', freeRolls: state.freeRolls + rolls };
+  return { status: 'granted', freeRolls };
 }
 
 /**

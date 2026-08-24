@@ -280,6 +280,16 @@ export type JoinResponse = {
   joined: boolean;
   granted: boolean;
   freeRolls: number;
+  /**
+   * Whether Reddit put the subscription through.
+   *
+   * Never a `true` that was verified — the call returns `void` and subscribed
+   * subreddits are private, so this is only ever "it did not throw". A `false`
+   * is the one thing here that is known: Reddit refused, the box was handed
+   * over anyway, and the offer says so rather than claiming a join that did not
+   * happen. Always `false` on a decline, where nothing was asked of Reddit.
+   */
+  subscribed: boolean;
 };
 
 export type SubmitQuestionRequest = {

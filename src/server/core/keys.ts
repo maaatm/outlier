@@ -274,14 +274,30 @@ export const userFields = {
   freeRolls: 'freeRolls',
 
   /**
-   * `"1" | "0"` — the join offer, in the `showBlob` idiom.
+   * `"1" | "0"` — the answer to the join offer, in the `showBlob` idiom.
    *
-   * Absent means never offered and never granted; `"1"` means the free roll has
-   * been handed out; `"0"` means they were offered it and said no. Three states
-   * on one field, and the `hSetNX` that grants it is the same atomic claim
-   * `voted:` uses — two taps racing each other can only produce one free roll.
+   * Absent means never offered and never granted; `"1"` means they joined;
+   * `"0"` means they were offered it and said no. Three states on one field,
+   * and the only one of them that is ever written over is the `"0"` — a no is
+   * allowed to become a yes, which is the whole reason the claim below is a
+   * field of its own.
    */
   joined: 'joined',
+
+  /**
+   * `"1"` — the free roll has been handed out. Absent means it has not.
+   *
+   * Two fields for one decision, and the split is what makes the grant atomic.
+   * `joined` above carries the answer and has to be writable from `"0"` to
+   * `"1"`, which is exactly what `hSetNX` cannot do — so the once-only claim
+   * cannot live there. This field is only ever claimed and never rewritten,
+   * which makes it the same atomic guard `voted:` and `commented:` use: two
+   * taps racing each other produce one winner and one free roll.
+   *
+   * Absent on accounts granted before this field existed, which is why
+   * `claimJoin` reads `joined` before claiming.
+   */
+  joinGrant: 'joinGrant',
 
   /**
    * Two counters, and the whole unseen-earnings marker.
