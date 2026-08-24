@@ -73,6 +73,13 @@
         "location": "subreddit",
         "forUserType": "moderator",
         "endpoint": "/internal/menu/grant-coins"
+      },
+      {
+        "label": "Outlier: wipe a player",
+        "description": "Erase one account's record, votes and items — preview first",
+        "location": "subreddit",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/wipe-player"
       }
     ]
   },
@@ -80,7 +87,8 @@
   "forms": {
     "submitQuestion": "/internal/forms/submit-question",
     "reviewQueue": "/internal/forms/review-queue",
-    "grantCoins": "/internal/forms/grant-coins"
+    "grantCoins": "/internal/forms/grant-coins",
+    "wipePlayer": "/internal/forms/wipe-player"
   },
 
   "scheduler": {

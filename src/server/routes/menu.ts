@@ -239,6 +239,66 @@ menuRoutes.post('/internal/menu/grant-coins', async (c) => {
   });
 });
 
+/**
+ * "Wipe a player" — take one account apart, or count what taking it apart would
+ * cost first.
+ *
+ * The only destructive tool in the app, and the form is built around that. It
+ * opens on **Preview**, which reads everything and writes nothing, so the first
+ * pass answers "is this the right account and is this what you think it is"
+ * before anything is gone. Choosing to wipe is then a second, deliberate act
+ * rather than a mistap on a form that deleted somebody the moment it was
+ * accepted.
+ *
+ * Mod-checked here and again on the form endpoint, for the reason `mod.ts`
+ * gives: `forUserType` hides a button and gates nothing.
+ *
+ * The username field is deliberately *not* prefilled, unlike the grant form's.
+ * A default there is one tap for the common case; a default here is a named
+ * account one accidental accept away from deletion.
+ */
+menuRoutes.post('/internal/menu/wipe-player', async (c) => {
+  if (!(await isModerator())) {
+    return c.json<UiResponse>({ showToast: 'Moderators only.' });
+  }
+
+  return c.json<UiResponse>({
+    showForm: {
+      name: 'wipePlayer',
+      form: {
+        title: 'Wipe a player',
+        description:
+          'Erases one account: streak, points, coins, items, both leaderboards, every ' +
+          'vote they cast, and their name on any question they wrote. Their Reddit ' +
+          'posts and comments are their own and stay up. Preview counts it and changes ' +
+          'nothing; wiping cannot be undone.',
+        acceptLabel: 'Run',
+        cancelLabel: 'Cancel',
+        fields: [
+          {
+            type: 'string',
+            name: 'username',
+            label: 'Username',
+            helpText: 'Without the u/.',
+            required: true,
+          },
+          {
+            type: 'select',
+            name: 'mode',
+            label: 'Mode',
+            required: true,
+            defaultValue: ['preview'],
+            options: [
+              { label: 'Preview — count it, delete nothing', value: 'preview' },
+              { label: 'Wipe — delete it, permanently', value: 'wipe' },
+            ],
+          },
+        ],
+      },
+    },
+  });
+});
+
 /** "Post the misjudged leaderboard" — the recurring event post. */
 menuRoutes.post('/internal/menu/post-leaderboard', async (c) => {
   if (!(await isModerator())) {

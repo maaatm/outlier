@@ -852,6 +852,53 @@ block a new one, and a moderator running it twice does not get two front doors.
 A failed sticky is not a failed post — Reddit allows two, and a subreddit that already
 has both gets the post plus a note rather than an error and nothing.
 
+### Wiping a player
+
+**Outlier: wipe a player** (mod menu) erases one account by username. It is the only
+destructive tool in the app, so the form opens on **Preview**, which reads everything and
+writes nothing: the first pass answers *is this the right account, and is this what you
+think it is* — `u/name · 1240 points · 300 coins · 47 votes · 12 items` — and deleting is
+a second, deliberate pass. Mod-checked on the form endpoint as well as on the menu item.
+
+It reaches all three shapes player data comes in. `user:`, `earn:`, `inv:`, `sub:recent:`
+and `sub:count:` are wholly theirs and are deleted outright. Their row goes from
+`avatars`, `users:names`, `lb:points:all`, the live weekly boards, and the
+`comments:tracked`/`comments:paid` pair — that last one is what stops the hourly sweep
+paying an account that no longer exists. And their vote comes off every question they
+answered: `voted:`, `guesses:`, `recent:` and `commented:`.
+
+**The counters are reversed, not left behind.** `voted:{questionId}` stores `"a:45:21"` —
+choice, guess, and the error the points were paid on — which are exactly the three values
+`tallyVote` and `finishVote` moved. So undoing a vote is subtraction rather than
+re-derivation: `a`/`b`, `guessSum`, `guessCount`, `errSum`, and the histogram bucket read
+back through the same `bucketFor` the write used. `stats:misjudged` is recomputed from
+what survives, and a question whose last vote just left comes off it rather than being
+ranked on a division by zero. A vote from before points existed has no banked error, so
+its count comes down and its `errSum` cannot — the one approximate corner, and the reason
+the average is recomputed rather than left standing on a count that moved under it.
+
+**Finding the questions.** Devvit's Redis has no `SCAN`, and `voted:` is keyed by question
+rather than by player, so there is no key to derive from a userId. The walk goes over an
+index instead: `stats:misjudged` holds every question that has ever been voted on —
+`finishVote` writes it on every vote — unioned with both queues, which add the questions
+submitted but not yet answered. `WIPE_SCAN_BATCH` questions per wave, two reads each,
+batched through the same `chunk` the push fan-out uses.
+
+**It is safe to run twice**, and running it again is the right answer to a run that fell
+over halfway. `hDel(voted:{questionId}, [userId])` is the claim — the exact mirror of the
+`hSetNX` that recorded the vote — and the counters move only when it reports a row
+actually removed, so two runs decrement once between them. The row is deleted *before* the
+counters move, which is the safe direction: an interrupted run leaves a tally counting a
+vote by nobody, where the other order can be interrupted into a tally decremented twice
+with nothing left to detect it.
+
+**What it deliberately does not touch.** The Reddit posts and comments the player made are
+theirs, made under their own account (`runAs: 'USER'`), and Reddit is where they are
+deleted. What goes is the byline this app stores — `authorId` and `authorName` on
+`q:{id}` — so the question renders with no author, the way a house question does. The
+question record itself stays: it is a live post other people have answered, and deleting
+it would orphan the post.
+
 ---
 
 ## Decisions taken

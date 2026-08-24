@@ -331,3 +331,26 @@ export const PUSH_MAX_RECIPIENTS_PER_RUN = 50_000;
 
 /** How much of a question fits in a notification body before it is trimmed. */
 export const PUSH_BODY_MAX_LENGTH = 120;
+
+/**
+ * How many questions the wipe tool reads in one wave.
+ *
+ * Erasing a player means walking every question they might have answered, and
+ * Devvit's Redis has no `SCAN` — so the walk is over an index (see
+ * `core/wipe.ts`) and costs two reads per question. Batched with the same
+ * `chunk` the push fan-out uses: a hundred parallel reads per wave, and one
+ * wave after another rather than ten thousand promises at once.
+ */
+export const WIPE_SCAN_BATCH = 50;
+
+/**
+ * How far back the wipe looks for keys that expire on their own.
+ *
+ * `sub:count:` and `lb:points:{week}` are the only player keys with a TTL, and
+ * neither can be found by scanning. So the wipe reconstructs their names from
+ * the calendar instead, going back far enough that nothing still alive is
+ * missed — which is the TTL plus one, so the arithmetic follows the TTL rather
+ * than a number somebody has to remember to change beside it.
+ */
+export const WIPE_DAY_LOOKBACK = Math.ceil(SUBMISSION_COUNT_TTL_SECONDS / (24 * 60 * 60)) + 1;
+export const WIPE_WEEK_LOOKBACK = Math.ceil(WEEK_BOARD_TTL_SECONDS / (7 * 24 * 60 * 60)) + 1;
