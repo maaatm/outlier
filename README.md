@@ -37,6 +37,28 @@ subreddit from the request context, so the app works wherever it is installed.
 The app posts a Daily automatically on install, so there is something to play with
 immediately rather than a wait until midnight.
 
+### The app account is not a moderator
+
+`devvit.json` asks for `permissions.reddit.scope: "user"`. Devvit 0.14.1 deprecated
+`"moderator"` and treats it as `"user"`, so an app cannot hold moderator APIs by declaring
+that it wants them — which means three things this game does are conditional rather than
+guaranteed:
+
+| Wanted | Where | Without it |
+|---|---|---|
+| Link flair (`Daily`, `Open question`) | `core/flair.ts` | Posts go up unlabelled |
+| Distinguish + sticky the summary | `summarize-daily` | Summary is a plain comment |
+| Pin the menu post | `Outlier: pin the menu post` | Post is created, a mod pins it by hand |
+
+**None of them can fail the thing they decorate.** Each is a separate call made *after*
+the post or comment exists, and each is allowed to throw — a refused flair used to travel
+inside `submitCustomPost` as `flairText`, where it could take the whole Daily down with it,
+or reject a player's question and spend one of their three for the day on nothing.
+
+Adding the app account to the subreddit's mod team turns all three back on with no code
+change and no redeploy. Everything else — posting, commenting, the queue, the economy,
+the leaderboards — never needed moderator scope and is unaffected either way.
+
 ---
 
 ## Layout
@@ -364,7 +386,7 @@ q:{questionId}         hash   text, title, labelA, labelB, authorId, authorName,
                               source, createdAt, postId, permalink, lockedAt, dailyDate
 daily:{YYYY-MM-DD}     string questionId
 daily:claims           hash   day -> "1"          (double-fire guard, see below)
-daily:summaries        hash   day -> "1"          (double-post guard for the sticky)
+daily:summaries        hash   day -> "1"          (double-post guard for the summary)
 post:{postId}          string questionId
 menu:post              string postId of the pinned menu post (no question on it)
 
@@ -505,6 +527,11 @@ POST /api/queue/:id/reject    mod-only
 Mod-only routes re-check moderator status server-side. The `forUserType: "moderator"`
 flag on a menu item hides a button; it does not gate the endpoint behind it.
 
+That check is about the **human** making the request, not the app account, and it reads
+public data — `core/mod.ts` asks Reddit who moderates the subreddit. It is unaffected by
+the app's own scope, so every mod tool keeps working on a subreddit that has not added the
+app to its mod team.
+
 ---
 
 ## Scheduler
@@ -512,7 +539,7 @@ flag on a menu item hides a button; it does not gate the endpoint behind it.
 | Job | Cadence | Action |
 |---|---|---|
 | `post-daily` | `0 0 * * *` | Resolve source, create the Daily post, write `daily:{date}`, then notify |
-| `summarize-daily` | `0 0 * * *` | Sticky where the *previous* day's split stands |
+| `summarize-daily` | `0 0 * * *` | Comment where the *previous* day's split stands, stickied if allowed |
 | `refresh-queue` | hourly | Re-score `queue:pending` from live post upvotes |
 | `sweep-comments` | hourly | Pay tracked comments what their upvotes owe |
 
@@ -531,7 +558,15 @@ trigger deliberately does not notify — a fresh install has nobody opted in.
 Both midnight jobs are idempotent and touch different day keys, so the order they fire
 in does not matter. `post-daily` guards on `daily:claims`, `summarize-daily` on
 `daily:summaries`; both claim before they act, so two overlapping runs produce one post
-and one sticky.
+and one summary.
+
+**Only the comment owns the summary's claim.** `summarize-daily` posts a comment and then
+distinguishes and stickies it, and just the first of those is the job. Distinguishing is a
+moderator action the app account does not have by default, so it is expected to fail — and
+a guard released on *that* failure would be a guard that never holds, since the comment is
+already up by then and the next run for the day would post a second one. The two calls sit
+in separate `try` blocks for that reason, and the result reports `distinguished` so the log
+line can tell a plain summary from a stickied one.
 
 ### Nothing closes on a schedule
 
@@ -872,8 +907,10 @@ playable post never pays for the lookup. The action is idempotent: it confirms t
 recorded post still exists before reporting it, so a deleted one does not permanently
 block a new one, and a moderator running it twice does not get two front doors.
 
-A failed sticky is not a failed post — Reddit allows two, and a subreddit that already
-has both gets the post plus a note rather than an error and nothing.
+A failed sticky is not a failed post, and there are two ordinary reasons it fails: Reddit
+allows only two stickies, so a subreddit that already has both gets the post plus a note
+rather than an error and nothing — and pinning is a moderator action the app account does
+not hold by default. Either way the post is created and a moderator can pin it by hand.
 
 ### Wiping a player
 

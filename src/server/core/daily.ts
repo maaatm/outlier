@@ -15,6 +15,7 @@ import { percentAgreeing } from '../../shared/scoring.js';
 import { fitTitle } from '../../shared/validate.js';
 import { creditCoins } from './coins.js';
 import { logEarning } from './earnings.js';
+import { applyFlair } from './flair.js';
 import { keys } from './keys.js';
 import { questionAtCursor, poolSize } from './pool.js';
 import { getQuestion, linkQuestionToPost, markAsDaily, writeQuestion } from './questions.js';
@@ -131,10 +132,11 @@ export async function postDaily(day: string = toDayKey()): Promise<PostDailyResu
       ? `Today's question comes from u/${resolution.promotedFrom.authorName}.`
       : '';
 
+    const subredditName = await currentSubredditName();
+
     const post = await reddit.submitCustomPost({
-      subredditName: await currentSubredditName(),
+      subredditName,
       title: dailyTitle(day, question.text),
-      flairText: DAILY_FLAIR,
       textFallback: {
         text: [
           question.text,
@@ -174,6 +176,14 @@ export async function postDaily(day: string = toDayKey()): Promise<PostDailyResu
     // id the same way `creditCoins` does, so a house Daily records nothing.
     await logEarning(promotedAuthor, 'promotion', COINS_PROMOTION);
 
+    // Dead last, after every write and every payment. Flair is a moderator
+    // action the app account no longer has by default — see `core/flair.ts` for
+    // why the label cannot ride along inside the submit — so this is the one
+    // call in here expected to fail, and nothing that matters waits behind it.
+    // `applyFlair` never throws, so it cannot reach the catch below and release
+    // a claim on a day whose post already exists.
+    await applyFlair(subredditName, post.id, DAILY_FLAIR);
+
     return {
       status: 'created',
       day,
@@ -190,11 +200,26 @@ export async function postDaily(day: string = toDayKey()): Promise<PostDailyResu
 }
 
 export type SummarizeDailyResult =
-  | { status: 'summarized'; day: string; questionId: string }
+  | {
+      status: 'summarized';
+      day: string;
+      questionId: string;
+      /**
+       * Whether the summary was also distinguished and stickied.
+       *
+       * Reported rather than folded into the status, because the two are
+       * different facts and only one of them is the job: the summary is up
+       * either way, and it is up exactly once either way. The task logs this so
+       * a subreddit can tell a plain comment from a stickied one without
+       * reading the post.
+       */
+      distinguished: boolean;
+    }
   | { status: 'skipped'; day: string; reason: string };
 
 /**
- * Sticky a summary of the previous day's Daily. Voting stays open.
+ * Comment a summary of the previous day's Daily, and sticky it where we can.
+ * Voting stays open.
  *
  * Yesterday's question is not finished with — it counts toward a streak and pays
  * points exactly like today's, so closing it would make the archive unplayable
@@ -204,7 +229,15 @@ export type SummarizeDailyResult =
  *
  * `daily:summaries` is the double-post guard, claimed before the comment is
  * submitted for the same reason `daily:claims` is claimed before the question is
- * resolved: two overlapping runs must leave one sticky, not two.
+ * resolved: two overlapping runs must leave one summary, not two.
+ *
+ * **The claim is released only if the comment itself failed.** Distinguishing is
+ * a moderator action and the app account is not a moderator by default since
+ * Devvit 0.14.1, so it is expected to fail on most subreddits — and a guard that
+ * released on *that* would be a guard that never holds: the comment is already
+ * up by then, so the next run for the same day would post a second one. The two
+ * live in separate `try` blocks for that reason, and only the first one owns the
+ * claim.
  */
 export async function summarizeDaily(
   day: string = previousDay()
@@ -219,20 +252,30 @@ export async function summarizeDaily(
   const claimed = await redis.hSetNX(keys.dailySummaries, day, '1');
   if (claimed === 0) return { status: 'skipped', day, reason: 'already summarized' };
 
+  let comment;
   try {
     const tally = await readTally(questionId);
     const summary = buildDailySummary(question.text, question.labelA, question.labelB, tally);
-    const comment = await reddit.submitComment({ id: question.postId as T3, text: summary });
-    await comment.distinguish(true);
+    comment = await reddit.submitComment({ id: question.postId as T3, text: summary });
   } catch (error) {
-    // Release the claim and let the next run try again. A missing summary is
-    // recoverable; a duplicate sticky is not.
+    // Nothing went up, so release the claim and let the next run try again. A
+    // missing summary is recoverable; a duplicate one is not.
     await redis.hDel(keys.dailySummaries, [day]);
-    console.error(`summarize-daily: could not sticky the summary for ${questionId}`, error);
+    console.error(`summarize-daily: could not comment the summary for ${questionId}`, error);
     return { status: 'skipped', day, reason: 'comment failed' };
   }
 
-  return { status: 'summarized', day, questionId };
+  // Past this line the day is summarized and the claim stays taken, whatever
+  // happens next. The comment is the summary; the sticky is where it sits.
+  let distinguished = true;
+  try {
+    await comment.distinguish(true);
+  } catch (error) {
+    distinguished = false;
+    console.error(`summarize-daily: summary is up but not stickied for ${questionId}`, error);
+  }
+
+  return { status: 'summarized', day, questionId, distinguished };
 }
 
 /**

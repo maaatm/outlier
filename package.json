@@ -20,7 +20,7 @@
     "publish": "devvit publish"
   },
   "dependencies": {
-    "@devvit/web": "0.14.0",
+    "@devvit/web": "0.14.1",
     "@hono/node-server": "^2.1.0",
     "hono": "^4.13.1",
     "react": "^19.2.0",
@@ -32,7 +32,7 @@
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.0.0",
     "concurrently": "^9.1.2",
-    "devvit": "0.14.0",
+    "devvit": "0.14.1",
     "typescript": "~5.8.3",
     "vite": "^7.0.0",
     "vitest": "^4.1.0"

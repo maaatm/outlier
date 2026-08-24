@@ -55,9 +55,13 @@ export async function isMenuPost(postId: string): Promise<boolean> {
  * two front doors. The recorded post is confirmed to still exist before it is
  * reported as live, so a deleted post does not permanently block a new one.
  *
- * A failed pin is not a failed post. The post is useful unpinned, and Reddit
- * only allows two stickies — a subreddit that already has both should get the
- * post plus a note, not an error and nothing.
+ * A failed pin is not a failed post. The post is useful unpinned, and there are
+ * two ordinary reasons it will not pin: Reddit allows only two stickies, so a
+ * subreddit that already has both should get the post plus a note rather than an
+ * error and nothing — and stickying is a moderator action the app account no
+ * longer holds by default, since Devvit 0.14.1 deprecated the `"moderator"`
+ * reddit scope. Adding the app to the mod team turns the pin back on with no
+ * code change; until then a moderator can pin it by hand.
  */
 export async function pinMenuPost(): Promise<PinMenuPostResult> {
   const existing = await getMenuPostId();

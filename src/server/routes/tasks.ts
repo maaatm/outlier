@@ -2,7 +2,8 @@
  * Scheduler task endpoints, wired to cron in `devvit.json`.
  *
  *   post-daily       00:00 UTC  resolve the source, post the Daily, write daily:{date}
- *   summarize-daily  00:00 UTC  sticky where yesterday's split stands. Voting stays open.
+ *   summarize-daily  00:00 UTC  comment where yesterday's split stands, stickied where the
+ *                              app is allowed to. Voting stays open.
  *   refresh-queue    hourly     re-score the pending queue from live post upvotes
  *   sweep-comments   hourly     pay tracked comments what their upvotes owe
  *
@@ -57,7 +58,13 @@ taskRoutes.post('/internal/tasks/post-daily', async (c) => {
 
 taskRoutes.post('/internal/tasks/summarize-daily', async (c) => {
   const result = await summarizeDaily(previousDay());
-  console.log(`summarize-daily: ${result.day} ${result.status}`);
+  const detail =
+    result.status === 'summarized'
+      ? result.distinguished
+        ? 'stickied'
+        : 'not stickied'
+      : result.reason;
+  console.log(`summarize-daily: ${result.day} ${result.status} (${detail})`);
   return c.json({});
 });
 
