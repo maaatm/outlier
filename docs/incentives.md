@@ -56,7 +56,7 @@ export const ROYALTY_COIN_CAP = 25;
 export const JOIN_FREE_ROLLS = 1;
 
 /** Reveals a player must have seen before the join offer appears on one. */
-export const JOIN_OFFER_MIN_PLAYS = 2;
+export const JOIN_OFFER_MIN_PLAYS = 1;
 
 /** Entries kept in a player's earnings ledger. A receipt, not a history. */
 export const EARNINGS_LOG_SIZE = 8;
@@ -804,15 +804,21 @@ the record clears it.
 ### The join offer
 
 **On slide 1 of the reveal, as a block under the award.** Not slide 0 — that is
-where `blobNotice` fires on a first reveal, and two first-run interruptions on one
-screen means both are dismissed unread. Not slide 2 — the share slide has exactly
+where `blobNotice` fires on a first reveal, which is the same reveal this offer
+now lands on, and two first-run interruptions on one screen means both are
+dismissed unread. Not slide 2 — the share slide has exactly
 one primary action, and a second one beside it makes a decision into a choice
 between decisions. Slide 1 is where the game already hands you something, and the
 award block is the idiom a second block below it inherits for free.
 
-**It fires at `stats.totalPlayed >= JOIN_OFFER_MIN_PLAYS`**, not on the first
-reveal. A player who has answered twice has shown up on purpose; one who is on
-their first reveal is still working out what the game is.
+**It fires at `stats.totalPlayed >= JOIN_OFFER_MIN_PLAYS`**, which is their first
+reveal — `totalPlayed` counts the vote that produced it, since `recordPlay` runs
+before `buildReveal`. It used to wait for a second reveal, on the reasoning that a
+player who has answered twice has shown up on purpose; the box is what makes the
+first play worth coming back from, and an offer held until the second reveal is
+only ever seen by players who came back without it. The floor stays a constant at
+`1` rather than the offer becoming unconditional, so a reveal built for an account
+with no plays banked is still never offered.
 
 `Reveal` gains `joinOffer: boolean`, computed in `buildReveal` from `totalPlayed`
 and the absence of `joined` — the same shape and the same gate `blobNotice` uses.

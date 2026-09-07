@@ -77,8 +77,15 @@ export const ROYALTY_COIN_CAP = 25;
 /** What joining the subreddit grants, once per account, ever. */
 export const JOIN_FREE_ROLLS = 1;
 
-/** Reveals a player must have seen before the join offer appears on one. */
-export const JOIN_OFFER_MIN_PLAYS = 2;
+/**
+ * Reveals a player must have seen before the join offer appears on one.
+ *
+ * `1` is their first reveal: `totalPlayed` counts the vote that produced it,
+ * because `recordPlay` runs before `buildReveal`. The floor stays a constant
+ * rather than the offer becoming unconditional, so a reveal built for an
+ * account with no plays banked at all is still never offered.
+ */
+export const JOIN_OFFER_MIN_PLAYS = 1;
 
 /** Entries kept in a player's earnings ledger. A receipt, not a history. */
 export const EARNINGS_LOG_SIZE = 8;
