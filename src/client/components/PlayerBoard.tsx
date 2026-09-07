@@ -119,12 +119,13 @@ function Rows({
 
   return (
     <div className="board">
-      {/* The list scrolls; the well does not. That is what keeps the row below
-          it on the floor of the well rather than somewhere off the bottom of a
-          long board. On a wide table the same list reads across in two columns
-          instead of scrolling at all — which is the one thing about this list
-          the stylesheet cannot work out for itself, so the column's length is
-          handed to it here. */}
+      {/* Nothing in the well scrolls: the well is as tall as the players in it
+          and the room around it is what moves. A list scrolling inside a fixed
+          well put the only draggable box on a phone in a strip that held four
+          of these ten rows, which is not a board anybody can read. On a wide
+          table the same list reads across in two columns — which is the one
+          thing about this list the stylesheet cannot work out for itself, so
+          the column's length is handed to it here. */}
       <ol
         className="board__rows"
         style={
@@ -138,8 +139,10 @@ function Rows({
 
       {/* Returned even when the viewer is already in the list above: a board you
           are absent from is a board you stop opening, and the second glance
-          costs a line. Pinned, so it is the one row that never moves when the
-          tab changes. */}
+          costs a line. Pinned — `position: sticky` on a phone, the floor of the
+          well on a wide table — so it is on screen the moment the board is,
+          however far down the room the players run, and it is the one row that
+          never moves when the tab changes. */}
       {board.you && (
         <div className="board__row board__you">
           <span className="board__rank">{board.you.rank}</span>
