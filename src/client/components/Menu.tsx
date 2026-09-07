@@ -76,6 +76,7 @@ import {
   submitQuestion,
 } from '../api.js';
 import { coalescingWriter } from '../coalesce.js';
+import { establishUserGrant } from '../consent.js';
 import { COUNTER_SIZE } from '../counterArt.js';
 import { WORDMARK_SIZE } from '../wordmarkArt.js';
 import { Blob } from './Blob.js';
@@ -1299,10 +1300,13 @@ function Ask({ canSubmit }: { canSubmit: boolean }): React.JSX.Element {
   const started = text.trim().length > 0;
   const ready = canSubmit && check.ok && !posting;
 
-  async function post(): Promise<void> {
+  async function post(event: Event): Promise<void> {
     setPosting(true);
     setError(null);
     try {
+      // The question goes up under the player's name for the same reason their
+      // comment does, and by the same grant — see `client/consent.ts`.
+      await establishUserGrant(event);
       const posted = await submitQuestion({ text, labelA, labelB, title });
       // Straight to the post. `posting` is deliberately left set: the button has
       // done its one job and must not spring back to life behind a navigation.
@@ -1412,7 +1416,7 @@ function Ask({ canSubmit }: { canSubmit: boolean }): React.JSX.Element {
         type="button"
         className="button block block--orange block--lg ask__post"
         disabled={!ready}
-        onClick={() => void post()}
+        onClick={(event) => void post(event.nativeEvent)}
       >
         {posting ? (
           'Posting...'

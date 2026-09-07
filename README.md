@@ -59,6 +59,36 @@ Adding the app account to the subreddit's mod team turns all three back on with 
 change and no redeploy. Everything else — posting, commenting, the queue, the economy,
 the leaderboards — never needed moderator scope and is unaffected either way.
 
+### What the player posts is posted by the player
+
+Three things in this game go up under the player's own name rather than the app's: the
+comment on the reveal, a question they ask, and the subscription the join offer puts
+through. All three are `runAs: 'USER'` on the server, and all three are declared in
+`devvit.json` under `permissions.reddit.asUser`.
+
+**Neither of those is sufficient on its own.** Reddit gates acting on somebody's behalf on
+a grant that account has given this app, and the only thing that can ask for one is the
+client, from inside a trusted gesture — `canRunAsUser` in `@devvit/web/client`. Without
+the grant the server's call still succeeds and still returns a permalink; it is simply
+authored by the app account. There is no error and nothing in the response to check, which
+is why this went unnoticed: the only symptom is the wrong name on every comment.
+
+`src/client/consent.ts` is the whole of it, called from the three buttons that need it.
+It is **not** a consent screen of ours and there is nothing to design: `canRunAsUser`
+shows nothing when the client does not carry the feature and nothing when the grant is
+already held, so the only thing a player ever sees is Reddit's own sheet, once. Pressing
+"Post comment" is the consent.
+
+It fails open — on a throw, and on a client that advertises the feature and then never
+answers the effect, which would otherwise wedge the button forever since the effect
+underneath carries no timeout of its own. Devvit does the same with its own hand, dropping
+the permission state entirely on clients too old to honour it. And it answers nothing: the
+result is not a permission the game checks before posting, because the press was already
+the decision.
+
+The grant is all-or-nothing across every scope in `devvit.json`, so whichever of the three
+a player reaches first covers the other two for good.
+
 ---
 
 ## Layout
