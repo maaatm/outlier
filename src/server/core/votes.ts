@@ -139,10 +139,11 @@ export async function buildReveal(
     // the window already. Anything later would be telling them after the fact.
     blobNotice: !visibility.told,
     pushNotice: false,
-    // The same shape and the same gate, one screen further in: never offered
-    // and never declined, and enough reveals behind them to have decided they
-    // are playing. `totalPlayed` counts this vote, because `recordPlay` ran
-    // before the reveal was built.
+    // The same shape as the notice above, and now the same reveal — the two
+    // are kept apart by a slide rather than by a play count. Never offered and
+    // never declined is the whole gate beyond the floor, and a first play
+    // clears a floor of one: `totalPlayed` counts this vote, because
+    // `recordPlay` ran before the reveal was built.
     joinOffer: !join.answered && stats.totalPlayed >= JOIN_OFFER_MIN_PLAYS,
   };
 

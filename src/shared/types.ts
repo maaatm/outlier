@@ -117,11 +117,13 @@ export type Reveal = {
   /**
    * Offer them the subreddit, and the free box that comes with it.
    *
-   * Gated on `JOIN_OFFER_MIN_PLAYS` rather than firing on a first reveal: a
-   * player who has answered twice has shown up on purpose, and one who is on
-   * their first is still working out what the game is. It rides beside
-   * `blobNotice` and is deliberately not on the same slide — two first-run
-   * interruptions on one screen means both are dismissed unread.
+   * Fires on their first reveal. It used to wait for a second one, on the
+   * reasoning that a player who has answered twice has shown up on purpose —
+   * but the box is what makes the first play worth coming back from, and an
+   * offer held until the second reveal is only ever seen by players who came
+   * back without it. It therefore rides on the same reveal as `blobNotice` and
+   * is deliberately not on the same slide — two first-run interruptions on one
+   * screen means both are dismissed unread.
    */
   joinOffer: boolean;
 };

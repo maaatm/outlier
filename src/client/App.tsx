@@ -665,9 +665,11 @@ function RevealView({
 
             {/* Under the award, on the slide where the game already hands you
                 something — so the offer inherits the block idiom rather than
-                inventing one. Not slide 0, where the blob notice fires: two
-                first-run interruptions on one screen means both are dismissed
-                unread. Not slide 2, which has exactly one primary action. */}
+                inventing one. Not slide 0, where the blob notice fires: the
+                offer now lands on that same first reveal, so this split is the
+                only thing keeping two first-run interruptions off one screen,
+                and both would be dismissed unread if it went. Not slide 2,
+                which has exactly one primary action. */}
             {reveal.joinOffer && <JoinOffer onAnswered={onJoinAnswered} />}
 
           </div>
