@@ -242,6 +242,27 @@ api.post('/api/comment', async (c) => {
     runAs: 'USER',
   });
 
+  // Who it actually went up as. This is the one thing about the call above that
+  // fails silently: `runAs: 'USER'` is honoured by the SDK — it asserts the
+  // scope, routes through the UserActions plugin and throws if either is
+  // missing — but whether the *installation* may act for a player is settled on
+  // Reddit's side, and an installation without that grant gets a comment under
+  // the app account, a 200, and a permalink. Nothing else here can tell.
+  //
+  // Logged rather than refused. The comment is up and it says what the player
+  // meant; taking the coins back over a byline they did not choose would be the
+  // worse answer, and the claim above has already spent their one post on this
+  // question either way.
+  if (comment.authorId && comment.authorId !== userId) {
+    console.error(
+      `comment on ${questionId} went up as ${comment.authorName ?? comment.authorId} ` +
+        `rather than the player who wrote it (${userId}). The app is asking to act as ` +
+        `the user and Reddit is declining: check that the version installed on this ` +
+        `subreddit is one built with permissions.reddit.asUser, and that the install ` +
+        `was upgraded to it — the grant is taken at install time, not at this call.`
+    );
+  }
+
   await recordComment(questionId, userId, comment.id);
 
   // Track before paying. A tracked comment that was not paid for is a comment
