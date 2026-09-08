@@ -59,35 +59,28 @@ Adding the app account to the subreddit's mod team turns all three back on with 
 change and no redeploy. Everything else — posting, commenting, the queue, the economy,
 the leaderboards — never needed moderator scope and is unaffected either way.
 
-### What the player posts is posted by the player
+### Do not add a consent call to the posting paths
 
-Three things in this game go up under the player's own name rather than the app's: the
-comment on the reveal, a question they ask, and the subscription the join offer puts
-through. All three are `runAs: 'USER'` on the server, and all three are declared in
-`devvit.json` under `permissions.reddit.asUser`.
+Three things go up under the player's own name rather than the app's: the comment on the
+reveal, a question they ask, and the join offer's subscription. All three are
+`runAs: 'USER'` on the server against a scope declared in `permissions.reddit.asUser`, and
+**that pair is the whole mechanism.** Consent is Reddit's to collect, not this app's to
+ask for.
 
-**Neither of those is sufficient on its own.** Reddit gates acting on somebody's behalf on
-a grant that account has given this app, and the only thing that can ask for one is the
-client, from inside a trusted gesture — `canRunAsUser` in `@devvit/web/client`. Without
-the grant the server's call still succeeds and still returns a permalink; it is simply
-authored by the app account. There is no error and nothing in the response to check, which
-is why this went unnoticed: the only symptom is the wrong name on every comment.
+`@devvit/web/client` exports `canRunAsUser`, which looks like the missing half and is not.
+Calling it puts a permission sheet in front of the player the first time they post, and no
+game needs one: Reddit's own `devvit-HotAndCold` submits its comment with
+`reddit.submitComment({ id, richtext, runAs: 'USER' })` and never calls it, on a copy of
+`run-as-user.js` byte-identical to the one shipping in 0.14.1. It was added here once, to
+fix comments arriving under the app account, and reverted — it is not what was wrong, and
+the popup is a real cost.
 
-`src/client/consent.ts` is the whole of it, called from the three buttons that need it.
-It is **not** a consent screen of ours and there is nothing to design: `canRunAsUser`
-shows nothing when the client does not carry the feature and nothing when the grant is
-already held, so the only thing a player ever sees is Reddit's own sheet, once. Pressing
-"Post comment" is the consent.
-
-It fails open — on a throw, and on a client that advertises the feature and then never
-answers the effect, which would otherwise wedge the button forever since the effect
-underneath carries no timeout of its own. Devvit does the same with its own hand, dropping
-the permission state entirely on clients too old to honour it. And it answers nothing: the
-result is not a permission the game checks before posting, because the press was already
-the decision.
-
-The grant is all-or-nothing across every scope in `devvit.json`, so whichever of the three
-a player reaches first covers the other two for good.
+Two related traps while looking at that block. `permissions.reddit.scope` is read nowhere
+in the `@devvit` tree and changes nothing; it survives in `devvit.json` only because the
+schema still lists it. And a failure here is silent by construction — `submitComment`
+resolves normally and returns a permalink whoever it was authored by, so there is nothing
+in the response to assert on. The check is to read the byline on a real comment after an
+upload.
 
 ---
 

@@ -13,7 +13,6 @@ import type { Equipped } from '../shared/items.js';
 import { getBand, type Award } from '../shared/points.js';
 import type { Choice, Question, QuestionState, Reveal, StateResponse } from '../shared/types.js';
 import { ApiFailure, castVote, fetchState, joinSubreddit, savePush, saveShowBlob } from './api.js';
-import { establishUserGrant } from './consent.js';
 import { Blob } from './components/Blob.js';
 import { Compose } from './components/Compose.js';
 import { Cross } from './components/Cross.js';
@@ -904,14 +903,10 @@ function JoinOffer({ onAnswered }: { onAnswered: () => void }): React.JSX.Elemen
   const [error, setError] = useState<string | null>(null);
   const [unsubscribed, setUnsubscribed] = useState(false);
 
-  async function answer(decline: boolean, event: Event): Promise<void> {
+  async function answer(decline: boolean): Promise<void> {
     setWorking(true);
     setError(null);
     try {
-      // Only the yes needs it. Declining asks Reddit for nothing, so there is
-      // nothing to ask on the player's behalf and no reason to make saying no
-      // the thing that raises a permission sheet.
-      if (!decline) await establishUserGrant(event);
       const result = await joinSubreddit(decline);
       if (!decline && !result.subscribed) {
         setUnsubscribed(true);
@@ -956,7 +951,7 @@ function JoinOffer({ onAnswered }: { onAnswered: () => void }): React.JSX.Elemen
           type="button"
           className="button block block--orange block--md join-offer__take"
           disabled={working}
-          onClick={(event) => void answer(false, event.nativeEvent)}
+          onClick={() => void answer(false)}
         >
           {working ? 'Joining...' : 'Join and claim'}
         </button>
@@ -965,7 +960,7 @@ function JoinOffer({ onAnswered }: { onAnswered: () => void }): React.JSX.Elemen
           className="join-offer__close"
           aria-label="No thanks"
           disabled={working}
-          onClick={(event) => void answer(true, event.nativeEvent)}
+          onClick={() => void answer(true)}
         >
           <Cross />
         </button>

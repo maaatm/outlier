@@ -17,7 +17,6 @@ import { buildComment, normalizeNote } from '../../shared/comment.js';
 import { COINS_COMMENT, NOTE_MAX_LENGTH } from '../../shared/config.js';
 import type { Question, Reveal } from '../../shared/types.js';
 import { ApiFailure, postComment } from '../api.js';
-import { establishUserGrant } from '../consent.js';
 import { CoinTag } from './CoinTag.js';
 
 type Props = {
@@ -58,18 +57,10 @@ export function Compose({ postId, question, reveal, onPaid }: Props): React.JSX.
     field.style.height = `${field.scrollHeight}px`;
   }, [note, posted]);
 
-  /**
-   * `event` is the press itself, and it has to be the real one — the grant is
-   * only asked for from a trusted gesture, so it cannot be moved off this path
-   * into a mount or a retry.
-   */
-  async function submit(event: Event): Promise<void> {
+  async function submit(): Promise<void> {
     setPosting(true);
     setError(null);
     try {
-      // Before the post, not after it: this is what decides whether the comment
-      // arrives under the player's name or the app's.
-      await establishUserGrant(event);
       const receipt = await postComment(postId, note.trim() || undefined, {
         choice: reveal.choice,
         guess: reveal.guess,
@@ -135,7 +126,7 @@ export function Compose({ postId, question, reveal, onPaid }: Props): React.JSX.
         <button
           type="button"
           className="button block block--orange block--lg compose__post"
-          onClick={(event) => void submit(event.nativeEvent)}
+          onClick={submit}
           disabled={posting}
         >
           {posting ? (
