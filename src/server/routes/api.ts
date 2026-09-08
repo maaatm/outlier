@@ -10,7 +10,7 @@ import { context, reddit } from '@devvit/web/server';
 import type { T3 } from '@devvit/web/shared';
 import { Hono } from 'hono';
 
-import { buildComment, normalizeNote } from '../../shared/comment.js';
+import { commentBlocks, normalizeNote } from '../../shared/comment.js';
 import {
   type Equipped,
   STARTER_ACCESSORY,
@@ -54,6 +54,7 @@ import { claimJoin, declineJoin, readJoinState } from '../core/join.js';
 import { readPlayerBoard } from '../core/leaderboard.js';
 import { isMenuPost } from '../core/menuPost.js';
 import { readPushState, setPushOptIn } from '../core/push.js';
+import { toRichText } from '../core/richtext.js';
 import {
   type QuestionRecord,
   getQuestion,
@@ -226,7 +227,7 @@ api.post('/api/comment', async (c) => {
   const stats = projectStats(await getUser(userId));
   const reveal = await buildReveal(question, vote, userId, stats);
 
-  const text = buildComment(toPublicQuestion(question), reveal, normalizeNote(body.note));
+  const blocks = commentBlocks(toPublicQuestion(question), reveal, normalizeNote(body.note));
 
   // The claim, not the `reveal.commented` read above it, is what guards the
   // payment. A read taken several awaits ago is a double payment waiting for two
@@ -237,7 +238,7 @@ api.post('/api/comment', async (c) => {
 
   const comment = await reddit.submitComment({
     id: (question.postId || body.postId) as T3,
-    text,
+    richtext: toRichText(blocks),
     runAs: 'USER',
   });
 

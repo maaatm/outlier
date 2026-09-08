@@ -13,7 +13,7 @@
 
 import { Fragment, useLayoutEffect, useRef, useState } from 'react';
 
-import { buildComment, normalizeNote } from '../../shared/comment.js';
+import { type CommentBlock, commentBlocks, normalizeNote } from '../../shared/comment.js';
 import { COINS_COMMENT, NOTE_MAX_LENGTH } from '../../shared/config.js';
 import type { Question, Reveal } from '../../shared/types.js';
 import { ApiFailure, postComment } from '../api.js';
@@ -44,8 +44,8 @@ export function Compose({ postId, question, reveal, onPaid }: Props): React.JSX.
   const [error, setError] = useState<string | null>(null);
   const noteRef = useRef<HTMLTextAreaElement>(null);
 
-  // The same function the server uses, so the preview is the comment.
-  const preview = buildComment(question, reveal, normalizeNote(note));
+  // The same blocks the server posts, so the preview is the comment.
+  const preview = commentBlocks(question, reveal, normalizeNote(note));
 
   // The note field takes the height of its own text, so a line that wraps
   // stretches the box down instead of scrolling inside it. Done before paint so
@@ -93,7 +93,7 @@ export function Compose({ postId, question, reveal, onPaid }: Props): React.JSX.
             // gone, and the whole receipt is one line longer than it was.
             earned > 0 ? `Posted to the thread. +${earned} coins.` : 'Posted to the thread.'
           ) : (
-            <Bolded text={preview} />
+            <Preview blocks={preview} />
           )}
         </p>
 
@@ -148,21 +148,39 @@ export function Compose({ postId, question, reveal, onPaid }: Props): React.JSX.
 }
 
 /**
- * The comment, with its bold runs drawn bold.
+ * The comment, drawn the way the thread will draw it.
  *
- * `buildComment` writes Reddit markdown, so the side taken and the badge come
- * out wrapped in asterisks — and asterisks in a preview are the one thing on
- * this screen that would not appear in the thread. Rendering the runs instead
- * of printing the markers is what makes this a preview rather than a copy of
- * the source. The text itself is untouched: what gets posted is still the
- * string the server builds, byte for byte.
+ * This used to take the markdown string and split it on `**`, which was a
+ * parser — and a parser is exactly what a preview must not be. It printed the
+ * footer's `^(...)` markers, which never appear in a thread, and it drew a
+ * player's own asterisks as emphasis, which the posted comment no longer does:
+ * the note travels as a plain run now, so `**crust**` in the note reaches
+ * Reddit as those characters and not as a bold word. Reading the same blocks
+ * the server posts is what keeps the two honest, and it is why no markup on
+ * this screen has to be recognised at all.
+ *
+ * Blocks are separated by the blank line `white-space: pre-wrap` renders, which
+ * is the paragraph break Reddit puts between them.
  */
-function Bolded({ text }: { text: string }): React.JSX.Element {
+function Preview({ blocks }: { blocks: CommentBlock[] }): React.JSX.Element {
   return (
     <>
-      {text.split('**').map((run, index) =>
-        index % 2 === 1 ? <strong key={index}>{run}</strong> : <Fragment key={index}>{run}</Fragment>
-      )}
+      {blocks.map((block, blockIndex) => (
+        <Fragment key={blockIndex}>
+          {blockIndex > 0 && '\n\n'}
+          {block.superscript ? (
+            <small>{block.runs.map((run) => run.text).join('')}</small>
+          ) : (
+            block.runs.map((run, index) =>
+              run.bold ? (
+                <strong key={index}>{run.text}</strong>
+              ) : (
+                <Fragment key={index}>{run.text}</Fragment>
+              )
+            )
+          )}
+        </Fragment>
+      ))}
     </>
   );
 }

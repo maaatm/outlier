@@ -1814,6 +1814,16 @@ button {
   color: var(--ink);
 }
 
+/*
+ * The footer, as the thread will show it. It is a superscript span in the
+ * posted richtext rather than a `^(...)` line of markdown, so the preview draws
+ * a caption instead of printing markers that reach nobody.
+ */
+.compose__preview small {
+  font-size: 0.82em;
+  opacity: 0.8;
+}
+
 .compose__label {
   margin-top: 14px;
 }

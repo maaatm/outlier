@@ -75,6 +75,15 @@ game needs one: Reddit's own `devvit-HotAndCold` submits its comment with
 fix comments arriving under the app account, and reverted — it is not what was wrong, and
 the popup is a real cost.
 
+The comment is submitted the same way that app submits its own: a `RichTextBuilder` of
+paragraphs, built in `server/core/richtext.ts` from the blocks in `shared/comment.ts`. The
+alternative is a markdown string, which is Reddit parsing prose and hoping — a `^(...)`
+footer one stray bracket from being printed literally, and a free-text note whose
+asterisks would become somebody else's emphasis. Runs say what is bold instead of spelling
+it, so nothing a player types can reach the formatter. `buildComment` still renders the
+same blocks to markdown; it is what `reveal.commentPreview` carries and what the tests pin
+the wording through.
+
 Two related traps while looking at that block. `permissions.reddit.scope` is read nowhere
 in the `@devvit` tree and changes nothing; it survives in `devvit.json` only because the
 schema still lists it. And a failure here is silent by construction — `submitComment`
